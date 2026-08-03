@@ -17,6 +17,7 @@ from btc_ema_trader.forecast_contract import (
 from btc_ema_trader.logging_setup import configure_logging
 from btc_ema_trader.market import fetch_and_store
 from btc_ema_trader.model import latest_bundle
+from btc_ema_trader.price_adaptive import PriceAdaptiveEngine
 from btc_ema_trader.runtime import RuntimeEngine
 from btc_ema_trader.storage import Database
 
@@ -75,7 +76,7 @@ def main() -> int:
     database.initialize()
 
     started_at = pd.Timestamp.now(tz="UTC")
-    bundle = None
+    price_summary: dict[str, Any] = {"status": "UNAVAILABLE"}
     try:
         bundle = latest_bundle(settings)
         market = fetch_and_store(
@@ -94,27 +95,29 @@ def main() -> int:
             else "FAIL_SAFE"
         )
         if status == "OK" and result.get("candle_time"):
-            recent_candles = database.load_candles(
-                provider=bundle.provider,
-                symbol=bundle.symbol,
-                limit=168,
-            )
-            general_prediction = predict_general_close_contract(
+            price_prediction = build_price_prediction(
                 settings,
                 database,
                 bundle,
             )
-            result["general_probabilities"] = general_prediction[
-                "probabilities"
-            ]
-            result["general_return_estimates"] = general_prediction[
-                "returns"
-            ]
+            price_summary = price_prediction
+            result["price_forecast_model"] = price_prediction
+            result["general_probabilities"] = {
+                "1": price_prediction["fused_probability_up"]
+            }
+            result["general_return_estimates"] = {
+                "1": price_prediction["fused_return"]
+            }
             interval_probability = float(
                 settings.section("forecast").get(
                     "interval_probability",
                     0.80,
                 )
+            )
+            recent_candles = database.load_candles(
+                provider=bundle.provider,
+                symbol=bundle.symbol,
+                limit=168,
             )
             contract = build_next_candle_forecast(
                 result,
@@ -123,10 +126,7 @@ def main() -> int:
                 previous_history,
                 interval_probability=interval_probability,
             )
-            result = attach_forecast_contract(
-                result,
-                contract,
-            )
+            result = attach_forecast_contract(result, contract)
     except Exception as exc:
         LOGGER.exception("Hourly forecast failed")
         market = None
@@ -171,6 +171,10 @@ def main() -> int:
         adaptive_state_dir / "summary.json",
         fresh_adaptive_summary,
     )
+    write_json(
+        adaptive_state_dir / "price_summary.json",
+        price_summary,
+    )
     (site_dir / ".nojekyll").write_text("", encoding="utf-8")
 
     print(json.dumps(record, ensure_ascii=False, indent=2))
@@ -182,7 +186,7 @@ def main() -> int:
     return 0
 
 
-def predict_general_close_contract(
+def build_price_prediction(
     settings,
     database: Database,
     bundle,
@@ -199,7 +203,7 @@ def predict_general_close_contract(
         candles,
         news,
         settings,
-        include_labels=False,
+        include_labels=True,
     )
     prepared = attach_close_based_general_labels(
         feature_set.frame,
@@ -210,13 +214,19 @@ def predict_general_close_contract(
     )
     if usable.empty:
         raise RuntimeError(
-            "No closed candle is available for the forecast contract"
+            "No closed candle is available for the price forecast"
         )
-    prediction = bundle.predict_frame(usable.tail(1))
-    return {
-        "probabilities": prediction["probabilities"],
-        "returns": prediction["returns"],
-    }
+    latest_row = usable.iloc[-1]
+    base_prediction = bundle.predict_frame(usable.tail(1))
+    base_probability_up = float(base_prediction["probabilities"][1])
+    base_return = float(base_prediction["returns"][1])
+    engine = PriceAdaptiveEngine(settings, bundle)
+    engine.synchronize(prepared)
+    return engine.predict(
+        latest_row,
+        base_probability_up,
+        base_return,
+    )
 
 
 def load_contract_metrics(
@@ -268,6 +278,7 @@ def attach_forecast_contract(
     ]
     output["prediction_result"] = "PENDING"
     output["direction_result"] = "PENDING"
+    output["interval_result"] = "PENDING"
     output["resolved_at"] = None
     output["forecast_frozen"] = True
     return output
@@ -295,7 +306,39 @@ def preserve_existing_forecast(
     )
     if existing is None:
         return record
-    return dict(existing)
+
+    frozen_keys = {
+        "next_candle_forecast",
+        "forecast_contract_version",
+        "forecast_direction",
+        "selected_horizon",
+        "confidence",
+        "expected_return",
+        "target_candle_time",
+        "target_candle_open_time",
+        "target_candle_close_time",
+        "predicted_close_median",
+        "predicted_close_low",
+        "predicted_close_high",
+        "prediction_result",
+        "direction_result",
+        "interval_result",
+        "resolved_at",
+        "forecast_frozen",
+        "evaluation_available_at",
+        "seconds_until_evaluation",
+        "actual_close",
+        "actual_close_return",
+        "actual_direction",
+        "actual_candle_open",
+        "actual_candle_high",
+        "actual_candle_low",
+    }
+    output = dict(record)
+    for name in frozen_keys:
+        if name in existing:
+            output[name] = existing[name]
+    return output
 
 
 def load_history(path: Path) -> list[dict[str, Any]]:
