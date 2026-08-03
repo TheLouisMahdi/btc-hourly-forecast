@@ -9,7 +9,7 @@ from typing import Any
 
 import pandas as pd
 
-from btc_ema_trader.features import build_feature_set
+from btc_ema_trader.contract_features import build_feature_set
 from btc_ema_trader.forecast_contract import (
     attach_close_based_general_labels,
     build_next_candle_forecast,
