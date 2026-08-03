@@ -21,7 +21,9 @@ LOGGER = logging.getLogger("github_weekly_retrain")
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
-        description="Retrain the next-candle model from fresh 180-day data"
+        description=(
+            "Retrain the structural breakout model from fresh configured history"
+        )
     )
     parser.add_argument("--output-dir", default="model-state-output")
     parser.add_argument("--runtime-dir", default=".github_runtime/training")
@@ -49,12 +51,15 @@ def main() -> int:
     configure_logging(settings, verbose=True)
     database = Database(settings)
     database.initialize()
+    history_days = float(
+        settings.section("market").get("history_days", 365)
+    )
 
     started = pd.Timestamp.now(tz="UTC")
     market = fetch_and_store(
         settings,
         database,
-        days=180,
+        days=history_days,
         provider=None,
     )
     historical_news = optional(
@@ -62,7 +67,7 @@ def main() -> int:
             settings,
             database,
             historical=True,
-            days=180,
+            days=history_days,
         )
     )
     recent_news = optional(
@@ -102,7 +107,9 @@ def main() -> int:
             "historical_news": historical_news,
             "recent_news": recent_news,
             "training": training,
+            "training_history_days": history_days,
             "forecast_target": "NEXT_CLOSED_1H_CANDLE",
+            "trade_setup": "STRUCTURAL_BREAKOUT",
             "general_label": "CLOSE_TO_CLOSE_RETURN",
         }
     )
@@ -114,7 +121,7 @@ def main() -> int:
 def optional(callback):
     try:
         return callback()
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:
         LOGGER.warning("Optional step failed: %s", exc)
         return {
             "status": "warning",
