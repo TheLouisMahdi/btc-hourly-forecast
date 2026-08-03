@@ -1,0 +1,1450 @@
+{
+  "model_id": "regime-meta-hourly-20260802T190632Z-a5a93ebe",
+  "schema_version": 3,
+  "created_at": "2026-08-02T19:06:32.822384+00:00",
+  "provider": "okx_swap",
+  "training_range": {
+    "start": "2026-02-03T18:00:00+00:00",
+    "end": "2026-08-02T14:00:00+00:00"
+  },
+  "event_counts": {
+    "DONCHIAN_BREAKOUT": 190,
+    "PULLBACK_RESUME": 159,
+    "VOLUME_IMPULSE": 139,
+    "SQUEEZE_RELEASE": 32
+  },
+  "feature_count": 86,
+  "features": [
+    "volume",
+    "quote_volume",
+    "kama_slope_1",
+    "kama_slope_3",
+    "price_vs_kama",
+    "atr_pct",
+    "atr_z_72",
+    "plus_di",
+    "minus_di",
+    "adx",
+    "di_spread",
+    "donchian_position",
+    "donchian_width_pct",
+    "bb_width",
+    "bb_width_percentile",
+    "rsi14",
+    "rsi_centered",
+    "return_1",
+    "return_2",
+    "return_3",
+    "return_6",
+    "return_12",
+    "return_24",
+    "return_48",
+    "return_72",
+    "log_return_1",
+    "realized_vol_3",
+    "realized_vol_6",
+    "realized_vol_12",
+    "realized_vol_24",
+    "realized_vol_48",
+    "realized_vol_72",
+    "range_pct",
+    "body_pct",
+    "body_atr",
+    "upper_wick_pct",
+    "lower_wick_pct",
+    "close_location",
+    "volume_change_1",
+    "volume_z_24",
+    "volume_z_72",
+    "quote_volume_z_24",
+    "hour_sin",
+    "hour_cos",
+    "weekday_sin",
+    "weekday_cos",
+    "regime_code",
+    "event_direction",
+    "event_score",
+    "is_event",
+    "event_continuation_bias",
+    "bars_since_event",
+    "active_event_direction",
+    "news_count_1h",
+    "news_sent_sum_1h",
+    "news_sent_mean_1h",
+    "news_weighted_sent_1h",
+    "news_relevance_1h",
+    "news_negative_share_1h",
+    "news_count_3h",
+    "news_sent_sum_3h",
+    "news_sent_mean_3h",
+    "news_weighted_sent_3h",
+    "news_relevance_3h",
+    "news_negative_share_3h",
+    "news_count_6h",
+    "news_sent_sum_6h",
+    "news_sent_mean_6h",
+    "news_weighted_sent_6h",
+    "news_relevance_6h",
+    "news_negative_share_6h",
+    "news_count_12h",
+    "news_sent_sum_12h",
+    "news_sent_mean_12h",
+    "news_weighted_sent_12h",
+    "news_relevance_12h",
+    "news_negative_share_12h",
+    "news_count_24h",
+    "news_sent_sum_24h",
+    "news_sent_mean_24h",
+    "news_weighted_sent_24h",
+    "news_relevance_24h",
+    "news_negative_share_24h",
+    "news_age_hours",
+    "news_available",
+    "news_shock"
+  ],
+  "metrics": {
+    "1": {
+      "samples": 3595,
+      "accuracy": 0.5073713490959666,
+      "balanced_accuracy": 0.5076241546342294,
+      "precision_up": 0.5036307053941909,
+      "recall_up": 0.5439775910364145,
+      "precision_down": 0.5116976604679064,
+      "recall_down": 0.4712707182320442,
+      "brier": 0.25064242742870774,
+      "log_loss": 0.6944551718917034,
+      "auc": 0.5106009254530541,
+      "calibration_error": 0.01010436340127972,
+      "confusion_matrix": [
+        [
+          853,
+          957
+        ],
+        [
+          814,
+          971
+        ]
+      ],
+      "return_mae": 0.0028810569507568876,
+      "event_samples": 437,
+      "event_balanced_accuracy": 0.4815251737939752,
+      "event_auc": 0.5086580998525385,
+      "event_calibration_error": 0.09159741702561086,
+      "event_brier": 0.25537043110966867,
+      "tradeability_auc": 0.5183596610524113,
+      "tradeability_calibration_error": 0.20062986578500375,
+      "tradeability_brier": 0.24977457226438946,
+      "tradeability_positive_rate": 0.2768878718535469,
+      "event_return_mae": 0.0033693474640635874,
+      "event_type_metrics": {
+        "DONCHIAN_BREAKOUT": {
+          "samples": 157,
+          "continuation_auc": 0.4883720930232558,
+          "continuation_balanced_accuracy": 0.4640517523747134,
+          "tradeability_auc": 0.5841392649903288,
+          "tradeability_rate": 0.29936305732484075
+        },
+        "PULLBACK_RESUME": {
+          "samples": 128,
+          "continuation_auc": 0.5086792452830189,
+          "continuation_balanced_accuracy": 0.48251572327044023,
+          "tradeability_auc": 0.5196186285295197,
+          "tradeability_rate": 0.2109375
+        },
+        "SQUEEZE_RELEASE": {
+          "samples": 30,
+          "continuation_auc": 0.41777777777777775,
+          "continuation_balanced_accuracy": 0.3666666666666667,
+          "tradeability_auc": 0.375,
+          "tradeability_rate": 0.26666666666666666
+        },
+        "VOLUME_IMPULSE": {
+          "samples": 122,
+          "continuation_auc": 0.5361850955071294,
+          "continuation_balanced_accuracy": 0.5224643529728276,
+          "tradeability_auc": 0.4497991967871486,
+          "tradeability_rate": 0.319672131147541
+        }
+      },
+      "trading": {
+        "selected": 0,
+        "mean_gross_return": 0.0,
+        "mean_net_return": 0.0,
+        "hit_rate": 0.0,
+        "cumulative_return": 0.0,
+        "positive": false
+      },
+      "folds": [
+        {
+          "samples": 719,
+          "accuracy": 0.4853963838664812,
+          "balanced_accuracy": 0.4916387830343588,
+          "precision_up": 0.478,
+          "recall_up": 0.6867816091954023,
+          "precision_down": 0.502283105022831,
+          "recall_down": 0.29649595687331537,
+          "brier": 0.2546936937084276,
+          "log_loss": 0.7026567307997074,
+          "auc": 0.48550051119992566,
+          "calibration_error": 0.05776285212215394,
+          "confusion_matrix": [
+            [
+              110,
+              261
+            ],
+            [
+              109,
+              239
+            ]
+          ],
+          "return_mae": 0.0032975373654647072,
+          "event_samples": 79,
+          "event_balanced_accuracy": 0.5051282051282051,
+          "event_auc": 0.5282051282051282,
+          "event_calibration_error": 0.0823984610939321,
+          "event_brier": 0.2537915240516099,
+          "tradeability_auc": 0.5783744557329463,
+          "tradeability_calibration_error": 0.1242017117850669,
+          "tradeability_brier": 0.2330397333697831,
+          "tradeability_positive_rate": 0.3291139240506329,
+          "event_return_mae": 0.0038149366091938452,
+          "event_type_metrics": {
+            "DONCHIAN_BREAKOUT": {
+              "samples": 32,
+              "continuation_auc": 0.6904761904761905,
+              "continuation_balanced_accuracy": 0.6111111111111112,
+              "tradeability_auc": 0.6958333333333333,
+              "tradeability_rate": 0.375
+            },
+            "PULLBACK_RESUME": {
+              "samples": 19,
+              "continuation_auc": 0.4431818181818182,
+              "continuation_balanced_accuracy": 0.5284090909090909,
+              "tradeability_auc": 0.5,
+              "tradeability_rate": 0.3157894736842105
+            },
+            "VOLUME_IMPULSE": {
+              "samples": 22,
+              "continuation_auc": 0.48760330578512395,
+              "continuation_balanced_accuracy": 0.45454545454545453,
+              "tradeability_auc": 0.625,
+              "tradeability_rate": 0.2727272727272727
+            }
+          },
+          "trading": {
+            "selected": 0,
+            "mean_gross_return": 0.0,
+            "mean_net_return": 0.0,
+            "hit_rate": 0.0,
+            "cumulative_return": 0.0,
+            "positive": false
+          },
+          "fold": 1,
+          "test_start": "2026-03-05T20:00:00+00:00",
+          "test_end": "2026-04-04T18:00:00+00:00"
+        },
+        {
+          "samples": 719,
+          "accuracy": 0.4993045897079277,
+          "balanced_accuracy": 0.485325817256994,
+          "precision_up": 0.513840830449827,
+          "recall_up": 0.7898936170212766,
+          "precision_down": 0.4397163120567376,
+          "recall_down": 0.18075801749271136,
+          "brier": 0.2500193369745146,
+          "log_loss": 0.6931858552762271,
+          "auc": 0.47268314620681096,
+          "calibration_error": 0.02217511414992086,
+          "confusion_matrix": [
+            [
+              62,
+              281
+            ],
+            [
+              79,
+              297
+            ]
+          ],
+          "return_mae": 0.0027258049203080057,
+          "event_samples": 88,
+          "event_balanced_accuracy": 0.4145833333333333,
+          "event_auc": 0.48593749999999997,
+          "event_calibration_error": 0.19789548514987484,
+          "event_brier": 0.26644474528993717,
+          "tradeability_auc": 0.41428571428571426,
+          "tradeability_calibration_error": 0.3081986660044627,
+          "tradeability_brier": 0.27811906955212407,
+          "tradeability_positive_rate": 0.20454545454545456,
+          "event_return_mae": 0.0026785479224351013,
+          "event_type_metrics": {
+            "DONCHIAN_BREAKOUT": {
+              "samples": 33,
+              "continuation_auc": 0.2777777777777778,
+              "continuation_balanced_accuracy": 0.36904761904761907,
+              "tradeability_auc": 0.465,
+              "tradeability_rate": 0.24242424242424243
+            },
+            "PULLBACK_RESUME": {
+              "samples": 26,
+              "continuation_auc": 0.5562130177514792,
+              "continuation_balanced_accuracy": 0.38461538461538464,
+              "tradeability_auc": 0.56,
+              "tradeability_rate": 0.038461538461538464
+            },
+            "VOLUME_IMPULSE": {
+              "samples": 25,
+              "continuation_auc": 0.5897435897435898,
+              "continuation_balanced_accuracy": 0.47435897435897434,
+              "tradeability_auc": 0.2777777777777778,
+              "tradeability_rate": 0.28
+            }
+          },
+          "trading": {
+            "selected": 0,
+            "mean_gross_return": 0.0,
+            "mean_net_return": 0.0,
+            "hit_rate": 0.0,
+            "cumulative_return": 0.0,
+            "positive": false
+          },
+          "fold": 2,
+          "test_start": "2026-04-04T19:00:00+00:00",
+          "test_end": "2026-05-04T17:00:00+00:00"
+        },
+        {
+          "samples": 719,
+          "accuracy": 0.49235048678720444,
+          "balanced_accuracy": 0.4901252632230893,
+          "precision_up": 0.476027397260274,
+          "recall_up": 0.396011396011396,
+          "precision_down": 0.5035128805620609,
+          "recall_down": 0.5842391304347826,
+          "brier": 0.25048035534394447,
+          "log_loss": 0.6941098633391555,
+          "auc": 0.4898272017837236,
+          "calibration_error": 0.016079369164173546,
+          "confusion_matrix": [
+            [
+              215,
+              153
+            ],
+            [
+              212,
+              139
+            ]
+          ],
+          "return_mae": 0.0023609819368422408,
+          "event_samples": 86,
+          "event_balanced_accuracy": 0.5882675438596491,
+          "event_auc": 0.5816885964912281,
+          "event_calibration_error": 0.037976223153569515,
+          "event_brier": 0.2414416836752848,
+          "tradeability_auc": 0.5703125,
+          "tradeability_calibration_error": 0.1406555959554552,
+          "tradeability_brier": 0.20610946791608778,
+          "tradeability_positive_rate": 0.2558139534883721,
+          "event_return_mae": 0.002981611607157251,
+          "event_type_metrics": {
+            "DONCHIAN_BREAKOUT": {
+              "samples": 30,
+              "continuation_auc": 0.5758928571428571,
+              "continuation_balanced_accuracy": 0.5625,
+              "tradeability_auc": 0.6534090909090909,
+              "tradeability_rate": 0.26666666666666666
+            },
+            "PULLBACK_RESUME": {
+              "samples": 24,
+              "continuation_auc": 0.6554621848739496,
+              "continuation_balanced_accuracy": 0.5966386554621849,
+              "tradeability_auc": 0.625,
+              "tradeability_rate": 0.16666666666666666
+            },
+            "VOLUME_IMPULSE": {
+              "samples": 28,
+              "continuation_auc": 0.5692307692307692,
+              "continuation_balanced_accuracy": 0.6564102564102564,
+              "tradeability_auc": 0.43333333333333335,
+              "tradeability_rate": 0.35714285714285715
+            }
+          },
+          "trading": {
+            "selected": 0,
+            "mean_gross_return": 0.0,
+            "mean_net_return": 0.0,
+            "hit_rate": 0.0,
+            "cumulative_return": 0.0,
+            "positive": false
+          },
+          "fold": 3,
+          "test_start": "2026-05-04T18:00:00+00:00",
+          "test_end": "2026-06-03T16:00:00+00:00"
+        },
+        {
+          "samples": 719,
+          "accuracy": 0.5146036161335188,
+          "balanced_accuracy": 0.5111224711094587,
+          "precision_up": 0.498220640569395,
+          "recall_up": 0.40229885057471265,
+          "precision_down": 0.5251141552511416,
+          "recall_down": 0.6199460916442049,
+          "brier": 0.24917488715907532,
+          "log_loss": 0.6914911761249417,
+          "auc": 0.5237243238219166,
+          "calibration_error": 0.01246180066928431,
+          "confusion_matrix": [
+            [
+              230,
+              141
+            ],
+            [
+              208,
+              140
+            ]
+          ],
+          "return_mae": 0.003732919055762587,
+          "event_samples": 91,
+          "event_balanced_accuracy": 0.45707317073170733,
+          "event_auc": 0.4429268292682927,
+          "event_calibration_error": 0.13235395316241416,
+          "event_brier": 0.26674342087108366,
+          "tradeability_auc": 0.5360655737704918,
+          "tradeability_calibration_error": 0.24549908097890905,
+          "tradeability_brier": 0.28483773392201656,
+          "tradeability_positive_rate": 0.32967032967032966,
+          "event_return_mae": 0.00492960859353569,
+          "event_type_metrics": {
+            "DONCHIAN_BREAKOUT": {
+              "samples": 28,
+              "continuation_auc": 0.6631016042780749,
+              "continuation_balanced_accuracy": 0.5721925133689839,
+              "tradeability_auc": 0.5906432748538012,
+              "tradeability_rate": 0.32142857142857145
+            },
+            "PULLBACK_RESUME": {
+              "samples": 33,
+              "continuation_auc": 0.36923076923076925,
+              "continuation_balanced_accuracy": 0.4173076923076923,
+              "tradeability_auc": 0.6086956521739131,
+              "tradeability_rate": 0.30303030303030304
+            },
+            "VOLUME_IMPULSE": {
+              "samples": 23,
+              "continuation_auc": 0.37692307692307697,
+              "continuation_balanced_accuracy": 0.3576923076923077,
+              "tradeability_auc": 0.4384615384615384,
+              "tradeability_rate": 0.43478260869565216
+            }
+          },
+          "trading": {
+            "selected": 0,
+            "mean_gross_return": 0.0,
+            "mean_net_return": 0.0,
+            "hit_rate": 0.0,
+            "cumulative_return": 0.0,
+            "positive": false
+          },
+          "fold": 4,
+          "test_start": "2026-06-03T17:00:00+00:00",
+          "test_end": "2026-07-03T15:00:00+00:00"
+        },
+        {
+          "samples": 719,
+          "accuracy": 0.545201668984701,
+          "balanced_accuracy": 0.5460018261448225,
+          "precision_up": 0.5631768953068592,
+          "recall_up": 0.430939226519337,
+          "precision_down": 0.5339366515837104,
+          "recall_down": 0.6610644257703081,
+          "brier": 0.24884386395757663,
+          "log_loss": 0.6908322339184849,
+          "auc": 0.5516040670411811,
+          "calibration_error": 0.027340815940885235,
+          "confusion_matrix": [
+            [
+              236,
+              121
+            ],
+            [
+              206,
+              156
+            ]
+          ],
+          "return_mae": 0.002288041475406898,
+          "event_samples": 93,
+          "event_balanced_accuracy": 0.4552411873840445,
+          "event_auc": 0.5538033395176253,
+          "event_calibration_error": 0.07794349909620513,
+          "event_brier": 0.24798467004290795,
+          "tradeability_auc": 0.44999999999999996,
+          "tradeability_calibration_error": 0.20752797302173445,
+          "tradeability_brier": 0.243238956936036,
+          "tradeability_positive_rate": 0.26881720430107525,
+          "event_return_mae": 0.0024763403469668173,
+          "event_type_metrics": {
+            "DONCHIAN_BREAKOUT": {
+              "samples": 34,
+              "continuation_auc": 0.30714285714285716,
+              "continuation_balanced_accuracy": 0.28214285714285714,
+              "tradeability_auc": 0.5291666666666667,
+              "tradeability_rate": 0.29411764705882354
+            },
+            "PULLBACK_RESUME": {
+              "samples": 26,
+              "continuation_auc": 0.7712418300653594,
+              "continuation_balanced_accuracy": 0.565359477124183,
+              "tradeability_auc": 0.4083333333333333,
+              "tradeability_rate": 0.23076923076923078
+            },
+            "SQUEEZE_RELEASE": {
+              "samples": 9,
+              "continuation_auc": 0.6,
+              "continuation_balanced_accuracy": 0.45,
+              "tradeability_auc": 0.22222222222222224,
+              "tradeability_rate": 0.3333333333333333
+            },
+            "VOLUME_IMPULSE": {
+              "samples": 24,
+              "continuation_auc": 0.7412587412587412,
+              "continuation_balanced_accuracy": 0.6258741258741258,
+              "tradeability_auc": 0.49999999999999994,
+              "tradeability_rate": 0.25
+            }
+          },
+          "trading": {
+            "selected": 0,
+            "mean_gross_return": 0.0,
+            "mean_net_return": 0.0,
+            "hit_rate": 0.0,
+            "cumulative_return": 0.0,
+            "positive": false
+          },
+          "fold": 5,
+          "test_start": "2026-07-03T16:00:00+00:00",
+          "test_end": "2026-08-02T14:00:00+00:00"
+        }
+      ],
+      "positive_fold_fraction": 0.0
+    },
+    "2": {
+      "samples": 3595,
+      "accuracy": 0.5115438108484005,
+      "balanced_accuracy": 0.511605683168084,
+      "precision_up": 0.5081877729257642,
+      "recall_up": 0.5212765957446809,
+      "precision_down": 0.5150311968235961,
+      "recall_down": 0.5019347705914871,
+      "brier": 0.24962129798924032,
+      "log_loss": 0.6923886028337667,
+      "auc": 0.519564984583119,
+      "calibration_error": 0.007097572639442031,
+      "confusion_matrix": [
+        [
+          908,
+          901
+        ],
+        [
+          855,
+          931
+        ]
+      ],
+      "return_mae": 0.004131219418249658,
+      "event_samples": 437,
+      "event_balanced_accuracy": 0.518211502001264,
+      "event_auc": 0.51038550663577,
+      "event_calibration_error": 0.03433186725141391,
+      "event_brier": 0.2513602903223829,
+      "tradeability_auc": 0.5174677664012135,
+      "tradeability_calibration_error": 0.16136194806771645,
+      "tradeability_brier": 0.24793947628516866,
+      "tradeability_positive_rate": 0.3295194508009153,
+      "event_return_mae": 0.004346535508461157,
+      "event_type_metrics": {
+        "DONCHIAN_BREAKOUT": {
+          "samples": 157,
+          "continuation_auc": 0.5484344422700587,
+          "continuation_balanced_accuracy": 0.5304957599478147,
+          "tradeability_auc": 0.5566844919786096,
+          "tradeability_rate": 0.3503184713375796
+        },
+        "PULLBACK_RESUME": {
+          "samples": 128,
+          "continuation_auc": 0.5063511830635119,
+          "continuation_balanced_accuracy": 0.5445828144458281,
+          "tradeability_auc": 0.5338541666666666,
+          "tradeability_rate": 0.25
+        },
+        "SQUEEZE_RELEASE": {
+          "samples": 30,
+          "continuation_auc": 0.44976076555023925,
+          "continuation_balanced_accuracy": 0.47607655502392343,
+          "tradeability_auc": 0.5669642857142857,
+          "tradeability_rate": 0.4666666666666667
+        },
+        "VOLUME_IMPULSE": {
+          "samples": 122,
+          "continuation_auc": 0.4873812754409769,
+          "continuation_balanced_accuracy": 0.4903663500678426,
+          "tradeability_auc": 0.4604062408007064,
+          "tradeability_rate": 0.3524590163934426
+        }
+      },
+      "trading": {
+        "selected": 0,
+        "mean_gross_return": 0.0,
+        "mean_net_return": 0.0,
+        "hit_rate": 0.0,
+        "cumulative_return": 0.0,
+        "positive": false
+      },
+      "folds": [
+        {
+          "samples": 719,
+          "accuracy": 0.5090403337969402,
+          "balanced_accuracy": 0.5099907135118402,
+          "precision_up": 0.5024154589371981,
+          "recall_up": 0.5859154929577465,
+          "precision_down": 0.5180327868852459,
+          "recall_down": 0.4340659340659341,
+          "brier": 0.251192000959886,
+          "log_loss": 0.6955499423650788,
+          "auc": 0.5121033895681784,
+          "calibration_error": 0.033389651605273095,
+          "confusion_matrix": [
+            [
+              158,
+              206
+            ],
+            [
+              147,
+              208
+            ]
+          ],
+          "return_mae": 0.004698558273918682,
+          "event_samples": 79,
+          "event_balanced_accuracy": 0.5943517329910142,
+          "event_auc": 0.5680359435173299,
+          "event_calibration_error": 0.07891902197123074,
+          "event_brier": 0.24870442257524353,
+          "tradeability_auc": 0.5538563829787234,
+          "tradeability_calibration_error": 0.09450031342888338,
+          "tradeability_brier": 0.2486930933284746,
+          "tradeability_positive_rate": 0.4050632911392405,
+          "event_return_mae": 0.0054580517462313296,
+          "event_type_metrics": {
+            "DONCHIAN_BREAKOUT": {
+              "samples": 32,
+              "continuation_auc": 0.6587301587301587,
+              "continuation_balanced_accuracy": 0.6626984126984128,
+              "tradeability_auc": 0.7124999999999999,
+              "tradeability_rate": 0.375
+            },
+            "PULLBACK_RESUME": {
+              "samples": 19,
+              "continuation_auc": 0.4659090909090909,
+              "continuation_balanced_accuracy": 0.4943181818181818,
+              "tradeability_auc": 0.6333333333333333,
+              "tradeability_rate": 0.47368421052631576
+            },
+            "VOLUME_IMPULSE": {
+              "samples": 22,
+              "continuation_auc": 0.6083333333333334,
+              "continuation_balanced_accuracy": 0.6,
+              "tradeability_auc": 0.4910714285714286,
+              "tradeability_rate": 0.36363636363636365
+            }
+          },
+          "trading": {
+            "selected": 0,
+            "mean_gross_return": 0.0,
+            "mean_net_return": 0.0,
+            "hit_rate": 0.0,
+            "cumulative_return": 0.0,
+            "positive": false
+          },
+          "fold": 1,
+          "test_start": "2026-03-05T20:00:00+00:00",
+          "test_end": "2026-04-04T18:00:00+00:00"
+        },
+        {
+          "samples": 719,
+          "accuracy": 0.5285118219749653,
+          "balanced_accuracy": 0.5341821705426356,
+          "precision_up": 0.5676691729323309,
+          "recall_up": 0.4026666666666667,
+          "precision_down": 0.5055187637969095,
+          "recall_down": 0.6656976744186046,
+          "brier": 0.24923219322449564,
+          "log_loss": 0.6916109417112425,
+          "auc": 0.5472868217054263,
+          "calibration_error": 0.028951057720047038,
+          "confusion_matrix": [
+            [
+              229,
+              115
+            ],
+            [
+              224,
+              151
+            ]
+          ],
+          "return_mae": 0.0040595252046505895,
+          "event_samples": 88,
+          "event_balanced_accuracy": 0.49581371009942443,
+          "event_auc": 0.4934589220303506,
+          "event_calibration_error": 0.05516184138908428,
+          "event_brier": 0.2540460151127444,
+          "tradeability_auc": 0.45650793650793653,
+          "tradeability_calibration_error": 0.20235424332156038,
+          "tradeability_brier": 0.25362837919664366,
+          "tradeability_positive_rate": 0.2840909090909091,
+          "event_return_mae": 0.003920209945272971,
+          "event_type_metrics": {
+            "DONCHIAN_BREAKOUT": {
+              "samples": 33,
+              "continuation_auc": 0.4214876033057851,
+              "continuation_balanced_accuracy": 0.4772727272727273,
+              "tradeability_auc": 0.42,
+              "tradeability_rate": 0.24242424242424243
+            },
+            "PULLBACK_RESUME": {
+              "samples": 26,
+              "continuation_auc": 0.5178571428571429,
+              "continuation_balanced_accuracy": 0.5416666666666667,
+              "tradeability_auc": 0.47500000000000003,
+              "tradeability_rate": 0.23076923076923078
+            },
+            "VOLUME_IMPULSE": {
+              "samples": 25,
+              "continuation_auc": 0.5961538461538461,
+              "continuation_balanced_accuracy": 0.4935897435897436,
+              "tradeability_auc": 0.4779411764705882,
+              "tradeability_rate": 0.32
+            }
+          },
+          "trading": {
+            "selected": 0,
+            "mean_gross_return": 0.0,
+            "mean_net_return": 0.0,
+            "hit_rate": 0.0,
+            "cumulative_return": 0.0,
+            "positive": false
+          },
+          "fold": 2,
+          "test_start": "2026-04-04T19:00:00+00:00",
+          "test_end": "2026-05-04T17:00:00+00:00"
+        },
+        {
+          "samples": 719,
+          "accuracy": 0.5034770514603616,
+          "balanced_accuracy": 0.5130635883084577,
+          "precision_up": 0.47608695652173916,
+          "recall_up": 0.6537313432835821,
+          "precision_down": 0.5521235521235521,
+          "recall_down": 0.3723958333333333,
+          "brier": 0.250052879097481,
+          "log_loss": 0.6932529163745649,
+          "auc": 0.5092506218905473,
+          "calibration_error": 0.03648091089265404,
+          "confusion_matrix": [
+            [
+              143,
+              241
+            ],
+            [
+              116,
+              219
+            ]
+          ],
+          "return_mae": 0.0034116336462869635,
+          "event_samples": 86,
+          "event_balanced_accuracy": 0.5353260869565217,
+          "event_auc": 0.5217391304347826,
+          "event_calibration_error": 0.02831916005562481,
+          "event_brier": 0.24910749717255634,
+          "tradeability_auc": 0.475,
+          "tradeability_calibration_error": 0.15463469017783768,
+          "tradeability_brier": 0.23764577815694513,
+          "tradeability_positive_rate": 0.3023255813953488,
+          "event_return_mae": 0.003928011056612692,
+          "event_type_metrics": {
+            "DONCHIAN_BREAKOUT": {
+              "samples": 30,
+              "continuation_auc": 0.5701357466063348,
+              "continuation_balanced_accuracy": 0.5542986425339367,
+              "tradeability_auc": 0.6349206349206349,
+              "tradeability_rate": 0.3
+            },
+            "PULLBACK_RESUME": {
+              "samples": 24,
+              "continuation_auc": 0.48148148148148145,
+              "continuation_balanced_accuracy": 0.5555555555555556,
+              "tradeability_auc": 0.29545454545454547,
+              "tradeability_rate": 0.08333333333333333
+            },
+            "VOLUME_IMPULSE": {
+              "samples": 28,
+              "continuation_auc": 0.5885416666666667,
+              "continuation_balanced_accuracy": 0.5729166666666667,
+              "tradeability_auc": 0.5051020408163265,
+              "tradeability_rate": 0.5
+            }
+          },
+          "trading": {
+            "selected": 0,
+            "mean_gross_return": 0.0,
+            "mean_net_return": 0.0,
+            "hit_rate": 0.0,
+            "cumulative_return": 0.0,
+            "positive": false
+          },
+          "fold": 3,
+          "test_start": "2026-05-04T18:00:00+00:00",
+          "test_end": "2026-06-03T16:00:00+00:00"
+        },
+        {
+          "samples": 719,
+          "accuracy": 0.4812239221140473,
+          "balanced_accuracy": 0.4814217165854036,
+          "precision_up": 0.4742547425474255,
+          "recall_up": 0.4943502824858757,
+          "precision_down": 0.48857142857142855,
+          "recall_down": 0.4684931506849315,
+          "brier": 0.25041390944465114,
+          "log_loss": 0.6939751018562629,
+          "auc": 0.4597941335809922,
+          "calibration_error": 0.022557155074200454,
+          "confusion_matrix": [
+            [
+              171,
+              194
+            ],
+            [
+              179,
+              175
+            ]
+          ],
+          "return_mae": 0.005190878154109255,
+          "event_samples": 91,
+          "event_balanced_accuracy": 0.5033914728682171,
+          "event_auc": 0.45155038759689925,
+          "event_calibration_error": 0.027389443953339414,
+          "event_brier": 0.2514041117656033,
+          "tradeability_auc": 0.5609110169491526,
+          "tradeability_calibration_error": 0.1630922224035077,
+          "tradeability_brier": 0.2505647100114609,
+          "tradeability_positive_rate": 0.3516483516483517,
+          "event_return_mae": 0.0051984811680811606,
+          "event_type_metrics": {
+            "DONCHIAN_BREAKOUT": {
+              "samples": 28,
+              "continuation_auc": 0.42857142857142855,
+              "continuation_balanced_accuracy": 0.42857142857142855,
+              "tradeability_auc": 0.4111111111111111,
+              "tradeability_rate": 0.35714285714285715
+            },
+            "PULLBACK_RESUME": {
+              "samples": 33,
+              "continuation_auc": 0.48161764705882354,
+              "continuation_balanced_accuracy": 0.5753676470588236,
+              "tradeability_auc": 0.6785714285714285,
+              "tradeability_rate": 0.36363636363636365
+            },
+            "VOLUME_IMPULSE": {
+              "samples": 23,
+              "continuation_auc": 0.25,
+              "continuation_balanced_accuracy": 0.3625,
+              "tradeability_auc": 0.5750000000000001,
+              "tradeability_rate": 0.34782608695652173
+            }
+          },
+          "trading": {
+            "selected": 0,
+            "mean_gross_return": 0.0,
+            "mean_net_return": 0.0,
+            "hit_rate": 0.0,
+            "cumulative_return": 0.0,
+            "positive": false
+          },
+          "fold": 4,
+          "test_start": "2026-06-03T17:00:00+00:00",
+          "test_end": "2026-07-03T15:00:00+00:00"
+        },
+        {
+          "samples": 719,
+          "accuracy": 0.5354659248956884,
+          "balanced_accuracy": 0.5365409028981917,
+          "precision_up": 0.5510835913312694,
+          "recall_up": 0.48501362397820164,
+          "precision_down": 0.5227272727272727,
+          "recall_down": 0.5880681818181818,
+          "brier": 0.2472155072196878,
+          "log_loss": 0.6875541118616838,
+          "auc": 0.5651396457765667,
+          "calibration_error": 0.01543960454523024,
+          "confusion_matrix": [
+            [
+              207,
+              145
+            ],
+            [
+              189,
+              178
+            ]
+          ],
+          "return_mae": 0.003295501812282797,
+          "event_samples": 93,
+          "event_balanced_accuracy": 0.46638655462184875,
+          "event_auc": 0.4491129785247432,
+          "event_calibration_error": 0.040037879424774214,
+          "event_brier": 0.2531153680645787,
+          "tradeability_auc": 0.44773706896551724,
+          "tradeability_calibration_error": 0.18389782299354546,
+          "tradeability_brier": 0.24886638561101423,
+          "tradeability_positive_rate": 0.3118279569892473,
+          "event_return_mae": 0.003359147493517764,
+          "event_type_metrics": {
+            "DONCHIAN_BREAKOUT": {
+              "samples": 34,
+              "continuation_auc": 0.5531135531135531,
+              "continuation_balanced_accuracy": 0.5366300366300366,
+              "tradeability_auc": 0.53125,
+              "tradeability_rate": 0.47058823529411764
+            },
+            "PULLBACK_RESUME": {
+              "samples": 26,
+              "continuation_auc": 0.443609022556391,
+              "continuation_balanced_accuracy": 0.4849624060150376,
+              "tradeability_auc": 0.05797101449275362,
+              "tradeability_rate": 0.11538461538461539
+            },
+            "SQUEEZE_RELEASE": {
+              "samples": 9,
+              "continuation_auc": 0.11111111111111112,
+              "continuation_balanced_accuracy": 0.16666666666666666,
+              "tradeability_auc": 0.35,
+              "tradeability_rate": 0.5555555555555556
+            },
+            "VOLUME_IMPULSE": {
+              "samples": 24,
+              "continuation_auc": 0.390625,
+              "continuation_balanced_accuracy": 0.4375,
+              "tradeability_auc": 0.4842105263157895,
+              "tradeability_rate": 0.20833333333333334
+            }
+          },
+          "trading": {
+            "selected": 0,
+            "mean_gross_return": 0.0,
+            "mean_net_return": 0.0,
+            "hit_rate": 0.0,
+            "cumulative_return": 0.0,
+            "positive": false
+          },
+          "fold": 5,
+          "test_start": "2026-07-03T16:00:00+00:00",
+          "test_end": "2026-08-02T14:00:00+00:00"
+        }
+      ],
+      "positive_fold_fraction": 0.0
+    },
+    "3": {
+      "samples": 3595,
+      "accuracy": 0.5184979137691238,
+      "balanced_accuracy": 0.5174527699928386,
+      "precision_up": 0.5048134777376655,
+      "recall_up": 0.48025186033199774,
+      "precision_down": 0.5302638385928609,
+      "recall_down": 0.5546536796536796,
+      "brier": 0.25114565411716205,
+      "log_loss": 0.6954829733151089,
+      "auc": 0.5158456550127987,
+      "calibration_error": 0.019988477197906022,
+      "confusion_matrix": [
+        [
+          1025,
+          823
+        ],
+        [
+          908,
+          839
+        ]
+      ],
+      "return_mae": 0.005139218204475923,
+      "event_samples": 437,
+      "event_balanced_accuracy": 0.5139575673048477,
+      "event_auc": 0.5368538945944803,
+      "event_calibration_error": 0.07624185992176309,
+      "event_brier": 0.25077681030414023,
+      "tradeability_auc": 0.5061597472924187,
+      "tradeability_calibration_error": 0.12730104970052009,
+      "tradeability_brier": 0.25303610595612397,
+      "tradeability_positive_rate": 0.36613272311212813,
+      "event_return_mae": 0.0050884645628563865,
+      "event_type_metrics": {
+        "DONCHIAN_BREAKOUT": {
+          "samples": 157,
+          "continuation_auc": 0.573529411764706,
+          "continuation_balanced_accuracy": 0.5395736946463978,
+          "tradeability_auc": 0.5584670231729055,
+          "tradeability_rate": 0.3503184713375796
+        },
+        "PULLBACK_RESUME": {
+          "samples": 128,
+          "continuation_auc": 0.499493927125506,
+          "continuation_balanced_accuracy": 0.5177125506072875,
+          "tradeability_auc": 0.4125730994152047,
+          "tradeability_rate": 0.296875
+        },
+        "SQUEEZE_RELEASE": {
+          "samples": 30,
+          "continuation_auc": 0.5277777777777778,
+          "continuation_balanced_accuracy": 0.4444444444444444,
+          "tradeability_auc": 0.45535714285714285,
+          "tradeability_rate": 0.5333333333333333
+        },
+        "VOLUME_IMPULSE": {
+          "samples": 122,
+          "continuation_auc": 0.5456989247311828,
+          "continuation_balanced_accuracy": 0.500268817204301,
+          "tradeability_auc": 0.543772438552886,
+          "tradeability_rate": 0.4180327868852459
+        }
+      },
+      "trading": {
+        "selected": 0,
+        "mean_gross_return": 0.0,
+        "mean_net_return": 0.0,
+        "hit_rate": 0.0,
+        "cumulative_return": 0.0,
+        "positive": false
+      },
+      "folds": [
+        {
+          "samples": 719,
+          "accuracy": 0.4937413073713491,
+          "balanced_accuracy": 0.49855133091630255,
+          "precision_up": 0.48148148148148145,
+          "recall_up": 0.6368876080691642,
+          "precision_down": 0.5153846153846153,
+          "recall_down": 0.3602150537634409,
+          "brier": 0.2577008840774168,
+          "log_loss": 0.7087951245656842,
+          "auc": 0.46632425397415633,
+          "calibration_error": 0.06088149788941233,
+          "confusion_matrix": [
+            [
+              134,
+              238
+            ],
+            [
+              126,
+              221
+            ]
+          ],
+          "return_mae": 0.005848590381969731,
+          "event_samples": 79,
+          "event_balanced_accuracy": 0.5186615186615187,
+          "event_auc": 0.5128700128700129,
+          "event_calibration_error": 0.11639113815616382,
+          "event_brier": 0.266149538213996,
+          "tradeability_auc": 0.5376623376623376,
+          "tradeability_calibration_error": 0.0831682763264524,
+          "tradeability_brier": 0.25397869847478693,
+          "tradeability_positive_rate": 0.4430379746835443,
+          "event_return_mae": 0.006508751994135289,
+          "event_type_metrics": {
+            "DONCHIAN_BREAKOUT": {
+              "samples": 32,
+              "continuation_auc": 0.7529411764705882,
+              "continuation_balanced_accuracy": 0.7019607843137254,
+              "tradeability_auc": 0.6916666666666667,
+              "tradeability_rate": 0.375
+            },
+            "PULLBACK_RESUME": {
+              "samples": 19,
+              "continuation_auc": 0.6285714285714286,
+              "continuation_balanced_accuracy": 0.5357142857142857,
+              "tradeability_auc": 0.5888888888888889,
+              "tradeability_rate": 0.5263157894736842
+            },
+            "VOLUME_IMPULSE": {
+              "samples": 22,
+              "continuation_auc": 0.475,
+              "continuation_balanced_accuracy": 0.475,
+              "tradeability_auc": 0.5,
+              "tradeability_rate": 0.45454545454545453
+            }
+          },
+          "trading": {
+            "selected": 0,
+            "mean_gross_return": 0.0,
+            "mean_net_return": 0.0,
+            "hit_rate": 0.0,
+            "cumulative_return": 0.0,
+            "positive": false
+          },
+          "fold": 1,
+          "test_start": "2026-03-05T20:00:00+00:00",
+          "test_end": "2026-04-04T18:00:00+00:00"
+        },
+        {
+          "samples": 719,
+          "accuracy": 0.5132127955493742,
+          "balanced_accuracy": 0.5164190078167324,
+          "precision_up": 0.5358851674641149,
+          "recall_up": 0.30684931506849317,
+          "precision_down": 0.503921568627451,
+          "recall_down": 0.7259887005649718,
+          "brier": 0.25102625737845397,
+          "log_loss": 0.6951862971127135,
+          "auc": 0.5253850321182572,
+          "calibration_error": 0.04480473385311063,
+          "confusion_matrix": [
+            [
+              257,
+              97
+            ],
+            [
+              253,
+              112
+            ]
+          ],
+          "return_mae": 0.005162749938927536,
+          "event_samples": 88,
+          "event_balanced_accuracy": 0.4589295177530472,
+          "event_auc": 0.5050344462109169,
+          "event_calibration_error": 0.11047100796440394,
+          "event_brier": 0.2544458758984769,
+          "tradeability_auc": 0.49688737973967173,
+          "tradeability_calibration_error": 0.15370511523664243,
+          "tradeability_brier": 0.25752305789057883,
+          "tradeability_positive_rate": 0.3522727272727273,
+          "event_return_mae": 0.0045797077995230135,
+          "event_type_metrics": {
+            "DONCHIAN_BREAKOUT": {
+              "samples": 33,
+              "continuation_auc": 0.5867768595041323,
+              "continuation_balanced_accuracy": 0.5909090909090908,
+              "tradeability_auc": 0.6217391304347826,
+              "tradeability_rate": 0.30303030303030304
+            },
+            "PULLBACK_RESUME": {
+              "samples": 26,
+              "continuation_auc": 0.39215686274509803,
+              "continuation_balanced_accuracy": 0.39542483660130723,
+              "tradeability_auc": 0.3383458646616541,
+              "tradeability_rate": 0.2692307692307692
+            },
+            "VOLUME_IMPULSE": {
+              "samples": 25,
+              "continuation_auc": 0.5324675324675325,
+              "continuation_balanced_accuracy": 0.40584415584415584,
+              "tradeability_auc": 0.46753246753246747,
+              "tradeability_rate": 0.44
+            }
+          },
+          "trading": {
+            "selected": 0,
+            "mean_gross_return": 0.0,
+            "mean_net_return": 0.0,
+            "hit_rate": 0.0,
+            "cumulative_return": 0.0,
+            "positive": false
+          },
+          "fold": 2,
+          "test_start": "2026-04-04T19:00:00+00:00",
+          "test_end": "2026-05-04T17:00:00+00:00"
+        },
+        {
+          "samples": 719,
+          "accuracy": 0.5271210013908206,
+          "balanced_accuracy": 0.5317708333333333,
+          "precision_up": 0.49385749385749383,
+          "recall_up": 0.6,
+          "precision_down": 0.5705128205128205,
+          "recall_down": 0.4635416666666667,
+          "brier": 0.25019620642477347,
+          "log_loss": 0.6935366316200618,
+          "auc": 0.5231498756218905,
+          "calibration_error": 0.04375602307724326,
+          "confusion_matrix": [
+            [
+              178,
+              206
+            ],
+            [
+              134,
+              201
+            ]
+          ],
+          "return_mae": 0.004326672192090683,
+          "event_samples": 86,
+          "event_balanced_accuracy": 0.5582579185520362,
+          "event_auc": 0.630656108597285,
+          "event_calibration_error": 0.19973453779409486,
+          "event_brier": 0.2388092785601618,
+          "tradeability_auc": 0.514102564102564,
+          "tradeability_calibration_error": 0.19920551054293273,
+          "tradeability_brier": 0.2526844477884291,
+          "tradeability_positive_rate": 0.3023255813953488,
+          "event_return_mae": 0.004346911787867299,
+          "event_type_metrics": {
+            "DONCHIAN_BREAKOUT": {
+              "samples": 30,
+              "continuation_auc": 0.4253393665158371,
+              "continuation_balanced_accuracy": 0.3981900452488688,
+              "tradeability_auc": 0.39,
+              "tradeability_rate": 0.3333333333333333
+            },
+            "PULLBACK_RESUME": {
+              "samples": 24,
+              "continuation_auc": 1.0,
+              "continuation_balanced_accuracy": 0.85,
+              "tradeability_auc": 0.5714285714285714,
+              "tradeability_rate": 0.125
+            },
+            "VOLUME_IMPULSE": {
+              "samples": 28,
+              "continuation_auc": 0.641025641025641,
+              "continuation_balanced_accuracy": 0.6025641025641025,
+              "tradeability_auc": 0.6041666666666666,
+              "tradeability_rate": 0.42857142857142855
+            }
+          },
+          "trading": {
+            "selected": 0,
+            "mean_gross_return": 0.0,
+            "mean_net_return": 0.0,
+            "hit_rate": 0.0,
+            "cumulative_return": 0.0,
+            "positive": false
+          },
+          "fold": 3,
+          "test_start": "2026-05-04T18:00:00+00:00",
+          "test_end": "2026-06-03T16:00:00+00:00"
+        },
+        {
+          "samples": 719,
+          "accuracy": 0.5187760778859527,
+          "balanced_accuracy": 0.5152722031954625,
+          "precision_up": 0.5,
+          "recall_up": 0.42196531791907516,
+          "precision_down": 0.531615925058548,
+          "recall_down": 0.6085790884718498,
+          "brier": 0.24921844844400862,
+          "log_loss": 0.6915827955181425,
+          "auc": 0.5320088642315859,
+          "calibration_error": 0.012722317388349124,
+          "confusion_matrix": [
+            [
+              227,
+              146
+            ],
+            [
+              200,
+              146
+            ]
+          ],
+          "return_mae": 0.00636429136546388,
+          "event_samples": 91,
+          "event_balanced_accuracy": 0.5238095238095237,
+          "event_auc": 0.564139941690962,
+          "event_calibration_error": 0.03157307523543088,
+          "event_brier": 0.247136639283541,
+          "tradeability_auc": 0.5090090090090091,
+          "tradeability_calibration_error": 0.08305810404301396,
+          "tradeability_brier": 0.2521699021855969,
+          "tradeability_positive_rate": 0.4065934065934066,
+          "event_return_mae": 0.0063904560614633215,
+          "event_type_metrics": {
+            "DONCHIAN_BREAKOUT": {
+              "samples": 28,
+              "continuation_auc": 0.6000000000000001,
+              "continuation_balanced_accuracy": 0.5,
+              "tradeability_auc": 0.4795321637426901,
+              "tradeability_rate": 0.32142857142857145
+            },
+            "PULLBACK_RESUME": {
+              "samples": 33,
+              "continuation_auc": 0.5735294117647058,
+              "continuation_balanced_accuracy": 0.6029411764705883,
+              "tradeability_auc": 0.5192307692307693,
+              "tradeability_rate": 0.3939393939393939
+            },
+            "VOLUME_IMPULSE": {
+              "samples": 23,
+              "continuation_auc": 0.5606060606060606,
+              "continuation_balanced_accuracy": 0.4772727272727273,
+              "tradeability_auc": 0.5984848484848485,
+              "tradeability_rate": 0.4782608695652174
+            }
+          },
+          "trading": {
+            "selected": 0,
+            "mean_gross_return": 0.0,
+            "mean_net_return": 0.0,
+            "hit_rate": 0.0,
+            "cumulative_return": 0.0,
+            "positive": false
+          },
+          "fold": 4,
+          "test_start": "2026-06-03T17:00:00+00:00",
+          "test_end": "2026-07-03T15:00:00+00:00"
+        },
+        {
+          "samples": 719,
+          "accuracy": 0.5396383866481224,
+          "balanced_accuracy": 0.5382749013234269,
+          "precision_up": 0.5389830508474577,
+          "recall_up": 0.4491525423728814,
+          "precision_down": 0.5400943396226415,
+          "recall_down": 0.6273972602739726,
+          "brier": 0.24758647426115743,
+          "log_loss": 0.6883140177589423,
+          "auc": 0.5591904651342776,
+          "calibration_error": 0.01224243670696947,
+          "confusion_matrix": [
+            [
+              229,
+              136
+            ],
+            [
+              195,
+              159
+            ]
+          ],
+          "return_mae": 0.00399378714392779,
+          "event_samples": 93,
+          "event_balanced_accuracy": 0.5160465116279069,
+          "event_auc": 0.5269767441860465,
+          "event_calibration_error": 0.026967644790202312,
+          "event_brier": 0.2488750900425966,
+          "tradeability_auc": 0.4432882414151925,
+          "tradeability_calibration_error": 0.1621168478889563,
+          "tradeability_brier": 0.24916245613175128,
+          "tradeability_positive_rate": 0.3333333333333333,
+          "event_return_mae": 0.0037751333841266415,
+          "event_type_metrics": {
+            "DONCHIAN_BREAKOUT": {
+              "samples": 34,
+              "continuation_auc": 0.5087719298245614,
+              "continuation_balanced_accuracy": 0.5105263157894737,
+              "tradeability_auc": 0.41428571428571426,
+              "tradeability_rate": 0.4117647058823529
+            },
+            "PULLBACK_RESUME": {
+              "samples": 26,
+              "continuation_auc": 0.6470588235294118,
+              "continuation_balanced_accuracy": 0.5490196078431372,
+              "tradeability_auc": 0.5333333333333334,
+              "tradeability_rate": 0.19230769230769232
+            },
+            "SQUEEZE_RELEASE": {
+              "samples": 9,
+              "continuation_auc": 0.25,
+              "continuation_balanced_accuracy": 0.35,
+              "tradeability_auc": 0.2,
+              "tradeability_rate": 0.5555555555555556
+            },
+            "VOLUME_IMPULSE": {
+              "samples": 24,
+              "continuation_auc": 0.48571428571428577,
+              "continuation_balanced_accuracy": 0.5214285714285715,
+              "tradeability_auc": 0.42016806722689076,
+              "tradeability_rate": 0.2916666666666667
+            }
+          },
+          "trading": {
+            "selected": 0,
+            "mean_gross_return": 0.0,
+            "mean_net_return": 0.0,
+            "hit_rate": 0.0,
+            "cumulative_return": 0.0,
+            "positive": false
+          },
+          "fold": 5,
+          "test_start": "2026-07-03T16:00:00+00:00",
+          "test_end": "2026-08-02T14:00:00+00:00"
+        }
+      ],
+      "positive_fold_fraction": 0.0
+    }
+  },
+  "qualification": {
+    "passed": false,
+    "qualified_horizons": [],
+    "per_horizon": {
+      "1": {
+        "passed": false,
+        "blockers": [
+          "event continuation AUC below minimum",
+          "event tradeability AUC below minimum",
+          "event tradeability calibration error too high",
+          "too few positive walk-forward folds",
+          "too few selected OOF trades",
+          "non-positive OOF net expectancy"
+        ],
+        "warnings": []
+      },
+      "2": {
+        "passed": false,
+        "blockers": [
+          "event continuation AUC below minimum",
+          "event tradeability AUC below minimum",
+          "event tradeability calibration error too high",
+          "too few positive walk-forward folds",
+          "too few selected OOF trades",
+          "non-positive OOF net expectancy"
+        ],
+        "warnings": []
+      },
+      "3": {
+        "passed": false,
+        "blockers": [
+          "event tradeability AUC below minimum",
+          "event tradeability calibration error too high",
+          "too few positive walk-forward folds",
+          "too few selected OOF trades",
+          "non-positive OOF net expectancy"
+        ],
+        "warnings": []
+      }
+    },
+    "blockers": [
+      "Only 0 qualified horizon(s); 1 required",
+      "h1: event continuation AUC below minimum",
+      "h1: event tradeability AUC below minimum",
+      "h1: event tradeability calibration error too high",
+      "h1: too few positive walk-forward folds",
+      "h1: too few selected OOF trades",
+      "h1: non-positive OOF net expectancy",
+      "h2: event continuation AUC below minimum",
+      "h2: event tradeability AUC below minimum",
+      "h2: event tradeability calibration error too high",
+      "h2: too few positive walk-forward folds",
+      "h2: too few selected OOF trades",
+      "h2: non-positive OOF net expectancy",
+      "h3: event tradeability AUC below minimum",
+      "h3: event tradeability calibration error too high",
+      "h3: too few positive walk-forward folds",
+      "h3: too few selected OOF trades",
+      "h3: non-positive OOF net expectancy"
+    ],
+    "checked_at": "2026-08-02T19:06:32.822384+00:00"
+  },
+  "execution_costs": {
+    "entry_fee_bps": 2.0,
+    "exit_fee_bps": 5.0,
+    "entry_slippage_bps": 1.5,
+    "exit_slippage_bps": 2.5,
+    "funding_buffer_bps": 0.0,
+    "base_cost_bps": 11.0,
+    "stress_cost_bps": 16.5,
+    "profit_buffer_bps": 8.0
+  },
+  "objective": {
+    "general_forecast": "UP/DOWN on all closed hourly candles",
+    "trade_gate": "event continuation and event-direction net tradeability",
+    "entry": "open of next hourly candle"
+  }
+}

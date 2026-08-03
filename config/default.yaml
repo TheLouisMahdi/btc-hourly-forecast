@@ -1,0 +1,151 @@
+project:
+  name: BTC Hourly Regime Trader
+  version: 2.1.0
+  timezone: UTC
+
+paths:
+  database: data/btc_ema_hourly.sqlite3
+  model_dir: artifacts/models
+  report_dir: artifacts/reports
+  log_dir: logs
+  runtime_state: data/runtime_state.json
+
+market:
+  symbol: BTCUSDT
+  interval: 1h
+  history_days: 180
+  provider: auto
+  provider_order: [binance_futures, bybit_linear, okx_swap]
+  request_timeout_seconds: 20
+  max_retries: 4
+  retry_backoff_seconds: 1.5
+  minimum_history_rows: 4000
+  maximum_gap_hours: 2
+  quote_stale_seconds: 90
+  binance_futures_base_url: https://fapi.binance.com
+  bybit_base_url: https://api.bybit.com
+  okx_base_url: https://www.okx.com
+  okx_instrument: BTC-USDT-SWAP
+
+news:
+  enabled: true
+  historical_days: 180
+  gdelt_enabled: true
+  gdelt_query: '(bitcoin OR btc OR cryptocurrency) sourcelang:english'
+  gdelt_chunk_days: 3
+  gdelt_max_records: 250
+  recent_hours: 72
+  request_timeout_seconds: 20
+  rss_enabled: true
+  rss_feeds:
+    - https://www.coindesk.com/arc/outboundfeeds/rss/
+    - https://cointelegraph.com/rss
+    - https://decrypt.co/feed
+    - https://bitcoinmagazine.com/.rss/full/
+  stale_hours: 6
+
+features:
+  kama_er_period: 10
+  kama_fast_period: 2
+  kama_slow_period: 30
+  atr_period: 14
+  adx_period: 14
+  rsi_period: 14
+  donchian_period: 20
+  bollinger_period: 20
+  bollinger_std: 2.0
+  squeeze_lookback: 120
+  squeeze_percentile: 0.20
+  trend_adx_threshold: 18.0
+  breakout_min_volume_z: -0.25
+  pullback_tolerance_atr: 0.35
+  impulse_body_atr: 1.0
+  impulse_min_volume_z: 0.50
+  event_cooldown_hours: 3
+  event_sample_weight: 2.5
+  normal_sample_weight: 1.0
+  oldest_sample_weight: 0.75
+  news_windows_hours: [1, 3, 6, 12, 24]
+  news_shock_min_count: 3
+  news_shock_min_relevance: 0.55
+
+model:
+  horizons_hours: [1, 2, 3]
+  horizon_weights:
+    1: 0.25
+    2: 0.40
+    3: 0.35
+  random_state: 42
+  walk_forward_splits: 5
+  validation_gap_hours: 3
+  min_train_rows: 1800
+  minimum_training_events: 80
+  max_iter: 280
+  learning_rate: 0.04
+  max_leaf_nodes: 15
+  min_samples_leaf: 30
+  l2_regularization: 1.5
+  logistic_weight: 0.30
+  tree_weight: 0.70
+  auto_retrain_days: 7
+
+qualification:
+  # General UP/DOWN metrics remain diagnostic; qualification is based on event trading skill.
+  minimum_event_auc: 0.52
+  minimum_tradeability_auc: 0.53
+  minimum_event_samples: 60
+  maximum_event_calibration_error: 0.10
+  maximum_tradeability_calibration_error: 0.10
+  minimum_positive_fold_fraction: 0.50
+  minimum_oof_trades: 10
+  minimum_oof_hit_rate: 0.50
+  minimum_qualified_horizons: 1
+  require_positive_oof_expectancy: true
+
+strategy:
+  paper_only: true
+  entry_order_style: maker
+  exit_order_style: taker
+  maker_fee_bps: 2.0
+  taker_fee_bps: 5.0
+  entry_slippage_bps: 1.5
+  exit_slippage_bps: 2.5
+  funding_buffer_bps: 0.0
+  fallback_round_trip_cost_bps: 11.0
+  stress_cost_multiplier: 1.50
+  minimum_profit_buffer_bps: 8.0
+  minimum_net_edge_bps: 8.0
+  # This threshold is P(event continuation), not generic UP/DOWN confidence.
+  minimum_confidence:
+    1: 0.56
+    2: 0.57
+    3: 0.58
+  minimum_tradeability_probability:
+    1: 0.55
+    2: 0.56
+    3: 0.57
+  minimum_horizon_agreement: 0.6667
+  maximum_atr_percent: 3.0
+  block_during_news_shock: true
+  require_fresh_news: false
+  risk_per_trade_fraction: 0.0020
+  account_equity_usd: 1000.0
+  maximum_leverage: 3.0
+  stop_atr_multiplier: 1.15
+  minimum_stop_percent: 0.0040
+  maximum_stop_percent: 0.014
+  target_r_multiple: 1.70
+  label_target_atr_multiplier: 1.35
+  label_stop_atr_multiplier: 1.0
+  gap_risk_buffer_bps: 6.0
+  maximum_daily_signals: 3
+  cooldown_hours_after_signal: 2
+
+live:
+  poll_seconds: 15
+  quote_poll_seconds: 8
+  start_on_next_closed_candle: true
+  collect_recent_news_each_cycle: true
+  auto_retrain: true
+  dashboard_host: 127.0.0.1
+  dashboard_port: 7860

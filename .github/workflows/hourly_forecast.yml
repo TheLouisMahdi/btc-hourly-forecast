@@ -1,0 +1,79 @@
+name: Hourly BTC forecast
+
+on:
+  schedule:
+    # GitHub schedules use UTC. Minute 17 avoids the busiest top-of-hour period.
+    - cron: "17 * * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+concurrency:
+  group: hourly-btc-pages
+  cancel-in-progress: true
+
+jobs:
+  forecast-and-deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Checkout project
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 1
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: requirements-github.txt
+
+      - name: Install lightweight runtime dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements-github.txt
+          python -m pip install -e . --no-deps
+
+      - name: Restore forecast history snapshot
+        shell: bash
+        run: |
+          mkdir -p .github_state
+          git fetch origin forecast-state --depth=1 || true
+          git show origin/forecast-state:history.json > .github_state/history.json 2>/dev/null || true
+          git show origin/forecast-state:latest.json > .github_state/latest.json 2>/dev/null || true
+
+      - name: Restore latest weekly model
+        shell: bash
+        run: |
+          mkdir -p .model_state
+          git fetch origin model-state --depth=1 || true
+          for file in latest.joblib latest_training_report.json latest_metrics.csv model_metadata.json; do
+            git show "origin/model-state:${file}" > ".model_state/${file}" 2>/dev/null || rm -f ".model_state/${file}"
+          done
+
+      - name: Run one forecast and build static dashboard
+        run: python scripts/github_hourly_forecast.py
+
+      - name: Save compact forecast history snapshot
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: bash scripts/push_snapshot_branch.sh forecast-state .github_state
+
+      - name: Configure GitHub Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload static dashboard
+        uses: actions/upload-pages-artifact@v4
+        with:
+          path: site
+
+      - name: Deploy GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
