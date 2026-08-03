@@ -8,9 +8,12 @@ on:
       - "config/default.yaml"
       - "src/btc_ema_trader/contract_training.py"
       - "src/btc_ema_trader/features.py"
+      - "src/btc_ema_trader/market_structure.py"
       - "src/btc_ema_trader/model.py"
+      - "src/btc_ema_trader/structure_training.py"
       - "src/btc_ema_trader/training.py"
       - "src/btc_ema_trader/forecast_contract.py"
+      - "tests/**"
       - "requirements-github.txt"
       - "pyproject.toml"
   schedule:
@@ -50,7 +53,7 @@ jobs:
       - name: Run quality tests
         run: python -m unittest discover -s tests -v
 
-      - name: Fetch 180 days and retrain
+      - name: Fetch configured history and retrain structural model
         run: python scripts/github_weekly_retrain.py
 
       - name: Publish latest batch model
