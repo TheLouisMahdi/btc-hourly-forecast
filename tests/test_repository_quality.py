@@ -55,13 +55,16 @@ REQUIRED_FILES = {
     "pyproject.toml",
     "scripts/github_pages_dashboard.py",
     "scripts/github_structural_forecast.py",
+    "src/btc_ema_trader/contract_features.py",
     "src/btc_ema_trader/contract_training.py",
+    "src/btc_ema_trader/directional_events.py",
     "src/btc_ema_trader/forecast_contract.py",
     "src/btc_ema_trader/market_structure.py",
     "src/btc_ema_trader/price_adaptive.py",
     "src/btc_ema_trader/structure_training.py",
     "tests/test_breakout_labels.py",
     "tests/test_dashboard_outcomes.py",
+    "tests/test_directional_events.py",
     "tests/test_forecast_contract.py",
     "tests/test_market_structure.py",
     "tests/test_price_adaptive.py",
@@ -152,7 +155,7 @@ class RepositoryQualityTests(unittest.TestCase):
         ):
             self.assertIn(required, readme)
 
-    def test_readme_documents_structural_breakouts(self) -> None:
+    def test_readme_documents_directional_event_contract(self) -> None:
         root = Path(__file__).resolve().parents[1]
         readme = (root / "README.md").read_text(
             encoding="utf-8"
@@ -160,9 +163,9 @@ class RepositoryQualityTests(unittest.TestCase):
         for required in (
             "RESISTANCE_BREAKOUT_LONG",
             "SUPPORT_BREAKDOWN_SHORT",
-            "TRIANGLE_BREAKOUT_LONG",
-            "false_breakout_h*",
-            "structure-breakout-hourly-",
+            "2,000 unique",
+            "sampling: NONE",
+            "directional-breakout-hourly-",
         ):
             self.assertIn(required, readme)
 
@@ -178,7 +181,7 @@ class RepositoryQualityTests(unittest.TestCase):
             dashboard,
         )
 
-    def test_model_is_configured_for_structural_breakouts(self) -> None:
+    def test_model_configuration_requires_real_event_inventory(self) -> None:
         root = Path(__file__).resolve().parents[1]
         config = yaml.safe_load(
             (root / "config" / "default.yaml").read_text(
@@ -187,12 +190,32 @@ class RepositoryQualityTests(unittest.TestCase):
         )
         self.assertEqual(
             config["model"]["horizons_hours"],
-            [1, 3, 6],
+            [1, 3, 6, 12],
+        )
+        self.assertEqual(
+            config["model"]["trade_horizons_hours"],
+            [3, 6, 12],
         )
         self.assertEqual(
             config["market"]["history_days"],
-            365,
+            3650,
         )
+        self.assertGreaterEqual(
+            config["market"]["minimum_history_rows"],
+            80000,
+        )
+        self.assertEqual(
+            config["event_inventory"]["minimum_events_per_direction"],
+            2000,
+        )
+        self.assertEqual(
+            config["event_mining"]["sampling_strategy"],
+            "NONE",
+        )
+        self.assertFalse(
+            config["event_mining"]["synthetic_events"]
+        )
+        self.assertFalse(config["event_mining"]["shuffle"])
         self.assertEqual(
             config["forecast"]["target"],
             "NEXT_CLOSED_1H_CANDLE",
@@ -201,30 +224,50 @@ class RepositoryQualityTests(unittest.TestCase):
             "price_adaptive_state",
             config["paths"],
         )
-        structure = config["structure"]
-        self.assertIn(480, structure["lookback_hours"])
-        self.assertGreaterEqual(
-            structure["triangle_lookback_hours"],
-            120,
+        self.assertIn(
+            "coinbase_spot",
+            config["market"]["provider_order"],
         )
-        self.assertGreater(
-            structure["breakout_crossing_tolerance_atr"],
-            0.0,
-        )
+        self.assertIn(720, config["structure"]["lookback_hours"])
 
-    def test_schema_v4_model_rejects_legacy_artifacts(self) -> None:
+    def test_schema_v5_model_rejects_legacy_artifacts(self) -> None:
         root = Path(__file__).resolve().parents[1]
         model = (
             root / "src" / "btc_ema_trader" / "model.py"
         ).read_text(encoding="utf-8")
-        self.assertIn("schema_version: int = 4", model)
-        self.assertIn("structure-breakout-hourly-", model)
+        self.assertIn("schema_version: int = 5", model)
+        self.assertIn("directional-breakout-hourly-", model)
+        self.assertIn("long_head", model)
+        self.assertIn("short_head", model)
+        self.assertIn("early_stopping=False", model)
         self.assertIn(
-            "The model artifact predates structural breakout v4",
+            "predates deterministic directional breakout schema v5",
             model,
         )
 
-    def test_contract_training_uses_structural_trainer(self) -> None:
+    def test_training_contains_no_random_sampling(self) -> None:
+        root = Path(__file__).resolve().parents[1]
+        training = (
+            root
+            / "src"
+            / "btc_ema_trader"
+            / "structure_training.py"
+        ).read_text(encoding="utf-8")
+        for forbidden in (
+            "train_test_split(",
+            "shuffle=True",
+            "resample(",
+            "SMOTE",
+            "RandomOverSampler",
+            "RandomUnderSampler",
+        ):
+            self.assertNotIn(forbidden, training)
+        self.assertIn(
+            "CHRONOLOGICAL_EXPANDING_WINDOW",
+            training,
+        )
+
+    def test_contract_training_uses_directional_features(self) -> None:
         root = Path(__file__).resolve().parents[1]
         contract_training = (
             root
@@ -232,6 +275,10 @@ class RepositoryQualityTests(unittest.TestCase):
             / "btc_ema_trader"
             / "contract_training.py"
         ).read_text(encoding="utf-8")
+        self.assertIn(
+            "from .contract_features import build_feature_set",
+            contract_training,
+        )
         self.assertIn(
             "from .structure_training import train_feature_set",
             contract_training,
