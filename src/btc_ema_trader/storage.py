@@ -304,7 +304,13 @@ class Database:
         with self.connect() as conn:
             conn.execute(
                 "INSERT INTO runtime_events(created_at,level,event_type,message,details_json) VALUES(?,?,?,?,?)",
-                (pd.Timestamp.now(tz="UTC").isoformat(), level, event_type, message, json.dumps(details or {})),
+                (
+                    pd.Timestamp.now(tz="UTC").isoformat(),
+                    level,
+                    event_type,
+                    message,
+                    json.dumps(details or {}, ensure_ascii=False, default=_json_default),
+                ),
             )
 
     def recent_events(self, limit: int = 50) -> pd.DataFrame:
@@ -358,6 +364,22 @@ class Database:
             return int(count), None
         last = _utc(row[0])
         return int(count), max(0.0, (now - last).total_seconds() / 3600)
+
+
+def _json_default(value: Any) -> Any:
+    """Convert common pandas/numpy values used in runtime diagnostics to JSON-safe values."""
+    if isinstance(value, pd.Timestamp):
+        return value.isoformat()
+    if isinstance(value, pd.Timedelta):
+        return value.isoformat()
+    if isinstance(value, Path):
+        return str(value)
+    if hasattr(value, "item"):
+        try:
+            return value.item()
+        except (TypeError, ValueError):
+            pass
+    raise TypeError(f"Object of type {type(value).__name__} is not JSON serializable")
 
 
 def _float_or_none(value: Any) -> float | None:
