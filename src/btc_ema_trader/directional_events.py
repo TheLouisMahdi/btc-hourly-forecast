@@ -132,8 +132,8 @@ def attach_directional_breakout_candidates(
             key=lambda item: (
                 item.score,
                 item.touches,
-                item.scale_hours,
                 -abs(item.distance_atr),
+                -item.scale_hours,
             ),
         )
         previous = last_event.get(selected.direction)
@@ -260,7 +260,7 @@ def attach_directional_event_labels(
             "target_first": np.full(len(output), np.nan),
             "stop_first": np.full(len(output), np.nan),
         }
-        for index in range(len(output) - horizon - 1):
+        for index in range(len(output) - horizon):
             direction = int(output.iloc[index].get("event_direction", 0))
             if direction not in {LONG, SHORT}:
                 continue
@@ -324,7 +324,9 @@ def event_inventory(
         subset = events.loc[events["event_direction"] == direction].copy()
         timestamps = pd.to_datetime(subset["open_time"], utc=True)
         years = int(timestamps.dt.year.nunique())
-        quarters = int(timestamps.dt.to_period("Q").nunique())
+        quarters = int(
+            timestamps.dt.tz_localize(None).dt.to_period("Q").nunique()
+        )
         scales = int(
             pd.to_numeric(
                 subset["event_scale_hours"], errors="coerce"
@@ -386,7 +388,7 @@ def event_inventory(
                 "market regimes",
             ),
         }
-        for key, (actual, required, label) in checks.items():
+        for actual, required, label in checks.values():
             if actual < required:
                 blockers.append(
                     f"{name} has {actual} {label}; at least {required} are required"
@@ -587,12 +589,7 @@ def _triangle_candidates(
     )
     if triangle_type == "NONE" or quality < minimum_quality:
         return []
-    scale = int(
-        max(
-            1,
-            _number(row.get("triangle_lookback_hours"), 120) or 120,
-        )
-    )
+    scale = 240
     candidates: list[BreakoutCandidate] = []
     upper = _number(row.get("triangle_upper"))
     lower = _number(row.get("triangle_lower"))
@@ -608,10 +605,7 @@ def _triangle_candidates(
             level=upper,
             touches=2.0 + quality * 4.0,
             age_bars=float(scale),
-            line_slope_atr=_number(
-                row.get("breakout_line_slope_atr"), 0.0
-            )
-            or 0.0,
+            line_slope_atr=0.0,
             line_r2=quality,
             scale=scale,
             source="TRIANGLE_UPPER",
@@ -633,10 +627,7 @@ def _triangle_candidates(
             level=lower,
             touches=2.0 + quality * 4.0,
             age_bars=float(scale),
-            line_slope_atr=_number(
-                row.get("breakout_line_slope_atr"), 0.0
-            )
-            or 0.0,
+            line_slope_atr=0.0,
             line_r2=quality,
             scale=scale,
             source="TRIANGLE_LOWER",
@@ -668,6 +659,7 @@ def _long_candidate(
     row: pd.Series,
     triangle_quality: float = 0.0,
 ) -> BreakoutCandidate | None:
+    del current_high
     tolerance = float(cfg.get("crossing_tolerance_atr", 0.08))
     minimum_cross = float(cfg.get("candidate_minimum_cross_atr", 0.015))
     maximum_extension = float(cfg.get("candidate_maximum_extension_atr", 2.20))
@@ -749,6 +741,7 @@ def _short_candidate(
     row: pd.Series,
     triangle_quality: float = 0.0,
 ) -> BreakoutCandidate | None:
+    del current_low
     tolerance = float(cfg.get("crossing_tolerance_atr", 0.10))
     minimum_cross = float(cfg.get("candidate_minimum_cross_atr", 0.020))
     maximum_extension = float(cfg.get("candidate_maximum_extension_atr", 2.40))
@@ -875,7 +868,7 @@ def _label_event(
         aligned_closes = level - closes
         favorable = (entry - lows) / atr
         adverse = (highs - entry) / atr
-        aligned_return = entry / closes[-1] - 1.0
+        aligned_return = (entry - closes[-1]) / entry
 
     target_index = _first_true(target_hits)
     stop_index = _first_true(stop_hits)
