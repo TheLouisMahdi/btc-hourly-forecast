@@ -1,11 +1,16 @@
 from __future__ import annotations
 
+import tempfile
 import unittest
+from pathlib import Path
+from types import SimpleNamespace
 
 import numpy as np
 import pandas as pd
 
 from btc_ema_trader.adaptive import OnlineBinaryLearner, adaptive_vector
+from btc_ema_trader.adaptive_runtime import AdaptiveEngine
+from btc_ema_trader.config import Settings
 
 
 class AdaptiveLearningTests(unittest.TestCase):
@@ -52,6 +57,53 @@ class AdaptiveLearningTests(unittest.TestCase):
         self.assertEqual(vector.ndim, 1)
         self.assertTrue(np.isfinite(vector).all())
         self.assertTrue((np.abs(vector) <= 8.0).all())
+
+    def test_champion_change_rebuilds_all_online_learners(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            settings = Settings(
+                root=root,
+                values={
+                    "adaptive": {"enabled": True},
+                    "model": {"random_state": 42},
+                    "paths": {
+                        "adaptive_state": "adaptive_state.joblib",
+                    },
+                },
+            )
+            first_bundle = SimpleNamespace(
+                model_id="champion-a",
+                horizons=[1, 2],
+            )
+            first = AdaptiveEngine(settings, first_bundle)
+            first.state.horizons[1].direction.samples_seen = 99
+            first.state.last_trained_open_time[1] = (
+                "2026-01-01T00:00:00+00:00"
+            )
+            first.save()
+
+            second_bundle = SimpleNamespace(
+                model_id="champion-b",
+                horizons=[1],
+            )
+            second = AdaptiveEngine(settings, second_bundle)
+
+            self.assertEqual(
+                second.state.champion_model_id,
+                "champion-b",
+            )
+            self.assertEqual(second.state.rebase_count, 1)
+            self.assertEqual(set(second.state.horizons), {1})
+            self.assertEqual(
+                second.state.horizons[1].direction.samples_seen,
+                0,
+            )
+            self.assertIsNone(
+                second.state.last_trained_open_time[1]
+            )
+            self.assertEqual(second.state.observations, [])
+            self.assertEqual(second.state.active_horizons, [])
+            self.assertEqual(second.state.suspended_horizons, [])
 
 
 if __name__ == "__main__":
