@@ -67,7 +67,7 @@ jobs:
         run: bash scripts/push_snapshot_branch.sh forecast-state .github_state
 
       - name: Configure GitHub Pages
-        uses: actions/configure-pages@v5
+        uses: actions/configure-pages@v6
 
       - name: Upload static dashboard
         uses: actions/upload-pages-artifact@v4
