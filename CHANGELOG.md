@@ -1,5 +1,27 @@
 # Changelog
 
+## 4.0.0 — Causal structural breakout model
+
+- Replaced the previous generic event engine with a structural breakout architecture.
+- Added confirmed causal pivots with explicit right-side confirmation timing.
+- Added multi-scale static and dynamic support and resistance across 48h, 120h, 240h and 480h windows.
+- Added line slope, fit quality, touch count, level age, ATR-normalized width and distance features.
+- Added causal symmetrical, ascending and descending triangle detection.
+- Added triangle contraction, line quality, width and apex-distance features.
+- Restricted primary trade events to resistance breakouts, support breakdowns and triangle boundary breaks.
+- Added ATR-normalized breakout confirmation, maximum extension, candle-body, close-location and volume checks.
+- Added structural breakout levels and invalidation levels to every event.
+- Rebuilt labels around level hold, false breakout, path-aware target or invalidation and net tradeability.
+- Added `1h`, `3h` and `6h` structural trade horizons while retaining the public next-candle one-hour forecast.
+- Extended full retraining history from 180 to 365 days.
+- Added six-fold chronological Walk-Forward validation with a six-hour embargo.
+- Added breakout hold-rate and false-breakout-rate qualification gates.
+- Rejected all pre-v4 model artifacts and introduced the `structure-breakout-hourly-` model ID prefix.
+- Removed raw absolute support, resistance and EMA levels from model training.
+- Anchored stop placement to structural invalidation with a bounded ATR fallback.
+- Added causal pivot, triangle, long-breakout, short-breakdown and prefix-stability tests.
+- Updated workflows, CLI defaults, documentation and project metadata for version 4.0.0.
+
 ## 3.2.0 — Direction-first adaptive price fusion
 
 - Made next-candle direction the primary forecast result.
