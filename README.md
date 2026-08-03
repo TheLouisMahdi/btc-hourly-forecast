@@ -1,6 +1,8 @@
 <div align="center">
 
-<img src="https://capsule-render.vercel.app/api?type=waving&color=0:020617,48:0f766e,100:22d3ee&height=180&section=header&text=BTC%20Hourly%20Forecast&fontColor=e6fffb&fontSize=42&fontAlignY=38&desc=Adaptive%20learning%20%7C%20Delayed%20labels%20%7C%20Fail-safe%20paper%20trading&descAlignY=59&animation=fadeIn" alt="BTC Hourly Forecast header" width="100%" />
+<img src="docs/assets/candlestick-loop.svg" alt="Animated BTC hourly candlestick chart" width="100%" />
+
+<br />
 
 <a href="https://thelouismahdi.github.io/btc-hourly-forecast/">
   <img src="https://img.shields.io/badge/OPEN_LIVE_DASHBOARD-GITHUB_PAGES-22d3ee?style=for-the-badge&logo=githubpages&logoColor=020617" alt="Open live dashboard" />
@@ -8,6 +10,10 @@
 
 <a href="https://github.com/TheLouisMahdi/btc-hourly-forecast/actions/workflows/hourly_forecast.yml">
   <img src="https://img.shields.io/github/actions/workflow/status/TheLouisMahdi/btc-hourly-forecast/hourly_forecast.yml?branch=main&style=for-the-badge&label=Hourly%20Pipeline&labelColor=020617" alt="Hourly pipeline status" />
+</a>
+
+<a href="https://github.com/TheLouisMahdi/btc-hourly-forecast/actions/workflows/weekly_retrain.yml">
+  <img src="https://img.shields.io/github/actions/workflow/status/TheLouisMahdi/btc-hourly-forecast/weekly_retrain.yml?branch=main&style=for-the-badge&label=Weekly%20Retraining&labelColor=020617" alt="Weekly retraining status" />
 </a>
 
 <br />
@@ -20,61 +26,65 @@
 
 </div>
 
----
-
 ## Overview
 
-**BTC Hourly Forecast** is a research-oriented Bitcoin market analysis system for one-hour candles. It combines a weekly batch model with a persistent adaptive correction layer that learns from every newly matured label.
+**BTC Hourly Forecast** is a research-oriented Bitcoin market analysis system for closed one-hour candles. It combines a weekly batch champion with a persistent adaptive correction layer that learns from newly matured labels.
 
-The batch model detects market regimes and independent events. The adaptive layer receives delayed labels after each forecast horizon closes, evaluates itself prequentially, updates incrementally, and earns permission to influence decisions only when it outperforms the batch champion under strict safety criteria.
+The system produces directional forecasts for 1-hour, 2-hour and 3-hour horizons, evaluates market events, estimates tradeability after execution costs and publishes a mobile-friendly static dashboard through GitHub Pages.
 
-A directional forecast does not automatically become a trade. Qualification, event, liquidity, expected-edge, execution-cost and risk gates can still return `WAIT`.
+A forecast does not automatically become a trade. Qualification, event, expected-edge, data-health and risk gates can return `WAIT` even when the directional prediction is confident.
 
----
+## Core capabilities
+
+| Area | Implementation |
+|---|---|
+| Market data | BTC perpetual hourly candles with provider fallback |
+| News data | Recent and historical crypto news features |
+| Batch model | Weekly walk-forward training on a rolling 180-day window |
+| Adaptive model | Incremental delayed-label learning with persisted state |
+| Horizons | Independent 1h, 2h and 3h outputs |
+| Event layer | Donchian breakout, squeeze release, pullback resume and volume impulse |
+| Safety | Qualification, cost, event, volatility, cooldown and data-health gates |
+| Delivery | Hourly GitHub Actions pipeline and static GitHub Pages dashboard |
 
 ## Adaptive architecture
 
 ```mermaid
 flowchart LR
-    A[Hourly market and news data] --> B[Leakage-safe feature pipeline]
+    A[Closed hourly candles and news] --> B[Leakage-safe feature pipeline]
     B --> C[Weekly batch champion]
-    C --> D[Base probabilities and return estimates]
+    C --> D[Base probabilities and returns]
     D --> E[Online adaptive learner]
-    E --> F{Validated improvement?}
+    E --> F{Promotion checks pass?}
     F -- No --> G[Shadow mode]
     F -- Yes --> H[Bounded adaptive blend]
     G --> I[Fail-safe strategy gates]
     H --> I
-    I --> J[Static dashboard and state snapshots]
-    J --> K[Delayed labels at 1h, 2h and 3h]
+    I --> J[Forecast and static dashboard]
+    J --> K[Delayed 1h, 2h and 3h labels]
     K --> E
 ```
 
 ### Batch champion
 
-- Uses a 180-day rolling market and news window.
+- Uses a rolling 180-day market and news window.
 - Trains separate models for 1-hour, 2-hour and 3-hour horizons.
 - Uses chronological walk-forward evaluation with a validation gap.
-- Produces general direction, event continuation, tradeability and return estimates.
+- Predicts direction, event continuation, tradeability and event-aligned return.
 - Retrains weekly and remains the fallback decision source.
 
 ### Adaptive learner
 
-- Uses `SGDClassifier`, `SGDRegressor` and incremental scaling.
-- Learns only after labels mature, preventing future leakage.
-- Updates on every newly resolved row.
-- Tracks base-versus-online Brier score, accuracy and return error.
-- Starts in `SHADOW` mode.
-- Activates per horizon only after minimum sample counts and measurable improvement.
+- Uses incremental classifiers and regressors.
+- Predicts before observing each matured label.
+- Updates only after the relevant horizon has closed.
+- Tracks batch-versus-online Brier score, accuracy and return error.
+- Starts in `SHADOW` mode and activates per horizon only after configured promotion checks.
 - Uses a bounded blend instead of replacing the batch model.
-- Suspends automatically when recent online performance degrades.
-- Persists between GitHub Actions runs in the `adaptive-state` branch.
+- Suspends automatically when recent performance degrades.
+- Persists between workflow runs in the `adaptive-state` branch.
 
----
-
-## Market logic
-
-The event layer is independent of the former EMA crossover design. It detects:
+## Market events
 
 | Event | Description |
 |---|---|
@@ -83,144 +93,124 @@ The event layer is independent of the former EMA crossover design. It detects:
 | `PULLBACK_RESUME` | A trend resumes after a controlled pullback toward KAMA. |
 | `VOLUME_IMPULSE` | A directional candle expands with abnormal volume. |
 
-The model estimates whether the event continues, whether the move remains tradeable after costs, and whether the expected edge survives stress assumptions.
+The event model estimates whether the move continues, whether it remains tradeable after costs and whether the expected edge survives stress assumptions.
 
----
+## Decision gates
+
+Common `WAIT` reasons are intentional safety controls:
+
+| Gate | Meaning |
+|---|---|
+| `MODEL_NOT_QUALIFIED` | No model horizon has passed the required validation criteria. |
+| `SELECTED_HORIZON_NOT_QUALIFIED` | The currently selected horizon is not approved for trading decisions. |
+| `NO_NEW_MARKET_EVENT` | No fresh independent market event exists on the latest closed candle. |
+| `INSUFFICIENT_STRESS_NET_EDGE` | Expected return does not exceed stress-adjusted costs and the required profit buffer. |
+
+These gates are not errors. They prevent weak forecasts from becoming paper-trade actions.
 
 ## Delayed-label contract
 
-Each forecast is evaluated using the same timing convention as training:
+Forecast outcomes use the same timing convention as training:
 
 1. The source is a closed hourly candle.
 2. Entry is the open of the next hourly candle.
-3. Evaluation occurs at the close of the selected 1-hour, 2-hour or 3-hour horizon.
-4. Outcomes are recorded as `CORRECT`, `WRONG`, `PENDING` or `NOT_SCORED`.
+3. Evaluation occurs at the close of the selected horizon.
+4. Results are recorded as `CORRECT`, `WRONG`, `PENDING` or `NOT_SCORED`.
 
-The dashboard reports resolved accuracy, actual return, adaptive status and per-horizon base-versus-online metrics.
+## Automation
 
----
-
-## Safety model
-
-The system remains paper-trading only. An actionable signal requires all relevant gates to pass, including:
-
-- batch model qualification;
-- selected-horizon qualification;
-- a new independent market event;
-- continuation confidence;
-- tradeability probability;
-- horizon agreement;
-- positive stress-adjusted edge;
-- healthy market data;
-- volatility, news-shock, cooldown and daily-signal limits.
-
-Adaptive activation does not bypass these controls.
-
----
-
-## Automated workflows
-
-### Hourly pipeline
+### Hourly forecast
 
 The hourly workflow:
 
 1. restores forecast, batch-model and adaptive state;
 2. runs repository quality tests;
-3. refreshes 180 days of hourly market data;
+3. refreshes market and recent news data;
 4. resolves newly matured labels;
-5. updates the adaptive learner incrementally;
-6. produces a forecast;
+5. updates the adaptive learner;
+6. produces the next forecast;
 7. renders the static dashboard;
-8. persists forecast and adaptive state;
+8. persists state snapshots;
 9. deploys GitHub Pages.
 
 ### Weekly retraining
 
-The weekly workflow fetches fresh market and news history, retrains the batch champion, publishes the new model snapshot and triggers a fresh hourly evaluation.
+The weekly workflow refreshes the 180-day market and news window, retrains the batch champion, publishes the model snapshot and triggers a fresh hourly evaluation.
 
----
+## Quick start
 
-## Local setup
+Create and activate a Python 3.11 environment, then install the project:
 
 ```bash
 python -m venv .venv
-```
-
-Activate the environment and install the project:
-
-```bash
 python -m pip install --upgrade pip
 python -m pip install -e .
 ```
 
-Fetch data and train the batch model:
+Fetch data, collect news and train the first batch model:
 
 ```bash
-btc-regime fetch --days 180
-btc-regime news-refresh --historical --days 180
-btc-regime train
+btc-regime bootstrap --days 180 --provider auto
 ```
 
-Run one adaptive cycle:
+Run one diagnostic cycle:
 
 ```bash
-btc-regime live --once --force
+btc-regime cycle --force
 ```
 
-Start the local dashboard:
+Start the local dashboard and runtime engine:
 
 ```bash
 btc-regime dashboard
 ```
 
-Run the repository tests:
+Run the complete test suite:
 
 ```bash
 python -m unittest discover -s tests -v
 ```
 
----
-
 ## Repository layout
 
 ```text
-.github/workflows/       Scheduled forecasting and retraining
+.github/workflows/       Forecasting, retraining and quality automation
 config/                  Market, model, adaptive and risk configuration
-scripts/                 GitHub automation and dashboard rendering
-src/btc_ema_trader/      Core package
-  adaptive.py            Incremental adaptive learner
-  features.py            Leakage-safe features and delayed labels
-  model.py               Weekly batch champion
-  runtime.py             Integrated hourly execution pipeline
-  strategy.py            Qualification and fail-safe decisions
-tests/                   Adaptive, dashboard and repository quality tests
+docs/assets/             Repository-owned visual assets
+scripts/                 GitHub automation and static dashboard rendering
+src/btc_ema_trader/      Core Python package
+tests/                   Adaptive, outcome and repository-quality tests
 ```
-
----
 
 ## State branches
 
-Runtime state is isolated from the source branch:
+Runtime artifacts are isolated from source code:
 
 | Branch | Purpose |
 |---|---|
-| `forecast-state` | Latest forecast and compact forecast history. |
-| `model-state` | Latest weekly batch model and training reports. |
-| `adaptive-state` | Incremental learner artifact and adaptive metrics. |
+| `forecast-state` | Latest forecast and compact forecast history |
+| `model-state` | Latest weekly batch model and training reports |
+| `adaptive-state` | Incremental learner artifact and adaptive metrics |
 
-These branches are managed by GitHub Actions and are force-updated snapshots.
+The state branches are managed by GitHub Actions as force-updated snapshots.
 
----
+## Reliability and scope
 
-## Limitations
-
-- Bitcoin markets are non-stationary and noisy.
+- The project is paper-trading only.
+- Bitcoin markets are noisy and non-stationary.
 - Online improvement is not guaranteed.
-- A higher directional accuracy does not guarantee positive trading expectancy.
-- The adaptive layer can remain in shadow mode indefinitely if it does not demonstrate a reliable advantage.
-- Historical, live and adaptive metrics are research diagnostics, not financial advice.
+- Higher directional accuracy does not guarantee positive trading expectancy.
+- The adaptive layer may remain in shadow mode if it does not demonstrate a reliable advantage.
+- Serialized model files must be treated as trusted artifacts and must not be loaded from unknown sources.
+- Historical and live outputs are research diagnostics, not financial advice.
 
----
+## Project standards
+
+- All code, comments, documentation and user-facing repository text must be written in English.
+- Changes must preserve chronological evaluation and delayed-label integrity.
+- Repository tests must pass before deployment.
+- Contribution guidance is available in [CONTRIBUTING.md](CONTRIBUTING.md).
+- Security reporting guidance is available in [SECURITY.md](SECURITY.md).
 
 <div align="center">
 
