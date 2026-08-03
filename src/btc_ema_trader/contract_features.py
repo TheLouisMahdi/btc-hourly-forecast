@@ -1,0 +1,104 @@
+from __future__ import annotations
+
+from typing import Iterable
+
+import pandas as pd
+
+from .config import Settings
+from .directional_events import (
+    attach_directional_breakout_candidates,
+    attach_directional_event_labels,
+)
+from .features import FeatureSet
+from .features import build_feature_set as build_base_feature_set
+from .forecast_contract import attach_close_based_general_labels
+
+
+def build_feature_set(
+    candles: pd.DataFrame,
+    news: pd.DataFrame,
+    settings: Settings,
+    include_labels: bool = True,
+) -> FeatureSet:
+    base = build_base_feature_set(
+        candles,
+        news,
+        settings,
+        include_labels=False,
+    )
+    frame = attach_directional_breakout_candidates(
+        base.frame,
+        settings,
+    )
+    horizons = _configured_horizons(settings, base.horizons)
+    if include_labels:
+        frame = attach_close_based_general_labels(frame, horizons)
+        frame = attach_directional_event_labels(
+            frame,
+            settings,
+            horizons,
+        )
+
+    label_prefixes = (
+        "target_",
+        "future_",
+        "entry_",
+        "breakout_success_",
+        "breakout_hold_",
+        "false_breakout_",
+        "neutral_breakout_",
+        "tradeable_",
+        "event_gross_return_",
+        "event_net_return_",
+        "event_mfe_",
+        "event_mae_",
+        "event_hold_ratio_",
+        "event_target_first_",
+        "event_stop_first_",
+    )
+    feature_columns = [
+        column
+        for column in base.feature_columns
+        if column in frame
+        and pd.api.types.is_numeric_dtype(frame[column])
+        and not column.startswith(label_prefixes)
+    ]
+    for column in (
+        "event_score",
+        "event_scale_hours",
+        "breakout_distance_atr",
+        "breakout_level_touches",
+        "breakout_level_age_bars",
+        "breakout_line_slope_atr",
+        "breakout_line_r2",
+        "aligned_body_atr",
+        "aligned_close_quality",
+        "aligned_regime",
+        "aligned_rsi",
+        "aligned_ema168_slope",
+    ):
+        if (
+            column in frame
+            and pd.api.types.is_numeric_dtype(frame[column])
+            and column not in feature_columns
+        ):
+            feature_columns.append(column)
+    return FeatureSet(
+        frame=frame,
+        feature_columns=feature_columns,
+        horizons=horizons,
+    )
+
+
+def _configured_horizons(
+    settings: Settings,
+    fallback: Iterable[int],
+) -> list[int]:
+    configured = settings.section("model").get(
+        "horizons_hours",
+        list(fallback),
+    )
+    horizons = sorted({int(value) for value in configured})
+    if 1 not in horizons:
+        horizons.insert(0, 1)
+    return horizons
