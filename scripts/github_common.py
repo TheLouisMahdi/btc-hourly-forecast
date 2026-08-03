@@ -47,6 +47,12 @@ def build_github_settings(
             "adaptive_state": str(
                 (adaptive_state_dir / "adaptive_state.joblib").resolve()
             ),
+            "price_adaptive_state": str(
+                (
+                    adaptive_state_dir
+                    / "price_adaptive_state.joblib"
+                ).resolve()
+            ),
             "log_dir": str((runtime_root / "logs").resolve()),
             "model_dir": str(model_dir),
             "report_dir": str(report_dir),
