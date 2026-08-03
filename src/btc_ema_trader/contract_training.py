@@ -8,8 +8,7 @@ import numpy as np
 import pandas as pd
 
 from .config import Settings
-from .features import FeatureSet, build_feature_set
-from .forecast_contract import attach_close_based_general_labels
+from .contract_features import build_feature_set
 from .storage import Database
 from .structure_training import train_feature_set
 
@@ -21,7 +20,7 @@ def train_from_database(
 ) -> dict[str, object]:
     market_cfg = settings.section("market")
     symbol = str(market_cfg.get("symbol", "BTCUSDT"))
-    history_days = float(market_cfg.get("history_days", 365))
+    history_days = float(market_cfg.get("history_days", 3650))
     if provider is None:
         candidates = database.providers(symbol)
         if not candidates:
@@ -41,10 +40,16 @@ def train_from_database(
     candles = candles[
         candles["open_time"] >= cutoff
     ].reset_index(drop=True)
+    news_days = float(
+        settings.section("news").get("historical_days", 365)
+    )
+    news_start = max(
+        candles["open_time"].min(),
+        candles["open_time"].max() - pd.Timedelta(days=news_days),
+    )
     news = database.load_news(
-        start=candles["open_time"].min(),
-        end=candles["open_time"].max()
-        + pd.Timedelta(hours=1),
+        start=news_start,
+        end=candles["open_time"].max() + pd.Timedelta(hours=1),
     )
     feature_set = build_feature_set(
         candles,
@@ -52,17 +57,9 @@ def train_from_database(
         settings,
         include_labels=True,
     )
-    prepared = FeatureSet(
-        frame=attach_close_based_general_labels(
-            feature_set.frame,
-            feature_set.horizons,
-        ),
-        feature_columns=feature_set.feature_columns,
-        horizons=feature_set.horizons,
-    )
     report = train_feature_set(
         settings,
-        prepared,
+        feature_set,
         provider=provider,
         symbol=symbol,
     )
@@ -82,6 +79,8 @@ def enrich_interval_metrics(
         return report
 
     oof = pd.read_csv(oof_path)
+    if "record_type" in oof:
+        oof = oof.loc[oof["record_type"] == "GENERAL"].copy()
     interval_probability = float(
         settings.section("forecast").get(
             "interval_probability",
