@@ -197,6 +197,7 @@ class HorizonModel:
     general_return_regressor: Any
     long_head: DirectionalEventHead
     short_head: DirectionalEventHead
+    general_available: bool = False
 
     def fit_general(
         self,
@@ -216,6 +217,7 @@ class HorizonModel:
             y_return,
             sample_weight=sample_weight,
         )
+        self.general_available = True
         return self
 
     def fit_direction(
@@ -238,11 +240,15 @@ class HorizonModel:
         return self
 
     def predict(self, X: pd.DataFrame) -> dict[str, np.ndarray]:
-        general_X = X.reindex(columns=self.general_feature_columns)
-        probability_up = (
-            self.general_direction_classifier.predict_probability(general_X)
-        )
-        general_return = self.general_return_regressor.predict(general_X)
+        if self.general_available:
+            general_X = X.reindex(columns=self.general_feature_columns)
+            probability_up = (
+                self.general_direction_classifier.predict_probability(general_X)
+            )
+            general_return = self.general_return_regressor.predict(general_X)
+        else:
+            probability_up = np.full(len(X), 0.5, dtype=float)
+            general_return = np.zeros(len(X), dtype=float)
         long_output = self.long_head.predict(X)
         short_output = self.short_head.predict(X)
         direction = pd.to_numeric(
