@@ -118,7 +118,7 @@ def main() -> int:
             )
             contract = build_next_candle_forecast(
                 result,
-                bundle.metrics,
+                load_contract_metrics(settings, bundle.metrics),
                 recent_candles,
                 previous_history,
                 interval_probability=interval_probability,
@@ -213,6 +213,19 @@ def predict_general_close_contract(
         "probabilities": prediction["probabilities"],
         "returns": prediction["returns"],
     }
+
+
+def load_contract_metrics(
+    settings,
+    fallback: dict[str, Any],
+) -> dict[str, Any]:
+    path = settings.path("report_dir") / "latest_training_report.json"
+    try:
+        report = json.loads(path.read_text(encoding="utf-8"))
+        metrics = report.get("metrics")
+        return metrics if isinstance(metrics, dict) else fallback
+    except Exception:
+        return fallback
 
 
 def attach_forecast_contract(
