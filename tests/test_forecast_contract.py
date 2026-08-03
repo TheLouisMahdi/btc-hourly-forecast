@@ -76,6 +76,42 @@ class ForecastContractTests(unittest.TestCase):
         self.assertTrue(pd.isna(result.loc[2, "future_return_h1"]))
         self.assertTrue(pd.isna(result.loc[2, "target_up_h1"]))
 
+    def test_walk_forward_residuals_calibrate_initial_interval(self) -> None:
+        record = {
+            "candle_time": "2026-01-01T00:00:00Z",
+            "price": 100.0,
+            "general_probabilities": {1: 0.50},
+            "general_return_estimates": {1: 0.002},
+        }
+        recent = pd.DataFrame(
+            {
+                "high": [100.4],
+                "low": [99.6],
+                "close": [100.0],
+            }
+        )
+        metrics = {
+            "1": {
+                "return_mae": 0.02,
+                "close_interval_oof_samples": 500,
+                "close_interval_residual_low": -0.006,
+                "close_interval_residual_high": 0.008,
+            }
+        }
+        result = build_next_candle_forecast(
+            record,
+            metrics,
+            recent,
+            [],
+        )
+        self.assertEqual(
+            result["interval_method"],
+            "WALK_FORWARD_RESIDUAL_QUANTILES",
+        )
+        self.assertEqual(result["calibration_samples"], 500)
+        self.assertAlmostEqual(result["likely_return_low"], -0.004)
+        self.assertAlmostEqual(result["likely_return_high"], 0.010)
+
     def test_resolved_history_calibrates_the_interval(self) -> None:
         history = []
         for index in range(30):
