@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import asdict, dataclass
-from typing import Any
+from typing import Any, Iterable
 
 import numpy as np
 import pandas as pd
@@ -39,6 +39,25 @@ class NextCandleForecast:
         return asdict(self)
 
 
+def attach_close_based_general_labels(
+    frame: pd.DataFrame,
+    horizons: Iterable[int],
+) -> pd.DataFrame:
+    output = frame.copy()
+    source_close = pd.to_numeric(output["close"], errors="coerce")
+    for raw_horizon in horizons:
+        horizon = int(raw_horizon)
+        future_close = source_close.shift(-horizon)
+        close_return = future_close / source_close.replace(0, np.nan) - 1.0
+        output[f"future_return_h{horizon}"] = close_return
+        output[f"target_up_h{horizon}"] = (close_return > 0).astype(float)
+        output.loc[
+            close_return.isna(),
+            f"target_up_h{horizon}",
+        ] = np.nan
+    return output
+
+
 def build_next_candle_forecast(
     record: dict[str, Any],
     model_metrics: dict[str, Any] | None,
@@ -54,9 +73,13 @@ def build_next_candle_forecast(
     if reference_close <= 0:
         raise ValueError("A positive source candle close is required")
 
+    probability_source = record.get(
+        "general_probabilities",
+        record.get("probabilities"),
+    )
     probability_up = float(
         np.clip(
-            _mapping_value(record.get("probabilities"), 1, 0.5),
+            _mapping_value(probability_source, 1, 0.5),
             1e-4,
             1 - 1e-4,
         )
