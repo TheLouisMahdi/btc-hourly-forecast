@@ -1,0 +1,70 @@
+name: Repository quality
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/**"
+      - ".editorconfig"
+      - "README.md"
+      - "CHANGELOG.md"
+      - "CONTRIBUTING.md"
+      - "SECURITY.md"
+      - "config/**"
+      - "docs/**"
+      - "scripts/**"
+      - "src/**"
+      - "tests/**"
+      - "pyproject.toml"
+      - "requirements-github.txt"
+  pull_request:
+    branches: [main]
+    paths:
+      - ".github/workflows/**"
+      - ".editorconfig"
+      - "README.md"
+      - "CHANGELOG.md"
+      - "CONTRIBUTING.md"
+      - "SECURITY.md"
+      - "config/**"
+      - "docs/**"
+      - "scripts/**"
+      - "src/**"
+      - "tests/**"
+      - "pyproject.toml"
+      - "requirements-github.txt"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: repository-quality-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: requirements-github.txt
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements-github.txt
+          python -m pip install -e . --no-deps
+
+      - name: Run unit tests
+        run: python -m unittest discover -s tests -v
+
+      - name: Compile Python sources
+        run: python -m compileall -q src scripts
