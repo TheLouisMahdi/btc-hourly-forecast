@@ -9,7 +9,11 @@ from typing import Any
 
 import pandas as pd
 
-from btc_ema_trader.forecast_contract import build_next_candle_forecast
+from btc_ema_trader.features import build_feature_set
+from btc_ema_trader.forecast_contract import (
+    attach_close_based_general_labels,
+    build_next_candle_forecast,
+)
 from btc_ema_trader.logging_setup import configure_logging
 from btc_ema_trader.market import fetch_and_store
 from btc_ema_trader.model import latest_bundle
@@ -57,7 +61,10 @@ def main() -> int:
 
     history_path = state_dir / "history.json"
     previous_history = load_history(history_path)
-    used_weekly_model = copy_latest_model_from_state(root, model_state_dir)
+    used_weekly_model = copy_latest_model_from_state(
+        root,
+        model_state_dir,
+    )
     settings = build_github_settings(
         root,
         runtime_dir,
@@ -77,21 +84,49 @@ def main() -> int:
             days=180,
             provider=bundle.provider,
         )
-        result = RuntimeEngine(settings, database).run_once(force=True)
-        status = "OK" if result.get("status") != "FAIL_SAFE" else "FAIL_SAFE"
+        result = RuntimeEngine(
+            settings,
+            database,
+        ).run_once(force=True)
+        status = (
+            "OK"
+            if result.get("status") != "FAIL_SAFE"
+            else "FAIL_SAFE"
+        )
         if status == "OK" and result.get("candle_time"):
             recent_candles = database.load_candles(
                 provider=bundle.provider,
                 symbol=bundle.symbol,
                 limit=168,
             )
+            general_prediction = predict_general_close_contract(
+                settings,
+                database,
+                bundle,
+            )
+            result["general_probabilities"] = general_prediction[
+                "probabilities"
+            ]
+            result["general_return_estimates"] = general_prediction[
+                "returns"
+            ]
+            interval_probability = float(
+                settings.section("forecast").get(
+                    "interval_probability",
+                    0.80,
+                )
+            )
             contract = build_next_candle_forecast(
                 result,
                 bundle.metrics,
                 recent_candles,
                 previous_history,
+                interval_probability=interval_probability,
             )
-            result = attach_forecast_contract(result, contract)
+            result = attach_forecast_contract(
+                result,
+                contract,
+            )
     except Exception as exc:
         LOGGER.exception("Hourly forecast failed")
         market = None
@@ -108,13 +143,18 @@ def main() -> int:
             "run_status": status,
             "run_started_at": started_at,
             "run_finished_at": finished_at,
-            "run_duration_seconds": (finished_at - started_at).total_seconds(),
+            "run_duration_seconds": (
+                finished_at - started_at
+            ).total_seconds(),
             "market_refresh": market,
             "weekly_model_loaded": used_weekly_model,
         }
     )
 
-    history = append_unique(previous_history, record)[-MAX_HISTORY:]
+    history = append_unique(
+        previous_history,
+        record,
+    )[-MAX_HISTORY:]
     write_json(state_dir / "latest.json", record)
     write_json(history_path, history)
     write_json(site_dir / "latest.json", record)
@@ -134,26 +174,77 @@ def main() -> int:
     return 0
 
 
+def predict_general_close_contract(
+    settings,
+    database: Database,
+    bundle,
+) -> dict[str, Any]:
+    candles = database.load_candles(
+        provider=bundle.provider,
+        symbol=bundle.symbol,
+    )
+    news = database.load_news(
+        start=candles["open_time"].min(),
+        end=pd.Timestamp.now(tz="UTC"),
+    )
+    feature_set = build_feature_set(
+        candles,
+        news,
+        settings,
+        include_labels=False,
+    )
+    prepared = attach_close_based_general_labels(
+        feature_set.frame,
+        feature_set.horizons,
+    )
+    usable = prepared.dropna(
+        subset=["kama", "donchian_mid", "atr", "adx"]
+    )
+    if usable.empty:
+        raise RuntimeError(
+            "No closed candle is available for the forecast contract"
+        )
+    prediction = bundle.predict_frame(usable.tail(1))
+    return {
+        "probabilities": prediction["probabilities"],
+        "returns": prediction["returns"],
+    }
+
+
 def attach_forecast_contract(
     result: dict[str, Any],
     contract: dict[str, Any],
 ) -> dict[str, Any]:
     output = dict(result)
-    output["trade_forecast_direction"] = output.get("forecast_direction")
-    output["trade_selected_horizon"] = output.get("selected_horizon")
+    output["trade_forecast_direction"] = output.get(
+        "forecast_direction"
+    )
+    output["trade_selected_horizon"] = output.get(
+        "selected_horizon"
+    )
     output["trade_confidence"] = output.get("confidence")
     output["next_candle_forecast"] = contract
-    output["forecast_contract_version"] = contract["contract_version"]
+    output["forecast_contract_version"] = contract[
+        "contract_version"
+    ]
     output["forecast_direction"] = contract["direction"]
     output["selected_horizon"] = 1
     output["confidence"] = contract["direction_confidence"]
     output["expected_return"] = contract["median_return"]
     output["target_candle_time"] = contract["target_open_time"]
-    output["target_candle_open_time"] = contract["target_open_time"]
-    output["target_candle_close_time"] = contract["target_close_time"]
+    output["target_candle_open_time"] = contract[
+        "target_open_time"
+    ]
+    output["target_candle_close_time"] = contract[
+        "target_close_time"
+    ]
     output["predicted_close_median"] = contract["median_close"]
-    output["predicted_close_low"] = contract["likely_close_low"]
-    output["predicted_close_high"] = contract["likely_close_high"]
+    output["predicted_close_low"] = contract[
+        "likely_close_low"
+    ]
+    output["predicted_close_high"] = contract[
+        "likely_close_high"
+    ]
     output["prediction_result"] = "PENDING"
     output["direction_result"] = "PENDING"
     output["resolved_at"] = None
@@ -174,11 +265,17 @@ def append_unique(
     history: list[dict[str, Any]],
     record: dict[str, Any],
 ) -> list[dict[str, Any]]:
-    key = record.get("candle_time") or record.get("run_finished_at")
+    key = record.get("candle_time") or record.get(
+        "run_finished_at"
+    )
     filtered = [
         item
         for item in history
-        if (item.get("candle_time") or item.get("run_finished_at")) != key
+        if (
+            item.get("candle_time")
+            or item.get("run_finished_at")
+        )
+        != key
     ]
     filtered.append(record)
     return sorted(
