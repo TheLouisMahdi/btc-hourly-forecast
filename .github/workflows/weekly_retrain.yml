@@ -1,6 +1,10 @@
 name: Weekly BTC model retraining
 
 on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/weekly_retrain.yml"
   schedule:
     # Every Sunday at 03:47 UTC.
     - cron: "47 3 * * 0"
