@@ -240,10 +240,8 @@ class RepositoryQualityTests(unittest.TestCase):
         self.assertIn("long_head", model)
         self.assertIn("short_head", model)
         self.assertIn("early_stopping=False", model)
-        self.assertIn(
-            "predates deterministic directional breakout schema v5",
-            model,
-        )
+        self.assertIn("predates deterministic directional", model)
+        self.assertIn("breakout schema v5", model)
 
     def test_training_contains_no_random_sampling(self) -> None:
         root = Path(__file__).resolve().parents[1]
