@@ -6,13 +6,15 @@ __pycache__/
 .github_runtime/
 .github_state/
 .model_state/
+.adaptive_state/
 model-state-output/
 site/
 data/*.sqlite3
 data/*.json
+data/*.joblib
 artifacts/models/*.joblib
 !artifacts/models/latest.joblib
 artifacts/reports/*.json
 !artifacts/reports/latest_training_report.json
-logs/*.log
 artifacts/reports/*_oof.csv
+logs/*.log
