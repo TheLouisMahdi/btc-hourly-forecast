@@ -42,6 +42,7 @@ class ForecastContractTests(unittest.TestCase):
             pd.DataFrame(),
             [],
         )
+        expected_magnitude = 0.67 * 0.008 + 0.33 * 0.02
         self.assertEqual(result["contract_version"], 2)
         self.assertEqual(
             result["target_close_time"],
@@ -49,7 +50,8 @@ class ForecastContractTests(unittest.TestCase):
         )
         self.assertEqual(result["direction"], "UP")
         self.assertEqual(result["forecast_source"], "BATCH_AND_ONLINE")
-        self.assertAlmostEqual(result["median_return"], 0.012)
+        self.assertAlmostEqual(result["median_return"], expected_magnitude)
+        self.assertAlmostEqual(result["raw_fused_return"], 0.012)
         self.assertAlmostEqual(result["batch_probability_up"], 0.58)
         self.assertAlmostEqual(result["online_probability_up"], 0.67)
         self.assertAlmostEqual(result["direction_blend_weight"], 0.33)
@@ -65,6 +67,36 @@ class ForecastContractTests(unittest.TestCase):
             result["likely_close_high"],
             result["median_close"],
         )
+
+    def test_expected_close_is_aligned_with_predicted_direction(self) -> None:
+        record = {
+            "candle_time": "2026-01-01T00:00:00Z",
+            "price": 100.0,
+            "general_probabilities": {"1": 0.61},
+            "general_return_estimates": {"1": -0.012},
+            "price_forecast_model": {
+                "source": "BATCH_AND_ONLINE",
+                "batch_probability_up": 0.58,
+                "online_probability_up": 0.67,
+                "direction_blend_weight": 0.33,
+                "batch_return": -0.008,
+                "online_return": -0.02,
+                "return_blend_weight": 0.33,
+            },
+        }
+        result = build_next_candle_forecast(
+            record,
+            {"1": {"return_mae": 0.005}},
+            pd.DataFrame(),
+            [],
+        )
+        expected_magnitude = 0.67 * 0.008 + 0.33 * 0.02
+        self.assertEqual(result["direction"], "UP")
+        self.assertAlmostEqual(result["median_return"], expected_magnitude)
+        self.assertAlmostEqual(result["raw_fused_return"], -0.012)
+        self.assertFalse(result["return_direction_consistent"])
+        self.assertTrue(result["direction_alignment_applied"])
+        self.assertGreater(result["median_close"], 100.0)
 
     def test_direction_is_always_up_or_down(self) -> None:
         record = {
