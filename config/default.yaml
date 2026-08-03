@@ -75,6 +75,7 @@ structure:
   level_touch_tolerance_atr: 0.30
   event_cooldown_hours: 4
   breakout_buffer_atr: 0.10
+  breakout_crossing_tolerance_atr: 0.05
   breakout_maximum_extension_atr: 1.50
   breakout_minimum_body_atr: 0.20
   breakout_minimum_volume_z: -0.25
@@ -100,7 +101,7 @@ model:
   walk_forward_splits: 6
   validation_gap_hours: 6
   min_train_rows: 5000
-  minimum_training_events: 60
+  minimum_training_events: 30
   max_iter: 320
   learning_rate: 0.035
   max_leaf_nodes: 15
