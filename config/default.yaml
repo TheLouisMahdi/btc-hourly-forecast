@@ -1,6 +1,6 @@
 project:
-  name: BTC Next-Candle Forecast
-  version: 3.2.0
+  name: BTC Structural Breakout Forecast
+  version: 4.0.0
   timezone: UTC
 
 paths:
@@ -15,13 +15,13 @@ paths:
 market:
   symbol: BTCUSDT
   interval: 1h
-  history_days: 180
+  history_days: 365
   provider: auto
   provider_order: [binance_futures, bybit_linear, okx_swap]
   request_timeout_seconds: 20
   max_retries: 4
   retry_backoff_seconds: 1.5
-  minimum_history_rows: 4000
+  minimum_history_rows: 8000
   maximum_gap_hours: 2
   quote_stale_seconds: 90
   binance_futures_base_url: https://fapi.binance.com
@@ -32,7 +32,7 @@ market:
 
 news:
   enabled: true
-  historical_days: 180
+  historical_days: 365
   gdelt_enabled: true
   gdelt_query: '(bitcoin OR btc OR cryptocurrency) sourcelang:english'
   gdelt_chunk_days: 3
@@ -60,76 +60,96 @@ features:
   squeeze_lookback: 120
   squeeze_percentile: 0.20
   trend_adx_threshold: 18.0
-  breakout_min_volume_z: -0.25
-  pullback_tolerance_atr: 0.35
-  impulse_body_atr: 1.0
-  impulse_min_volume_z: 0.50
-  event_cooldown_hours: 3
-  event_sample_weight: 2.5
-  normal_sample_weight: 1.0
-  oldest_sample_weight: 0.75
+  event_sample_weight: 4.0
+  normal_sample_weight: 0.70
+  oldest_sample_weight: 0.55
   news_windows_hours: [1, 3, 6, 12, 24]
   news_shock_min_count: 3
   news_shock_min_relevance: 0.55
 
+structure:
+  lookback_hours: [48, 120, 240, 480]
+  pivot_left_bars: 3
+  pivot_right_bars: 3
+  maximum_pivots_per_line: 8
+  level_touch_tolerance_atr: 0.30
+  event_cooldown_hours: 4
+  breakout_buffer_atr: 0.10
+  breakout_maximum_extension_atr: 1.50
+  breakout_minimum_body_atr: 0.20
+  breakout_minimum_volume_z: -0.25
+  breakout_invalidation_atr: 0.35
+  long_minimum_close_location: 0.65
+  short_maximum_close_location: 0.35
+  triangle_lookback_hours: 120
+  triangle_minimum_contraction: 0.15
+  triangle_maximum_width_percent: 0.08
+  triangle_minimum_line_r2: 0.25
+  triangle_minimum_slope_atr: 0.005
+  triangle_flat_slope_atr: 0.018
+  triangle_minimum_quality: 0.45
+  label_hold_buffer_atr: 0.05
+
 model:
-  horizons_hours: [1]
+  horizons_hours: [1, 3, 6]
   horizon_weights:
-    1: 1.0
+    1: 0.20
+    3: 0.45
+    6: 0.35
   random_state: 42
-  walk_forward_splits: 5
-  validation_gap_hours: 3
-  min_train_rows: 1800
-  minimum_training_events: 80
-  max_iter: 280
-  learning_rate: 0.04
+  walk_forward_splits: 6
+  validation_gap_hours: 6
+  min_train_rows: 5000
+  minimum_training_events: 120
+  max_iter: 320
+  learning_rate: 0.035
   max_leaf_nodes: 15
-  min_samples_leaf: 30
-  l2_regularization: 1.5
-  logistic_weight: 0.30
-  tree_weight: 0.70
+  min_samples_leaf: 36
+  l2_regularization: 2.0
+  logistic_weight: 0.35
+  tree_weight: 0.65
   auto_retrain_days: 7
 
 forecast:
   target: NEXT_CLOSED_1H_CANDLE
   interval_probability: 0.80
   settlement_delay_seconds: 90
-  minimum_residual_samples: 20
-  maximum_residual_samples: 240
-  online_bootstrap_rows: 1440
-  online_observation_limit: 1000
-  online_evaluation_window: 336
-  online_minimum_samples: 72
-  online_maximum_direction_weight: 0.45
-  online_maximum_return_weight: 0.45
-  online_brier_tolerance: 0.005
-  online_accuracy_tolerance: 0.01
-  online_return_mae_tolerance: 0.0001
+  minimum_residual_samples: 30
+  maximum_residual_samples: 360
+  online_bootstrap_rows: 2160
+  online_observation_limit: 1500
+  online_evaluation_window: 504
+  online_minimum_samples: 168
+  online_maximum_direction_weight: 0.35
+  online_maximum_return_weight: 0.35
+  online_brier_tolerance: 0.003
+  online_accuracy_tolerance: 0.005
+  online_return_mae_tolerance: 0.00008
 
 adaptive:
   enabled: true
-  bootstrap_rows: 1440
-  observation_limit: 1000
-  evaluation_window: 336
-  minimum_direction_samples: 72
-  minimum_event_samples: 12
-  minimum_brier_improvement: 0.003
-  maximum_accuracy_regression: 0.015
-  suspension_brier_margin: 0.02
-  blend_weight: 0.35
-  maximum_blend_weight: 0.55
-  event_weight: 2.0
+  bootstrap_rows: 2160
+  observation_limit: 1500
+  evaluation_window: 504
+  minimum_direction_samples: 168
+  minimum_event_samples: 60
+  minimum_brier_improvement: 0.004
+  maximum_accuracy_regression: 0.010
+  suspension_brier_margin: 0.015
+  blend_weight: 0.25
+  maximum_blend_weight: 0.40
+  event_weight: 3.0
   new_sample_weight: 1.0
 
 qualification:
-  minimum_event_auc: 0.52
-  minimum_tradeability_auc: 0.53
-  minimum_event_samples: 60
+  minimum_event_auc: 0.54
+  minimum_tradeability_auc: 0.55
+  minimum_event_samples: 80
   maximum_event_calibration_error: 0.10
   maximum_tradeability_calibration_error: 0.10
   minimum_positive_fold_fraction: 0.50
-  minimum_oof_trades: 10
-  minimum_oof_hit_rate: 0.50
+  minimum_oof_trades: 20
+  minimum_oof_hit_rate: 0.52
   minimum_qualified_horizons: 1
   require_positive_oof_expectancy: true
 
@@ -147,10 +167,14 @@ strategy:
   minimum_profit_buffer_bps: 8.0
   minimum_net_edge_bps: 8.0
   minimum_confidence:
-    1: 0.56
+    1: 0.58
+    3: 0.60
+    6: 0.61
   minimum_tradeability_probability:
-    1: 0.55
-  minimum_horizon_agreement: 1.0
+    1: 0.56
+    3: 0.58
+    6: 0.59
+  minimum_horizon_agreement: 0.6667
   maximum_atr_percent: 3.0
   block_during_news_shock: true
   require_fresh_news: false
@@ -160,12 +184,12 @@ strategy:
   stop_atr_multiplier: 1.15
   minimum_stop_percent: 0.0040
   maximum_stop_percent: 0.014
-  target_r_multiple: 1.70
-  label_target_atr_multiplier: 1.35
+  target_r_multiple: 1.80
+  label_target_atr_multiplier: 1.50
   label_stop_atr_multiplier: 1.0
   gap_risk_buffer_bps: 6.0
   maximum_daily_signals: 3
-  cooldown_hours_after_signal: 2
+  cooldown_hours_after_signal: 3
 
 live:
   poll_seconds: 15
