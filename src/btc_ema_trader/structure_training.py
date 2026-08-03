@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import re
 import uuid
 from typing import Any
 
@@ -13,6 +14,10 @@ from .costs import execution_cost_breakdown
 from .features import FeatureSet, sample_weights
 from .model import HourlyModelBundle, build_horizon_model
 from .training import _metrics, _summary_csv, qualify_model
+
+_ABSOLUTE_STRUCTURE_LEVEL = re.compile(
+    r"^structure_\d+h_(resistance|support)$"
+)
 
 
 def train_feature_set(
@@ -36,7 +41,8 @@ def train_feature_set(
     feature_columns = [
         column
         for column in feature_set.feature_columns
-        if frame[column].notna().sum()
+        if not _is_absolute_price_feature(column)
+        and frame[column].notna().sum()
         > max(80, len(frame) * 0.12)
     ]
     minimum_rows = int(
@@ -51,7 +57,7 @@ def train_feature_set(
     minimum_events = int(
         settings.section("model").get(
             "minimum_training_events",
-            120,
+            80,
         )
     )
     if event_count < minimum_events:
@@ -289,7 +295,10 @@ def train_feature_set(
         )
         models[horizon] = final_model
 
-    qualification = qualify_model(horizon_metrics, settings)
+    qualification = _qualify_structure_model(
+        horizon_metrics,
+        settings,
+    )
     created_at = pd.Timestamp.now(tz="UTC")
     model_id = (
         "structure-breakout-hourly-"
@@ -393,6 +402,72 @@ def train_feature_set(
         index=False,
     )
     return report
+
+
+def _qualify_structure_model(
+    metrics: dict[str, Any],
+    settings: Settings,
+) -> dict[str, Any]:
+    qualification = qualify_model(metrics, settings)
+    cfg = settings.section("qualification")
+    minimum_hold = float(
+        cfg.get("minimum_breakout_hold_rate", 0.42)
+    )
+    maximum_false = float(
+        cfg.get("maximum_false_breakout_rate", 0.58)
+    )
+    qualified: list[int] = []
+    blockers: list[str] = []
+    per_horizon = qualification.get("per_horizon", {})
+    for horizon, item in metrics.items():
+        horizon_state = per_horizon.setdefault(
+            str(horizon),
+            {"passed": True, "blockers": [], "warnings": []},
+        )
+        reasons = list(horizon_state.get("blockers", []))
+        hold_rate = float(item.get("breakout_hold_rate", 0.0))
+        false_rate = float(item.get("false_breakout_rate", 1.0))
+        if hold_rate < minimum_hold:
+            reasons.append("breakout hold rate below minimum")
+        if false_rate > maximum_false:
+            reasons.append("false breakout rate above maximum")
+        horizon_state["blockers"] = reasons
+        horizon_state["passed"] = not reasons
+        if reasons:
+            blockers.extend(
+                [f"h{horizon}: {reason}" for reason in reasons]
+            )
+        else:
+            qualified.append(int(horizon))
+    minimum_qualified = int(
+        cfg.get("minimum_qualified_horizons", 1)
+    )
+    passed = len(qualified) >= minimum_qualified
+    if not passed:
+        blockers.insert(
+            0,
+            f"Only {len(qualified)} qualified horizon(s); "
+            f"{minimum_qualified} required",
+        )
+    qualification.update(
+        {
+            "passed": passed,
+            "qualified_horizons": qualified,
+            "per_horizon": per_horizon,
+            "blockers": blockers,
+            "structure_checks": {
+                "minimum_breakout_hold_rate": minimum_hold,
+                "maximum_false_breakout_rate": maximum_false,
+            },
+        }
+    )
+    return qualification
+
+
+def _is_absolute_price_feature(column: str) -> bool:
+    if column in {"ema_24", "ema_72", "ema_168", "ema_336"}:
+        return True
+    return bool(_ABSOLUTE_STRUCTURE_LEVEL.match(column))
 
 
 def _event_rate(values: np.ndarray, event_mask: np.ndarray) -> float:
