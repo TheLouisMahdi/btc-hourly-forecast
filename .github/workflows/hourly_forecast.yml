@@ -6,7 +6,8 @@ on:
     paths:
       - ".github/workflows/hourly_forecast.yml"
       - "src/**"
-      - "scripts/**"
+      - "scripts/github_hourly_forecast.py"
+      - "scripts/github_common.py"
       - "tests/**"
       - "config/**"
       - "requirements-github.txt"
@@ -20,21 +21,16 @@ on:
 
 permissions:
   contents: write
-  pages: write
-  id-token: write
 
 concurrency:
-  group: hourly-btc-pages
+  group: hourly-btc-forecast
   cancel-in-progress: true
 
 jobs:
-  forecast-and-deploy:
+  forecast:
     if: github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success'
     runs-on: ubuntu-latest
     timeout-minutes: 35
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - name: Checkout project
         uses: actions/checkout@v6
@@ -92,7 +88,7 @@ jobs:
       - name: Run adaptive forecast
         run: python scripts/github_hourly_forecast.py
 
-      - name: Resolve outcomes and render dashboard
+      - name: Resolve outcomes
         run: python scripts/github_dashboard.py
 
       - name: Persist forecast history
@@ -104,15 +100,3 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ github.token }}
         run: bash scripts/push_snapshot_branch.sh adaptive-state .adaptive_state
-
-      - name: Configure GitHub Pages
-        uses: actions/configure-pages@v6
-
-      - name: Upload dashboard
-        uses: actions/upload-pages-artifact@v4
-        with:
-          path: site
-
-      - name: Deploy GitHub Pages
-        id: deployment
-        uses: actions/deploy-pages@v4
