@@ -32,6 +32,13 @@ FORBIDDEN_FILES = {
     "PATCH_INSTRUCTIONS_FA.md",
     "PATCH_V2_1_FA.md",
     "v1_to_v2_regime.patch",
+    "requirements.txt",
+    "setup.bat",
+    "start_first_run.bat",
+    "start_live.bat",
+    "start_news_refresh.bat",
+    "start_retrain.bat",
+    "start_status.bat",
 }
 
 
@@ -61,7 +68,7 @@ class RepositoryQualityTests(unittest.TestCase):
             f"Persian text found in: {violations}",
         )
 
-    def test_obsolete_patch_artifacts_are_absent(self) -> None:
+    def test_obsolete_artifacts_are_absent(self) -> None:
         root = Path(__file__).resolve().parents[1]
         present = sorted(
             name
