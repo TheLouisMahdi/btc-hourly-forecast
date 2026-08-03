@@ -1,6 +1,15 @@
 name: Hourly BTC forecast
 
 on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/hourly_forecast.yml"
+      - "src/**"
+      - "scripts/**"
+      - "config/**"
+      - "requirements-github.txt"
+      - "pyproject.toml"
   schedule:
     # GitHub schedules use UTC. Minute 17 avoids the busiest top-of-hour period.
     - cron: "17 * * * *"
@@ -45,18 +54,22 @@ jobs:
         shell: bash
         run: |
           mkdir -p .github_state
-          git fetch origin forecast-state --depth=1 || true
-          git show origin/forecast-state:history.json > .github_state/history.json 2>/dev/null || true
-          git show origin/forecast-state:latest.json > .github_state/latest.json 2>/dev/null || true
+          if git ls-remote --exit-code --heads origin forecast-state >/dev/null 2>&1; then
+            git fetch origin forecast-state --depth=1
+            git show origin/forecast-state:history.json > .github_state/history.json 2>/dev/null || true
+            git show origin/forecast-state:latest.json > .github_state/latest.json 2>/dev/null || true
+          fi
 
       - name: Restore latest weekly model
         shell: bash
         run: |
           mkdir -p .model_state
-          git fetch origin model-state --depth=1 || true
-          for file in latest.joblib latest_training_report.json latest_metrics.csv model_metadata.json; do
-            git show "origin/model-state:${file}" > ".model_state/${file}" 2>/dev/null || rm -f ".model_state/${file}"
-          done
+          if git ls-remote --exit-code --heads origin model-state >/dev/null 2>&1; then
+            git fetch origin model-state --depth=1
+            for file in latest.joblib latest_training_report.json latest_metrics.csv model_metadata.json; do
+              git show "origin/model-state:${file}" > ".model_state/${file}" 2>/dev/null || rm -f ".model_state/${file}"
+            done
+          fi
 
       - name: Run one forecast and build static dashboard
         run: python scripts/github_hourly_forecast.py
