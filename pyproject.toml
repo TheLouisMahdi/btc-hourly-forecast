@@ -4,8 +4,8 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "btc-hourly-regime-trader"
-version = "3.2.0"
-description = "Direction-first BTC next-candle forecasting with performance-weighted online price adaptation and immutable delayed outcomes"
+version = "4.0.0"
+description = "Causal multi-scale BTC structural breakout forecasting with dynamic support, resistance, triangle patterns and adaptive validation"
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
