@@ -4,14 +4,19 @@ from typing import Iterable
 
 import pandas as pd
 
+from . import features as base_features
 from .config import Settings
 from .directional_events import (
     attach_directional_breakout_candidates,
     attach_directional_event_labels,
 )
 from .features import FeatureSet
-from .features import build_feature_set as build_base_feature_set
 from .forecast_contract import attach_close_based_general_labels
+from .market_structure_fast import (
+    build_market_structure as build_fast_market_structure,
+)
+
+base_features.build_market_structure = build_fast_market_structure
 
 
 def build_feature_set(
@@ -20,7 +25,7 @@ def build_feature_set(
     settings: Settings,
     include_labels: bool = True,
 ) -> FeatureSet:
-    base = build_base_feature_set(
+    base = base_features.build_feature_set(
         candles,
         news,
         settings,
