@@ -16,7 +16,9 @@ TEXT_SUFFIXES = {
     ".txt",
     ".sh",
     ".bat",
+    ".svg",
 }
+TEXT_FILENAMES = {".editorconfig"}
 IGNORED_DIRECTORIES = {
     ".git",
     ".venv",
@@ -40,6 +42,16 @@ FORBIDDEN_FILES = {
     "start_retrain.bat",
     "start_status.bat",
 }
+REQUIRED_FILES = {
+    ".editorconfig",
+    ".github/workflows/quality.yml",
+    "CHANGELOG.md",
+    "CONTRIBUTING.md",
+    "README.md",
+    "SECURITY.md",
+    "docs/assets/candlestick-loop.svg",
+    "pyproject.toml",
+}
 
 
 class RepositoryQualityTests(unittest.TestCase):
@@ -47,9 +59,11 @@ class RepositoryQualityTests(unittest.TestCase):
         root = Path(__file__).resolve().parents[1]
         violations: list[str] = []
         for path in root.rglob("*"):
+            if not path.is_file():
+                continue
             if (
-                not path.is_file()
-                or path.suffix.lower() not in TEXT_SUFFIXES
+                path.suffix.lower() not in TEXT_SUFFIXES
+                and path.name not in TEXT_FILENAMES
             ):
                 continue
             if any(
@@ -79,6 +93,31 @@ class RepositoryQualityTests(unittest.TestCase):
             present,
             [],
             f"Obsolete files found: {present}",
+        )
+
+    def test_professional_repository_files_exist(self) -> None:
+        root = Path(__file__).resolve().parents[1]
+        missing = sorted(
+            name
+            for name in REQUIRED_FILES
+            if not (root / name).is_file()
+        )
+        self.assertEqual(
+            missing,
+            [],
+            f"Required repository files are missing: {missing}",
+        )
+
+    def test_readme_uses_repository_owned_animation(self) -> None:
+        root = Path(__file__).resolve().parents[1]
+        readme = (root / "README.md").read_text(encoding="utf-8")
+        self.assertIn(
+            "docs/assets/candlestick-loop.svg",
+            readme,
+        )
+        self.assertNotIn(
+            "capsule-render.vercel.app",
+            readme,
         )
 
 
