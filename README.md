@@ -5,34 +5,40 @@
 <br />
 
 <a href="https://thelouismahdi.github.io/btc-hourly-forecast/">
-  <img src="https://img.shields.io/badge/OPEN_LIVE_DASHBOARD-GITHUB_PAGES-22d3ee?style=for-the-badge&logo=githubpages&logoColor=020617" alt="Open live dashboard" />
+  <img src="https://img.shields.io/badge/OPEN_LIVE_DASHBOARD-GITHUB_PAGES-6f9b91?style=for-the-badge&logo=githubpages&logoColor=ffffff" alt="Open live dashboard" />
 </a>
 
 <a href="https://github.com/TheLouisMahdi/btc-hourly-forecast/actions/workflows/hourly_forecast.yml">
-  <img src="https://img.shields.io/github/actions/workflow/status/TheLouisMahdi/btc-hourly-forecast/hourly_forecast.yml?branch=main&style=for-the-badge&label=Hourly%20Pipeline&labelColor=020617" alt="Hourly pipeline status" />
+  <img src="https://img.shields.io/github/actions/workflow/status/TheLouisMahdi/btc-hourly-forecast/hourly_forecast.yml?branch=main&style=for-the-badge&label=Hourly%20Pipeline&labelColor=47746b" alt="Hourly pipeline status" />
 </a>
 
 <a href="https://github.com/TheLouisMahdi/btc-hourly-forecast/actions/workflows/weekly_retrain.yml">
-  <img src="https://img.shields.io/github/actions/workflow/status/TheLouisMahdi/btc-hourly-forecast/weekly_retrain.yml?branch=main&style=for-the-badge&label=Weekly%20Retraining&labelColor=020617" alt="Weekly retraining status" />
+  <img src="https://img.shields.io/github/actions/workflow/status/TheLouisMahdi/btc-hourly-forecast/weekly_retrain.yml?branch=main&style=for-the-badge&label=Weekly%20Retraining&labelColor=47746b" alt="Weekly retraining status" />
 </a>
 
 <br />
 <br />
 
-<img src="https://img.shields.io/badge/version-3.1.0-14b8a6?style=flat-square" alt="Version 3.1.0" />
+<img src="https://img.shields.io/badge/version-3.2.0-8f8ab8?style=flat-square" alt="Version 3.2.0" />
 <img src="https://img.shields.io/badge/Python-3.11%2B-3776ab?style=flat-square&logo=python&logoColor=white" alt="Python 3.11 or newer" />
-<img src="https://img.shields.io/badge/forecast-next_closed_1h_candle-22d3ee?style=flat-square" alt="Next closed one-hour candle" />
-<img src="https://img.shields.io/badge/mode-paper_trading_only-f59e0b?style=flat-square" alt="Paper trading only" />
+<img src="https://img.shields.io/badge/target-next_closed_1h_candle-6f9b91?style=flat-square" alt="Next closed one-hour candle" />
+<img src="https://img.shields.io/badge/mode-paper_trading_only-c99078?style=flat-square" alt="Paper trading only" />
 
 </div>
 
 ## Overview
 
-**BTC Next-Candle Forecast** is a research system that creates one forecast after each fully closed hourly Bitcoin candle.
+**BTC Next-Candle Forecast** creates one immutable forecast after every fully closed hourly Bitcoin candle.
 
-The public forecast is not an exact future price. It is an **80% probable close range** for the next one-hour candle, together with a median estimate, directional bias and scenario label.
+Version 3.2 makes **direction the primary forecast target**. Every forecast predicts `UP` or `DOWN` for the next hourly close. A model-estimated price interval remains available as a secondary uncertainty measure, but a wide interval can no longer make a wrong direction appear successful.
 
-The forecast is evaluated only after the target candle has fully closed. A result becomes immutable after resolution and cannot change when later candles arrive.
+The final forecast combines:
+
+- the weekly Batch champion;
+- a dedicated incremental price learner;
+- performance-weighted direction fusion;
+- performance-weighted close-return fusion;
+- chronological model residuals for price uncertainty.
 
 ## Forecast contract
 
@@ -44,120 +50,166 @@ For a source candle with open time `T`:
 | Source candle closes and forecast is created | `T + 1h` |
 | Target candle opens | `T + 1h` |
 | Target candle closes | `T + 2h` |
-| Outcome becomes eligible | after `T + 2h` plus a short settlement delay |
+| Outcome becomes eligible | after `T + 2h` plus the settlement delay |
 
-The forecast record includes:
+A contract contains both the direction forecast and price estimate:
 
 ```json
 {
+  "contract_version": 2,
   "target": "NEXT_CLOSED_1H_CANDLE",
-  "interval_probability": 0.80,
+  "direction": "UP",
+  "direction_confidence": 0.61,
+  "signal_strength": "MODERATE",
   "reference_close": 63250.0,
   "median_close": 63340.0,
-  "likely_close_low": 62920.0,
-  "likely_close_high": 63780.0,
-  "scenario": "BULLISH_BIAS",
+  "likely_close_low": 63020.0,
+  "likely_close_high": 63610.0,
+  "forecast_source": "BATCH_AND_ONLINE",
   "target_close_time": "2026-08-03T18:00:00+00:00"
 }
 ```
 
-`median_close` is an estimate, not a guaranteed price.
+`median_close` is a model estimate, not a guaranteed price.
 
 ## Outcome rules
 
-The primary result measures the probabilistic interval:
+Direction is the primary score:
 
 | Result | Meaning |
 |---|---|
 | `PENDING` | The target candle has not fully closed yet. |
-| `IN_RANGE` | The final target close is inside the predicted range. |
-| `OUT_OF_RANGE` | The final target close is outside the predicted range. |
-| `LEGACY_NOT_SCORED` | The record predates the interval forecast contract. |
+| `DIRECTION_CORRECT` | The target close moved in the predicted direction. |
+| `DIRECTION_WRONG` | The target close moved against the predicted direction. |
+| `LEGACY_NOT_SCORED` | The record predates the current forecast contract. |
 
-Direction is scored separately as `DIRECTION_CORRECT`, `DIRECTION_WRONG` or `DIRECTION_NOT_SCORED`.
+The interval is evaluated independently:
 
-A resolved result is immutable. Historical records are never reclassified from later price movement.
+| Interval result | Meaning |
+|---|---|
+| `IN_RANGE` | The target close finished inside the estimated interval. |
+| `OUT_OF_RANGE` | The target close finished outside the estimated interval. |
 
-## How the range is produced
+A forecast can therefore be directionally wrong while still landing inside the price interval. The dashboard reports these outcomes separately.
 
-The interval combines:
+## Batch and Online price fusion
 
-- the batch model's next-hour return estimate;
-- the model's historical out-of-sample return error;
-- recent hourly market ranges;
-- adaptive residuals from previously resolved live forecasts.
+The price forecast is not generated from a generic current-price range.
 
-Before enough live residuals exist, the system uses a conservative model-error and market-range fallback. After at least 20 resolved interval forecasts, it uses empirical prequential residual quantiles and continues recalibrating from newly closed candles.
+The center of the estimate comes from trained return models:
+
+```text
+Batch next-close probability and return
+                +
+Incremental online probability and return
+                ↓
+Performance-weighted fused direction and fused return
+                ↓
+Expected next close
+```
+
+The online model receives weight only after enough chronological evaluation samples exist and only while it remains competitive with the Batch champion on:
+
+- direction Brier score;
+- direction accuracy;
+- close-return mean absolute error.
+
+Direction and return have independent blend weights. A model may therefore help direction without being trusted for price magnitude, or help price magnitude without changing direction.
+
+Probability outputs are bounded to reduce extreme online overconfidence.
+
+## Price interval calibration
+
+The interval is centered on the fused model return. Its width is calibrated in this order:
+
+1. residuals from resolved live forecasts;
+2. chronological Walk-Forward residual quantiles;
+3. Batch model return error as a final fallback.
+
+The interval no longer uses a generic recent candle range as its primary source.
+
+After enough live outcomes are resolved, recent prequential errors become the main calibration source so uncertainty can adapt to current market behavior.
 
 ## Architecture
 
 ```mermaid
 flowchart LR
-    A[Closed hourly candle] --> B[Leakage-safe market and news features]
-    B --> C[Weekly batch champion]
-    C --> D[Next-hour return and direction estimates]
-    D --> E[Adaptive correction layer]
-    E --> F[Probabilistic next-close range]
-    F --> G[Pending until target candle closes]
-    G --> H[Immutable interval and direction outcome]
-    H --> I[Residual calibration for future ranges]
-    I --> E
-    F --> J[Independent trade and risk gates]
+    A[Fully closed hourly candle] --> B[Leakage-safe market and news features]
+    B --> C[Weekly Batch champion]
+    B --> D[Incremental price learner]
+    C --> E[Batch direction and close return]
+    D --> F[Online direction and close return]
+    E --> G[Performance-weighted fusion]
+    F --> G
+    G --> H[UP or DOWN forecast]
+    G --> I[Expected close and model residual interval]
+    H --> J[Pending until target candle closes]
+    I --> J
+    J --> K[Immutable direction and interval outcomes]
+    K --> D
+    K --> I
+    G --> L[Independent trade and risk gates]
 ```
-
-## Market scenarios
-
-The forecast scenario is derived from the one-hour directional probability:
-
-| Scenario | Interpretation |
-|---|---|
-| `BULLISH_BIAS` | The next close has a meaningful upward bias. |
-| `BEARISH_BIAS` | The next close has a meaningful downward bias. |
-| `RANGE_BIAS` | Directional evidence is weak and a range outcome is more appropriate. |
-
-The event layer separately monitors:
-
-- `DONCHIAN_BREAKOUT`
-- `SQUEEZE_RELEASE`
-- `PULLBACK_RESUME`
-- `VOLUME_IMPULSE`
 
 ## Forecast versus trade decision
 
-The public forecast and the trade decision are separate contracts.
+The public forecast and paper-trade decision are separate contracts.
 
-The next-candle forecast can be valid while the trade action remains `WAIT`. Trade gates still require:
+A direction forecast can be valid while the action remains `WAIT`. Trade execution still requires:
 
 - a qualified model;
-- a qualified selected horizon;
+- a qualified horizon;
 - a new market event;
 - sufficient continuation probability;
 - sufficient tradeability probability;
 - positive stress-adjusted net edge;
-- healthy market data;
-- acceptable volatility, news and cooldown conditions.
+- healthy market and news inputs;
+- acceptable volatility and cooldown conditions.
 
-This prevents a probable price range from being misrepresented as an actionable trade.
+This prevents a directional estimate from being presented as a guaranteed trading signal.
 
-## Adaptive learning
+## Adaptive learning states
 
-The adaptive layer:
+Two adaptive layers are persisted:
 
-- restores its state on every hourly run;
-- predicts before observing a matured label;
-- learns only after the target candle closes;
-- compares online and batch performance prequentially;
-- calibrates future intervals from resolved forecast residuals;
-- remains in shadow mode until its promotion criteria pass;
-- falls back to the batch champion when performance degrades.
+| State | Purpose |
+|---|---|
+| Trade adaptive state | Event continuation, tradeability and event-return adaptation. |
+| Price adaptive state | Next-close direction and close-return adaptation. |
+
+The dedicated price learner:
+
+- learns from mature close-to-close labels;
+- predicts before updating;
+- stores prequential Batch-versus-Online observations;
+- resets when the Batch champion changes;
+- starts with zero decision weight;
+- gains bounded weight only after passing performance checks;
+- automatically returns to Batch-only output when it underperforms.
 
 Runtime state is stored outside `main`:
 
 | Branch | Purpose |
 |---|---|
-| `forecast-state` | Latest forecast and compact immutable outcome history. |
-| `model-state` | Latest weekly batch model and reports. |
-| `adaptive-state` | Persistent incremental learner and adaptive metrics. |
+| `forecast-state` | Latest forecast and immutable outcome ledger. |
+| `model-state` | Latest weekly Batch model and reports. |
+| `adaptive-state` | Persistent trade and price adaptive learners. |
+
+## Dashboard
+
+The public site uses a calm, modern direction-first layout:
+
+- large `UP` or `DOWN` forecast;
+- direction confidence and strength;
+- model-estimated expected close;
+- probable close interval;
+- Batch and Online influence;
+- direction accuracy;
+- interval coverage;
+- immutable forecast ledger;
+- separate trade blockers.
+
+The footer identifies the project author as **Mahdi Ghahremani** with GitHub ID **TheLouisMahdi**.
 
 ## Automated workflows
 
@@ -165,20 +217,21 @@ Runtime state is stored outside `main`:
 
 Every hour the pipeline:
 
-1. restores forecast, batch and adaptive state;
+1. restores Batch, forecast and adaptive state;
 2. runs repository tests;
 3. fetches fresh market and news data;
 4. selects the latest fully closed hourly candle;
-5. creates one next-candle probabilistic forecast;
-6. keeps unresolved forecasts pending;
-7. resolves only targets whose candles have fully closed;
-8. freezes resolved outcomes;
-9. recalibrates future ranges from resolved residuals;
-10. deploys the static GitHub Pages dashboard.
+5. updates the dedicated online price learner from mature labels;
+6. compares Batch and Online performance;
+7. generates one frozen `UP` or `DOWN` forecast;
+8. estimates the next close from fused model returns;
+9. keeps the forecast pending until the target candle closes;
+10. resolves direction and interval outcomes separately;
+11. deploys the static GitHub Pages dashboard.
 
 ### Weekly retraining
 
-The batch model retrains weekly and whenever the forecast contract, model configuration or training code changes.
+The Batch model retrains weekly and whenever model, feature, configuration or forecast-contract code changes.
 
 ## Local setup
 
@@ -219,32 +272,38 @@ python -m unittest discover -s tests -v
 
 ```text
 .github/workflows/           Forecast, retraining and quality workflows
-config/default.yaml          Market, forecast, model and risk configuration
+config/default.yaml          Market, model, online fusion and risk configuration
 docs/assets/                 Repository-owned visual assets
-scripts/github_dashboard.py  Immutable close-time outcome resolution
+scripts/github_dashboard.py  Direction-first resolution and static dashboard
 scripts/github_hourly_forecast.py
 src/btc_ema_trader/
-  adaptive.py                Persistent incremental learner
-  forecast_contract.py       Next-candle probabilistic interval contract
+  adaptive.py                Trade-focused incremental learner
+  price_adaptive.py          Dedicated adaptive direction and price learner
+  forecast_contract.py       Immutable next-candle forecast contract
   features.py                Leakage-safe features and labels
-  model.py                   Weekly batch champion
+  model.py                   Weekly Batch champion
   runtime.py                 Hourly market and decision runtime
   strategy.py                Trade and risk gates
-tests/                       Contract, adaptive and repository tests
+tests/                       Forecast, adaptive and repository tests
 ```
 
 ## Reliability rules
 
-- Only database rows marked `closed = 1` are used as completed candles.
-- Evaluation also requires the target close time to have passed.
-- A 90-second settlement delay protects against provider timing differences.
-- Legacy direction-only forecasts are excluded from interval accuracy.
+- Only rows marked `closed = 1` are treated as completed candles.
+- Evaluation requires the target close time and settlement delay to pass.
+- Each candle receives one frozen forecast.
+- Direction is always `UP` or `DOWN`; weak confidence is shown explicitly.
+- Direction accuracy and interval coverage are never combined.
 - Resolved outcomes are immutable.
-- The median estimate is never presented as an exact future price.
+- Online influence is performance-weighted and bounded.
 - The system remains paper-trading only.
 
 ## Limitations
 
-Bitcoin is non-stationary and highly noisy. An 80% interval is a calibrated probability target, not a promise that exactly 80% of every small sample will fall inside the range. Coverage must be assessed over a meaningful number of resolved forecasts.
+Bitcoin is non-stationary and noisy. Direction accuracy, interval coverage and paper-trade expectancy require a meaningful live sample before they can support commercial claims.
 
 This repository is for transparent market-model research and is not financial advice.
+
+---
+
+© 2026 Mahdi Ghahremani · ID: [TheLouisMahdi](https://github.com/TheLouisMahdi)
