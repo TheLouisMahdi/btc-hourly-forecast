@@ -6,7 +6,7 @@ from typing import Any
 
 import github_hourly_forecast
 
-MODEL_PREFIX = "structure-breakout-hourly-"
+MODEL_PREFIX = "directional-breakout-hourly-"
 
 
 def main() -> int:
@@ -15,28 +15,28 @@ def main() -> int:
     history_path = state_dir / "history.json"
     latest_path = state_dir / "latest.json"
     history = _load_list(history_path)
-    structural_history = [
+    directional_history = [
         item
         for item in history
-        if _is_structural_record(item)
+        if _is_directional_record(item)
     ]
-    if structural_history != history:
+    if directional_history != history:
         state_dir.mkdir(parents=True, exist_ok=True)
         history_path.write_text(
             json.dumps(
-                structural_history,
+                directional_history,
                 ensure_ascii=False,
                 indent=2,
             ),
             encoding="utf-8",
         )
         latest = _load_dict(latest_path)
-        if latest and not _is_structural_record(latest):
+        if latest and not _is_directional_record(latest):
             latest_path.write_text("{}\n", encoding="utf-8")
     return github_hourly_forecast.main()
 
 
-def _is_structural_record(item: dict[str, Any]) -> bool:
+def _is_directional_record(item: dict[str, Any]) -> bool:
     return str(item.get("model_id") or "").startswith(MODEL_PREFIX)
 
 
