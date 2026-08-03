@@ -75,8 +75,11 @@ jobs:
             done
           fi
 
-      - name: Run one forecast and build static dashboard
+      - name: Run one forecast and build base dashboard
         run: python scripts/github_hourly_forecast.py
+
+      - name: Resolve outcomes and render English dashboard
+        run: python scripts/github_dashboard.py
 
       - name: Save compact forecast history snapshot
         env:
