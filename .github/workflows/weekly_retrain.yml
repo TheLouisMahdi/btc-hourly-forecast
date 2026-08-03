@@ -6,7 +6,6 @@ on:
     paths:
       - ".github/workflows/weekly_retrain.yml"
   schedule:
-    # Every Sunday at 03:47 UTC.
     - cron: "47 3 * * 0"
   workflow_dispatch:
 
@@ -40,10 +39,13 @@ jobs:
           python -m pip install -r requirements-github.txt
           python -m pip install -e . --no-deps
 
+      - name: Run quality tests
+        run: python -m unittest discover -s tests -v
+
       - name: Fetch 180 days and retrain
         run: python scripts/github_weekly_retrain.py
 
-      - name: Publish latest model snapshot
+      - name: Publish latest batch model
         env:
           GITHUB_TOKEN: ${{ github.token }}
         run: bash scripts/push_snapshot_branch.sh model-state model-state-output
