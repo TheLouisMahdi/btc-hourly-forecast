@@ -1,6 +1,6 @@
 project:
   name: BTC Next-Candle Forecast
-  version: 3.1.0
+  version: 3.2.0
   timezone: UTC
 
 paths:
@@ -10,6 +10,7 @@ paths:
   log_dir: logs
   runtime_state: data/runtime_state.json
   adaptive_state: data/adaptive_state.joblib
+  price_adaptive_state: data/price_adaptive_state.joblib
 
 market:
   symbol: BTCUSDT
@@ -25,6 +26,7 @@ market:
   quote_stale_seconds: 90
   binance_futures_base_url: https://fapi.binance.com
   bybit_base_url: https://api.bybit.com
+  okx_swap_base_url: https://www.okx.com
   okx_base_url: https://www.okx.com
   okx_instrument: BTC-USDT-SWAP
 
@@ -94,6 +96,15 @@ forecast:
   settlement_delay_seconds: 90
   minimum_residual_samples: 20
   maximum_residual_samples: 240
+  online_bootstrap_rows: 1440
+  online_observation_limit: 1000
+  online_evaluation_window: 336
+  online_minimum_samples: 72
+  online_maximum_direction_weight: 0.45
+  online_maximum_return_weight: 0.45
+  online_brier_tolerance: 0.005
+  online_accuracy_tolerance: 0.01
+  online_return_mae_tolerance: 0.0001
 
 adaptive:
   enabled: true
