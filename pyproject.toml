@@ -4,8 +4,8 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "btc-hourly-regime-trader"
-version = "3.0.0"
-description = "Adaptive one-hour BTC regime-event forecasting with delayed labels and fail-safe paper-trade decisions"
+version = "3.1.0"
+description = "Adaptive next-candle BTC close-range forecasting with immutable delayed outcomes and fail-safe paper-trade decisions"
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
