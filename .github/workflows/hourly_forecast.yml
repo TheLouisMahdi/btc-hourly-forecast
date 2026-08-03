@@ -7,11 +7,11 @@ on:
       - ".github/workflows/hourly_forecast.yml"
       - "src/**"
       - "scripts/**"
+      - "tests/**"
       - "config/**"
       - "requirements-github.txt"
       - "pyproject.toml"
   schedule:
-    # GitHub schedules use UTC. Minute 17 avoids the busiest top-of-hour period.
     - cron: "17 * * * *"
   workflow_dispatch:
   workflow_run:
@@ -31,7 +31,7 @@ jobs:
   forecast-and-deploy:
     if: github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success'
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 35
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
@@ -48,13 +48,16 @@ jobs:
           cache: pip
           cache-dependency-path: requirements-github.txt
 
-      - name: Install lightweight runtime dependencies
+      - name: Install runtime dependencies
         run: |
           python -m pip install --upgrade pip
           python -m pip install -r requirements-github.txt
           python -m pip install -e . --no-deps
 
-      - name: Restore forecast history snapshot
+      - name: Run quality tests
+        run: python -m unittest discover -s tests -v
+
+      - name: Restore forecast history
         shell: bash
         run: |
           mkdir -p .github_state
@@ -64,7 +67,7 @@ jobs:
             git show origin/forecast-state:latest.json > .github_state/latest.json 2>/dev/null || true
           fi
 
-      - name: Restore latest weekly model
+      - name: Restore weekly batch model
         shell: bash
         run: |
           mkdir -p .model_state
@@ -75,21 +78,37 @@ jobs:
             done
           fi
 
-      - name: Run one forecast and build base dashboard
+      - name: Restore adaptive learner
+        shell: bash
+        run: |
+          mkdir -p .adaptive_state
+          if git ls-remote --exit-code --heads origin adaptive-state >/dev/null 2>&1; then
+            git fetch origin adaptive-state --depth=1
+            for file in adaptive_state.joblib summary.json; do
+              git show "origin/adaptive-state:${file}" > ".adaptive_state/${file}" 2>/dev/null || rm -f ".adaptive_state/${file}"
+            done
+          fi
+
+      - name: Run adaptive forecast
         run: python scripts/github_hourly_forecast.py
 
-      - name: Resolve outcomes and render English dashboard
+      - name: Resolve outcomes and render dashboard
         run: python scripts/github_dashboard.py
 
-      - name: Save compact forecast history snapshot
+      - name: Persist forecast history
         env:
           GITHUB_TOKEN: ${{ github.token }}
         run: bash scripts/push_snapshot_branch.sh forecast-state .github_state
 
+      - name: Persist adaptive learner
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: bash scripts/push_snapshot_branch.sh adaptive-state .adaptive_state
+
       - name: Configure GitHub Pages
         uses: actions/configure-pages@v6
 
-      - name: Upload static dashboard
+      - name: Upload dashboard
         uses: actions/upload-pages-artifact@v4
         with:
           path: site
