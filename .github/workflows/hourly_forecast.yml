@@ -78,13 +78,13 @@ jobs:
             done
           fi
 
-      - name: Restore adaptive learner
+      - name: Restore adaptive learners
         shell: bash
         run: |
           mkdir -p .adaptive_state
           if git ls-remote --exit-code --heads origin adaptive-state >/dev/null 2>&1; then
             git fetch origin adaptive-state --depth=1
-            for file in adaptive_state.joblib summary.json; do
+            for file in adaptive_state.joblib price_adaptive_state.joblib summary.json price_summary.json; do
               git show "origin/adaptive-state:${file}" > ".adaptive_state/${file}" 2>/dev/null || rm -f ".adaptive_state/${file}"
             done
           fi
@@ -100,7 +100,7 @@ jobs:
           GITHUB_TOKEN: ${{ github.token }}
         run: bash scripts/push_snapshot_branch.sh forecast-state .github_state
 
-      - name: Persist adaptive learner
+      - name: Persist adaptive learners
         env:
           GITHUB_TOKEN: ${{ github.token }}
         run: bash scripts/push_snapshot_branch.sh adaptive-state .adaptive_state
