@@ -13,13 +13,16 @@ import pandas as pd
 from github_common import json_safe, write_json
 
 MAX_HISTORY = 24 * 30
-FINAL_RESULTS = {"IN_RANGE", "OUT_OF_RANGE"}
+FINAL_DIRECTION_RESULTS = {
+    "DIRECTION_CORRECT",
+    "DIRECTION_WRONG",
+}
 SETTLEMENT_DELAY_SECONDS = 90
 
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
-        description="Resolve next-candle interval forecasts and render the static dashboard"
+        description="Resolve next-candle forecasts and render the dashboard"
     )
     parser.add_argument("--state-dir", default=".github_state")
     parser.add_argument("--runtime-dir", default=".github_runtime/hourly")
@@ -34,7 +37,10 @@ def load_json(path: Path, default: Any) -> Any:
         return default
 
 
-def load_candles(database_path: Path, provider: str | None) -> pd.DataFrame:
+def load_candles(
+    database_path: Path,
+    provider: str | None,
+) -> pd.DataFrame:
     if not database_path.exists():
         return pd.DataFrame()
     clauses = ["closed = 1"]
@@ -50,14 +56,21 @@ def load_candles(database_path: Path, provider: str | None) -> pd.DataFrame:
     with sqlite3.connect(database_path) as connection:
         frame = pd.read_sql_query(sql, connection, params=params)
     if not frame.empty:
-        frame["open_time"] = pd.to_datetime(frame["open_time"], utc=True)
+        frame["open_time"] = pd.to_datetime(
+            frame["open_time"],
+            utc=True,
+        )
     return frame
 
 
-def pending(item: dict[str, Any], result: str = "PENDING") -> dict[str, Any]:
+def pending(
+    item: dict[str, Any],
+    result: str = "PENDING",
+) -> dict[str, Any]:
     output = dict(item)
     output["prediction_result"] = result
-    output.setdefault("direction_result", "PENDING")
+    output.setdefault("direction_result", result)
+    output.setdefault("interval_result", "PENDING")
     output.setdefault("actual_close", None)
     output.setdefault("actual_close_return", None)
     output.setdefault("actual_direction", None)
@@ -77,9 +90,10 @@ def resolve_outcomes(
     for source in history:
         item = dict(source)
         if (
-            item.get("prediction_result") in FINAL_RESULTS
+            item.get("direction_result") in FINAL_DIRECTION_RESULTS
             and item.get("resolved_at")
         ):
+            item["prediction_result"] = item["direction_result"]
             resolved.append(item)
             continue
         if item.get("run_status") != "OK":
@@ -132,23 +146,25 @@ def resolve_outcomes(
             if actual_close_return < 0
             else "FLAT"
         )
-        forecast_direction = str(contract.get("direction") or "RANGE").upper()
-        if forecast_direction in {"UP", "DOWN"}:
-            direction_result = (
-                "DIRECTION_CORRECT"
-                if actual_direction == forecast_direction
-                else "DIRECTION_WRONG"
-            )
-        else:
-            direction_result = "DIRECTION_NOT_SCORED"
+        forecast_direction = str(
+            contract.get("direction") or ""
+        ).upper()
+        direction_result = (
+            "DIRECTION_CORRECT"
+            if forecast_direction in {"UP", "DOWN"}
+            and actual_direction == forecast_direction
+            else "DIRECTION_WRONG"
+        )
         in_range = min(predicted_low, predicted_high) <= actual_close <= max(
             predicted_low,
             predicted_high,
         )
+        interval_result = "IN_RANGE" if in_range else "OUT_OF_RANGE"
         item.update(
             {
-                "prediction_result": "IN_RANGE" if in_range else "OUT_OF_RANGE",
+                "prediction_result": direction_result,
                 "direction_result": direction_result,
+                "interval_result": interval_result,
                 "actual_close": actual_close,
                 "actual_price": actual_close,
                 "actual_close_return": actual_close_return,
@@ -165,25 +181,42 @@ def resolve_outcomes(
     return resolved
 
 
-def accuracy(history: list[dict[str, Any]]) -> tuple[int, int, float | None]:
-    scored = [
-        item for item in history if item.get("prediction_result") in FINAL_RESULTS
-    ]
-    inside = sum(item.get("prediction_result") == "IN_RANGE" for item in scored)
-    return inside, len(scored), inside / len(scored) if scored else None
-
-
-def direction_accuracy(history: list[dict[str, Any]]) -> tuple[int, int, float | None]:
+def direction_accuracy(
+    history: list[dict[str, Any]],
+) -> tuple[int, int, float | None]:
     scored = [
         item
         for item in history
-        if item.get("direction_result")
-        in {"DIRECTION_CORRECT", "DIRECTION_WRONG"}
+        if item.get("direction_result") in FINAL_DIRECTION_RESULTS
     ]
     correct = sum(
-        item.get("direction_result") == "DIRECTION_CORRECT" for item in scored
+        item.get("direction_result") == "DIRECTION_CORRECT"
+        for item in scored
     )
-    return correct, len(scored), correct / len(scored) if scored else None
+    return (
+        correct,
+        len(scored),
+        correct / len(scored) if scored else None,
+    )
+
+
+def interval_coverage(
+    history: list[dict[str, Any]],
+) -> tuple[int, int, float | None]:
+    scored = [
+        item
+        for item in history
+        if item.get("interval_result") in {"IN_RANGE", "OUT_OF_RANGE"}
+    ]
+    inside = sum(
+        item.get("interval_result") == "IN_RANGE"
+        for item in scored
+    )
+    return (
+        inside,
+        len(scored),
+        inside / len(scored) if scored else None,
+    )
 
 
 def esc(value: Any) -> str:
@@ -192,240 +225,430 @@ def esc(value: Any) -> str:
 
 def number(value: Any, digits: int = 2) -> str:
     try:
-        value = float(value)
+        numeric = float(value)
     except (TypeError, ValueError):
         return "—"
-    if not np.isfinite(value):
+    if not np.isfinite(numeric):
         return "—"
-    return f"{value:,.{digits}f}"
+    return f"{numeric:,.{digits}f}"
 
 
-def percent(value: Any, digits: int = 2) -> str:
+def percent(value: Any, digits: int = 1) -> str:
     try:
-        value = float(value)
+        numeric = float(value)
     except (TypeError, ValueError):
         return "—"
-    if not np.isfinite(value):
+    if not np.isfinite(numeric):
         return "—"
-    return f"{value * 100:.{digits}f}%"
+    return f"{numeric * 100:.{digits}f}%"
 
 
 def value(item: Any) -> str:
     return "—" if item in (None, "") else str(item)
 
 
-def price_range(contract: dict[str, Any] | None) -> str:
-    if not isinstance(contract, dict):
-        return "—"
-    low = number(contract.get("likely_close_low"), 2)
-    high = number(contract.get("likely_close_high"), 2)
-    return "—" if low == "—" or high == "—" else f"${low} – ${high}"
+def price(value_: Any) -> str:
+    formatted = number(value_, 2)
+    return "—" if formatted == "—" else f"${formatted}"
+
+
+def compact_time(value_: Any) -> str:
+    try:
+        timestamp = _utc(value_)
+    except Exception:
+        return value(value_)
+    return timestamp.strftime("%b %d · %H:%M UTC")
 
 
 def chart(history: list[dict[str, Any]]) -> str:
     points = [
-        item for item in history[-168:] if _finite(item.get("price")) is not None
+        item
+        for item in history[-168:]
+        if _finite(item.get("price")) is not None
     ]
     if len(points) < 2:
-        return '<div class="empty-chart">Not enough history to draw the chart.</div>'
+        return (
+            '<div class="empty-chart">'
+            "The chart will appear after more forecasts are recorded."
+            "</div>"
+        )
 
-    width, height, pad_x, pad_y = 1120, 340, 48, 28
-    values: list[float] = [float(item["price"]) for item in points]
-    for item in points:
-        contract = item.get("next_candle_forecast")
-        if isinstance(contract, dict):
-            for key in ("likely_close_low", "likely_close_high", "median_close"):
-                candidate = _finite(contract.get(key))
-                if candidate is not None:
-                    values.append(candidate)
-        actual = _finite(item.get("actual_close"))
-        if actual is not None:
-            values.append(actual)
-    low, high = min(values), max(values)
-    margin = max((high - low) * 0.10, 1.0)
+    width = 1120
+    height = 360
+    pad_x = 42
+    pad_y = 30
+    prices = [float(item["price"]) for item in points]
+    latest_contract = points[-1].get("next_candle_forecast")
+    scale_values = list(prices)
+    if isinstance(latest_contract, dict):
+        for key in ("likely_close_low", "likely_close_high", "median_close"):
+            candidate = _finite(latest_contract.get(key))
+            if candidate is not None:
+                scale_values.append(candidate)
+    low = min(scale_values)
+    high = max(scale_values)
+    margin = max((high - low) * 0.15, 1.0)
     low -= margin
     high += margin
 
-    def xy(index: int, price: float) -> tuple[float, float]:
-        x = pad_x + index * (width - 2 * pad_x) / max(1, len(points) - 1)
-        y = height - pad_y - (price - low) * (height - 2 * pad_y) / (high - low)
+    def xy(index: float, price_value: float) -> tuple[float, float]:
+        x = (
+            pad_x
+            + index
+            * (width - 2 * pad_x)
+            / max(1, len(points))
+        )
+        y = (
+            height
+            - pad_y
+            - (price_value - low)
+            * (height - 2 * pad_y)
+            / max(high - low, 1e-9)
+        )
         return x, y
 
-    source_path = " ".join(
+    path = " ".join(
         ("M" if index == 0 else "L")
-        + f" {xy(index, float(item['price']))[0]:.2f} {xy(index, float(item['price']))[1]:.2f}"
-        for index, item in enumerate(points)
+        + f" {xy(index, item_price)[0]:.2f} {xy(index, item_price)[1]:.2f}"
+        for index, item_price in enumerate(prices)
     )
+    area = (
+        path
+        + f" L {xy(len(prices) - 1, low)[0]:.2f} {height-pad_y:.2f}"
+        + f" L {xy(0, low)[0]:.2f} {height-pad_y:.2f} Z"
+    )
+
     grid: list[str] = []
     labels: list[str] = []
-    for line in range(5):
-        ratio = line / 4
+    for line in range(4):
+        ratio = line / 3
         y = pad_y + ratio * (height - 2 * pad_y)
         label_price = high - ratio * (high - low)
         grid.append(
-            f'<line x1="{pad_x}" y1="{y:.2f}" x2="{width-pad_x}" y2="{y:.2f}" class="grid-line" />'
+            f'<line x1="{pad_x}" y1="{y:.2f}" '
+            f'x2="{width-pad_x}" y2="{y:.2f}" class="chart-grid" />'
         )
         labels.append(
-            f'<text x="6" y="{y+4:.2f}" class="axis-label">${label_price:,.0f}</text>'
+            f'<text x="6" y="{y+4:.2f}" class="chart-label">'
+            f'${label_price:,.0f}</text>'
         )
 
-    ranges: list[str] = []
     markers: list[str] = []
     for index, item in enumerate(points):
-        contract = item.get("next_candle_forecast")
-        if not isinstance(contract, dict):
+        result = str(item.get("direction_result") or "PENDING")
+        direction = str(item.get("forecast_direction") or "")
+        if direction not in {"UP", "DOWN"}:
             continue
-        low_value = _finite(contract.get("likely_close_low"))
-        high_value = _finite(contract.get("likely_close_high"))
-        median_value = _finite(contract.get("median_close"))
-        if low_value is None or high_value is None or median_value is None:
-            continue
-        x, low_y = xy(index, low_value)
-        _, high_y = xy(index, high_value)
-        _, median_y = xy(index, median_value)
-        result = str(item.get("prediction_result") or "PENDING")
+        x, y = xy(index, float(item["price"]))
         marker_class = {
-            "IN_RANGE": "marker-correct",
-            "OUT_OF_RANGE": "marker-wrong",
+            "DIRECTION_CORRECT": "marker-correct",
+            "DIRECTION_WRONG": "marker-wrong",
             "PENDING": "marker-pending",
         }.get(result, "marker-muted")
-        ranges.append(
-            f'<line x1="{x:.2f}" y1="{low_y:.2f}" x2="{x:.2f}" y2="{high_y:.2f}" class="range-line" />'
-        )
+        symbol = "↑" if direction == "UP" else "↓"
         markers.append(
-            f'<circle cx="{x:.2f}" cy="{median_y:.2f}" r="4.5" class="{marker_class}" />'
+            f'<g transform="translate({x:.2f},{y-12:.2f})">'
+            f'<circle r="11" class="marker-dot {marker_class}" />'
+            f'<text y="4" text-anchor="middle" class="marker-symbol">'
+            f'{symbol}</text></g>'
         )
 
+    forecast_band = ""
+    if isinstance(latest_contract, dict):
+        band_low = _finite(latest_contract.get("likely_close_low"))
+        band_high = _finite(latest_contract.get("likely_close_high"))
+        median = _finite(latest_contract.get("median_close"))
+        if band_low is not None and band_high is not None and median is not None:
+            x0 = xy(len(points) - 1, prices[-1])[0]
+            x1 = width - pad_x
+            top = xy(len(points), band_high)[1]
+            bottom = xy(len(points), band_low)[1]
+            median_y = xy(len(points), median)[1]
+            forecast_band = (
+                f'<rect x="{x0:.2f}" y="{top:.2f}" '
+                f'width="{max(0.0, x1-x0):.2f}" '
+                f'height="{max(2.0, bottom-top):.2f}" '
+                'class="forecast-band" />'
+                f'<line x1="{x0:.2f}" y1="{median_y:.2f}" '
+                f'x2="{x1:.2f}" y2="{median_y:.2f}" '
+                'class="forecast-median" />'
+            )
+
     return (
-        f'<svg class="chart" viewBox="0 0 {width} {height}" role="img" aria-label="Source closes and next-candle probabilistic close ranges">'
+        f'<svg class="chart" viewBox="0 0 {width} {height}" '
+        'role="img" aria-label="BTC close history and next forecast range">'
         + "".join(grid)
         + "".join(labels)
-        + "".join(ranges)
-        + f'<path d="{source_path}" class="price-line" />'
+        + f'<path d="{area}" class="chart-area" />'
+        + f'<path d="{path}" class="chart-line" />'
+        + forecast_band
         + "".join(markers)
         + "</svg>"
-        + '<div class="legend">'
-        + '<span class="marker-correct-text">● Close inside range</span>'
-        + '<span class="marker-wrong-text">● Close outside range</span>'
-        + '<span class="marker-pending-text">● Pending</span>'
-        + '<span>│ Probable close range</span>'
-        + '<span>— Source candle close</span>'
+        + '<div class="chart-legend">'
+        + '<span><i class="legend-dot correct-dot"></i>Correct direction</span>'
+        + '<span><i class="legend-dot wrong-dot"></i>Wrong direction</span>'
+        + '<span><i class="legend-dot pending-dot"></i>Pending</span>'
+        + '<span><i class="legend-band"></i>Next close range</span>'
         + "</div>"
     )
 
 
-def rows(history: list[dict[str, Any]]) -> str:
+def history_rows(history: list[dict[str, Any]]) -> str:
     output: list[str] = []
     classes = {
-        "IN_RANGE": "correct",
-        "OUT_OF_RANGE": "wrong",
-        "PENDING": "pending",
-        "NOT_SCORED": "muted-result",
-        "LEGACY_NOT_SCORED": "muted-result",
+        "DIRECTION_CORRECT": "result-correct",
+        "DIRECTION_WRONG": "result-wrong",
+        "PENDING": "result-pending",
+        "LEGACY_NOT_SCORED": "result-muted",
+        "NOT_SCORED": "result-muted",
     }
-    for item in reversed(history[-30:]):
+    for item in reversed(history[-36:]):
         contract = item.get("next_candle_forecast")
-        result = str(item.get("prediction_result") or "PENDING")
-        target_close = (
-            contract.get("target_close_time")
-            if isinstance(contract, dict)
-            else item.get("target_candle_close_time")
+        contract = contract if isinstance(contract, dict) else {}
+        direction = value(contract.get("direction") or item.get("forecast_direction"))
+        probability_up = contract.get("probability_up")
+        direction_probability = (
+            probability_up
+            if direction == "UP"
+            else 1.0 - float(probability_up)
+            if _finite(probability_up) is not None
+            else None
         )
-        actual = number(item.get("actual_close"), 2)
-        actual_text = "Waiting for candle close" if actual == "—" else f"${actual}"
-        scenario = (
-            value(contract.get("scenario")) if isinstance(contract, dict) else "Legacy"
-        )
-        probability = (
-            percent(contract.get("interval_probability"), 0)
-            if isinstance(contract, dict)
+        range_text = (
+            f"{price(contract.get('likely_close_low'))} – "
+            f"{price(contract.get('likely_close_high'))}"
+            if contract
             else "—"
         )
+        direction_result = str(
+            item.get("direction_result") or "PENDING"
+        )
+        interval_result = value(item.get("interval_result"))
         output.append(
             "<tr>"
-            f'<td>{esc(value(item.get("candle_time") or item.get("run_finished_at")))}</td>'
-            f'<td>${esc(number(item.get("price"), 2))}</td>'
-            f"<td>{esc(scenario)}</td>"
-            f"<td>{esc(price_range(contract))}</td>"
-            f"<td>{esc(probability)}</td>"
-            f"<td>{esc(value(target_close))}</td>"
-            f"<td>{esc(actual_text)}</td>"
-            f'<td><span class="result {classes.get(result, "muted-result")}">{esc(result)}</span></td>'
-            f"<td>{esc(value(item.get('direction_result')))}</td>"
-            f"<td>{esc(value(item.get('action') or item.get('run_status')))}</td>"
+            f"<td>{esc(compact_time(item.get('candle_time') or item.get('run_finished_at')))}</td>"
+            f"<td>{esc(price(item.get('price')))}</td>"
+            f'<td><span class="direction-mini {"up" if direction == "UP" else "down"}">{esc(direction)}</span></td>'
+            f"<td>{esc(percent(direction_probability))}</td>"
+            f"<td>{esc(price(contract.get('median_close')))}</td>"
+            f"<td>{esc(range_text)}</td>"
+            f"<td>{esc(price(item.get('actual_close')))}</td>"
+            f'<td><span class="table-result {classes.get(direction_result, "result-muted")}">{esc(direction_result.replace("DIRECTION_", ""))}</span></td>'
+            f"<td>{esc(interval_result.replace('_', ' '))}</td>"
             "</tr>"
         )
-    return "".join(output) if output else '<tr><td colspan="10" class="empty">No forecasts recorded yet.</td></tr>'
+    if output:
+        return "".join(output)
+    return (
+        '<tr><td colspan="9" class="empty">'
+        "No forecasts have been recorded yet."
+        "</td></tr>"
+    )
 
 
-def adaptive_rows(adaptive: dict[str, Any]) -> str:
-    metrics = adaptive.get("metrics") if isinstance(adaptive, dict) else None
-    if not isinstance(metrics, dict) or not metrics:
-        return '<tr><td colspan="8" class="empty">Adaptive metrics are not available yet.</td></tr>'
-    active = {int(item) for item in adaptive.get("active_horizons", [])}
-    output: list[str] = []
-    for key in sorted(metrics, key=lambda item: int(item)):
-        horizon = int(key)
-        item = metrics[key] if isinstance(metrics[key], dict) else {}
-        status = "ACTIVE" if horizon in active else "SHADOW"
-        status_class = "correct" if status == "ACTIVE" else "pending"
-        output.append(
-            "<tr>"
-            f"<td>{horizon}h</td>"
-            f'<td><span class="result {status_class}">{status}</span></td>'
-            f'<td>{esc(value(item.get("direction_samples")))}</td>'
-            f'<td>{esc(value(item.get("event_samples")))}</td>'
-            f'<td>{esc(number(item.get("base_direction_brier"), 4))}</td>'
-            f'<td>{esc(number(item.get("online_direction_brier"), 4))}</td>'
-            f'<td>{esc(percent(item.get("base_direction_accuracy"), 1))}</td>'
-            f'<td>{esc(percent(item.get("online_direction_accuracy"), 1))}</td>'
-            "</tr>"
-        )
-    return "".join(output)
+def blocker_chips(blockers: Any) -> str:
+    if not isinstance(blockers, list) or not blockers:
+        return '<span class="chip chip-good">No active blockers</span>'
+    return "".join(
+        f'<span class="chip">{esc(str(blocker).replace("_", " ").title())}</span>'
+        for blocker in blockers
+    )
 
 
-def render(latest: dict[str, Any], history: list[dict[str, Any]]) -> str:
-    action = value(latest.get("action") or latest.get("status") or latest.get("run_status"))
-    action_class = "wait" if action == "WAIT" else "bad" if action in {"FAIL_SAFE", "BLOCKED"} else "good"
-    run_ok = latest.get("run_status") == "OK" and latest.get("status") != "FAIL_SAFE"
-    inside, scored, coverage = accuracy(history)
-    direction_correct, direction_scored, direction_rate = direction_accuracy(history)
-    coverage_text = "—" if coverage is None else f"{coverage * 100:.1f}%"
-    direction_text = "—" if direction_rate is None else f"{direction_rate * 100:.1f}%"
-    blockers = latest.get("blockers")
-    blockers_text = "\n".join(map(str, blockers)) if isinstance(blockers, list) and blockers else "No decision blockers were recorded."
-    adaptive = latest.get("adaptive") if isinstance(latest.get("adaptive"), dict) else {}
-    adaptive_status = value(adaptive.get("status"))
-    active_horizons = adaptive.get("active_horizons") or []
-    active_text = ", ".join(f"{item}h" for item in active_horizons) or "None"
-    contract = latest.get("next_candle_forecast") if isinstance(latest.get("next_candle_forecast"), dict) else {}
-    latest_range = price_range(contract)
-    interval_probability = percent(contract.get("interval_probability"), 0)
-    target_close_time = value(contract.get("target_close_time"))
-    scenario = value(contract.get("scenario"))
-    reference_close = number(contract.get("reference_close", latest.get("price")), 2)
-    reference_close = "—" if reference_close == "—" else f"${reference_close}"
-    median_close = number(contract.get("median_close"), 2)
-    median_close = "—" if median_close == "—" else f"${median_close}"
-    edge = number(latest.get("expected_net_edge_bps"), 1)
-    edge = "—" if edge == "—" else f"{edge} bps"
-    details = {
-        "source_candle_open_time": latest.get("candle_time"),
-        "source_candle_close_time": contract.get("source_close_time"),
-        "target_candle_open_time": contract.get("target_open_time"),
-        "target_candle_close_time": contract.get("target_close_time"),
-        "interval_method": contract.get("interval_method"),
-        "calibration_samples": contract.get("calibration_samples"),
-        "provider": latest.get("provider"),
-        "model_id": latest.get("model_id"),
-        "adaptive_status": adaptive_status,
-        "adaptive_decision_source": adaptive.get("decision_source"),
-        "latest_prediction_result": latest.get("prediction_result"),
-        "resolved_at": latest.get("resolved_at"),
-        "data_health": latest.get("data_health"),
-        "error": latest.get("error"),
-    }
-    details_text = json.dumps(json_safe(details), ensure_ascii=False, indent=2, allow_nan=False)
+def render(
+    latest: dict[str, Any],
+    history: list[dict[str, Any]],
+) -> str:
+    contract = latest.get("next_candle_forecast")
+    contract = contract if isinstance(contract, dict) else {}
+    model = latest.get("price_forecast_model")
+    model = model if isinstance(model, dict) else {}
+    model_metrics = model.get("metrics")
+    model_metrics = model_metrics if isinstance(model_metrics, dict) else {}
+
+    direction = value(contract.get("direction") or latest.get("forecast_direction"))
+    direction_class = "up" if direction == "UP" else "down"
+    probability_up = _finite(contract.get("probability_up"))
+    direction_probability = (
+        probability_up
+        if direction == "UP"
+        else 1.0 - probability_up
+        if probability_up is not None
+        else None
+    )
+    confidence = percent(direction_probability)
+    signal_strength = value(contract.get("signal_strength"))
+    source = value(contract.get("forecast_source"))
+    source_label = source.replace("_", " ").title()
+    action = value(
+        latest.get("action")
+        or latest.get("status")
+        or latest.get("run_status")
+    )
+    run_ok = latest.get("run_status") == "OK"
+
+    direction_correct, direction_total, direction_rate = direction_accuracy(
+        history
+    )
+    interval_inside, interval_total, coverage_rate = interval_coverage(history)
+    direction_rate_text = (
+        "—" if direction_rate is None else f"{direction_rate * 100:.1f}%"
+    )
+    coverage_text = (
+        "—" if coverage_rate is None else f"{coverage_rate * 100:.1f}%"
+    )
+
+    direction_weight = _finite(contract.get("direction_blend_weight")) or 0.0
+    return_weight = _finite(contract.get("return_blend_weight")) or 0.0
+    batch_share = max(0.0, 1.0 - max(direction_weight, return_weight))
+    online_share = max(direction_weight, return_weight)
+    evaluation_text = (
+        compact_time(latest.get("evaluation_available_at"))
+        if latest.get("prediction_result") == "PENDING"
+        else compact_time(latest.get("resolved_at"))
+    )
+
+    styles = """
+:root {
+  color-scheme: light;
+  --bg: #f4f7f5;
+  --surface: rgba(255, 255, 255, 0.76);
+  --surface-solid: #ffffff;
+  --ink: #263532;
+  --muted: #72817d;
+  --line: rgba(74, 101, 95, 0.14);
+  --sage: #6f9b91;
+  --sage-deep: #47746b;
+  --mint: #dcebe6;
+  --lavender: #8f8ab8;
+  --lavender-soft: #ebe9f5;
+  --peach: #c99078;
+  --peach-soft: #f5e6de;
+  --blue-soft: #e2edf2;
+  --correct: #4d8b76;
+  --wrong: #bd726e;
+  --pending: #9b865c;
+  --shadow: 0 24px 70px rgba(57, 79, 73, 0.10);
+}
+* { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; }
+body {
+  margin: 0;
+  min-height: 100vh;
+  color: var(--ink);
+  font-family: Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  background:
+    radial-gradient(circle at 8% 8%, rgba(220,235,230,.9), transparent 32%),
+    radial-gradient(circle at 92% 5%, rgba(235,233,245,.86), transparent 30%),
+    linear-gradient(180deg, #f8faf9 0%, var(--bg) 100%);
+}
+a { color: inherit; }
+.shell { width: min(1240px, 92%); margin: 0 auto; padding: 28px 0 44px; }
+.topbar { display: flex; justify-content: space-between; align-items: center; gap: 18px; margin-bottom: 26px; }
+.brand { display: flex; align-items: center; gap: 13px; }
+.brand-mark { width: 44px; height: 44px; border-radius: 15px; display: grid; place-items: center; background: linear-gradient(135deg, var(--mint), var(--lavender-soft)); box-shadow: inset 0 0 0 1px rgba(71,116,107,.1); font-weight: 850; color: var(--sage-deep); }
+.brand h1 { margin: 0; font-size: 18px; letter-spacing: -.02em; }
+.brand p { margin: 3px 0 0; color: var(--muted); font-size: 12px; }
+.run-pill { display: inline-flex; align-items: center; gap: 8px; padding: 9px 13px; border-radius: 999px; background: rgba(255,255,255,.72); border: 1px solid var(--line); font-size: 12px; font-weight: 750; }
+.run-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--correct); box-shadow: 0 0 0 5px rgba(77,139,118,.12); }
+.run-pill.failed .run-dot { background: var(--wrong); box-shadow: 0 0 0 5px rgba(189,114,110,.12); }
+.hero { position: relative; overflow: hidden; display: grid; grid-template-columns: 1.18fr .82fr; gap: 22px; padding: clamp(24px, 4vw, 48px); border: 1px solid rgba(255,255,255,.85); border-radius: 34px; background: linear-gradient(135deg, rgba(255,255,255,.94), rgba(247,250,249,.72)); box-shadow: var(--shadow); }
+.hero::after { content: ""; position: absolute; width: 360px; height: 360px; right: -140px; top: -180px; border-radius: 50%; background: linear-gradient(135deg, rgba(220,235,230,.7), rgba(235,233,245,.68)); filter: blur(2px); }
+.hero-main, .hero-side { position: relative; z-index: 1; }
+.eyebrow { display: inline-flex; align-items: center; gap: 8px; color: var(--sage-deep); font-size: 12px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; }
+.eyebrow::before { content: ""; width: 22px; height: 2px; border-radius: 2px; background: var(--sage); }
+.direction-row { display: flex; align-items: end; flex-wrap: wrap; gap: 14px; margin: 18px 0 8px; }
+.direction { font-size: clamp(58px, 10vw, 106px); line-height: .88; letter-spacing: -.075em; font-weight: 850; }
+.direction.up { color: var(--sage-deep); }
+.direction.down { color: #a96663; }
+.confidence-badge { margin-bottom: 8px; padding: 9px 12px; border-radius: 14px; background: var(--mint); color: var(--sage-deep); font-size: 13px; font-weight: 800; }
+.hero-copy { max-width: 620px; color: var(--muted); line-height: 1.7; font-size: 14px; }
+.hero-copy strong { color: var(--ink); }
+.probability { margin-top: 26px; }
+.probability-head { display: flex; justify-content: space-between; color: var(--muted); font-size: 12px; margin-bottom: 9px; }
+.probability-track { height: 12px; border-radius: 999px; background: var(--peach-soft); overflow: hidden; box-shadow: inset 0 0 0 1px rgba(127,93,83,.08); }
+.probability-fill { height: 100%; border-radius: inherit; background: linear-gradient(90deg, var(--sage), #82aaa1); }
+.hero-side { display: flex; flex-direction: column; justify-content: space-between; gap: 18px; padding: 22px; border-radius: 25px; background: rgba(246,249,248,.75); border: 1px solid var(--line); }
+.range-label { color: var(--muted); font-size: 12px; }
+.range-value { margin-top: 7px; font-size: clamp(24px, 4vw, 38px); font-weight: 820; letter-spacing: -.04em; }
+.range-caption { margin-top: 8px; color: var(--muted); font-size: 12px; line-height: 1.55; }
+.range-scale { position: relative; height: 10px; margin: 22px 0 10px; border-radius: 999px; background: linear-gradient(90deg, var(--peach-soft), var(--lavender-soft), var(--mint)); }
+.range-scale::after { content: ""; position: absolute; left: 50%; top: 50%; width: 16px; height: 16px; border-radius: 50%; background: var(--surface-solid); border: 4px solid var(--lavender); transform: translate(-50%, -50%); box-shadow: 0 4px 12px rgba(80,76,112,.18); }
+.range-points { display: flex; justify-content: space-between; gap: 8px; font-size: 11px; color: var(--muted); }
+.meta-line { display: flex; justify-content: space-between; gap: 12px; padding-top: 14px; border-top: 1px solid var(--line); font-size: 12px; }
+.meta-line span:first-child { color: var(--muted); }
+.metrics { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; margin-top: 18px; }
+.metric { padding: 20px; border-radius: 23px; background: var(--surface); border: 1px solid rgba(255,255,255,.82); box-shadow: 0 12px 36px rgba(57,79,73,.055); backdrop-filter: blur(14px); }
+.metric-label { color: var(--muted); font-size: 12px; }
+.metric-value { margin-top: 9px; font-size: 25px; font-weight: 820; letter-spacing: -.035em; }
+.metric-note { margin-top: 6px; color: var(--muted); font-size: 11px; line-height: 1.45; }
+.content-grid { display: grid; grid-template-columns: 1.45fr .55fr; gap: 18px; margin-top: 18px; }
+.panel { min-width: 0; padding: 24px; border-radius: 28px; background: var(--surface); border: 1px solid rgba(255,255,255,.82); box-shadow: 0 16px 44px rgba(57,79,73,.06); backdrop-filter: blur(14px); }
+.panel-head { display: flex; justify-content: space-between; align-items: start; gap: 14px; margin-bottom: 18px; }
+.panel h2 { margin: 0; font-size: 17px; letter-spacing: -.02em; }
+.panel-sub { margin-top: 5px; color: var(--muted); font-size: 12px; }
+.chart { width: 100%; min-height: 280px; display: block; }
+.chart-grid { stroke: rgba(74,101,95,.10); stroke-width: 1; }
+.chart-label { fill: #87938f; font-size: 10px; }
+.chart-line { fill: none; stroke: var(--sage-deep); stroke-width: 3; stroke-linecap: round; stroke-linejoin: round; }
+.chart-area { fill: url(#none); opacity: .08; }
+.forecast-band { fill: rgba(143,138,184,.18); }
+.forecast-median { stroke: var(--lavender); stroke-width: 2.5; stroke-dasharray: 6 5; }
+.marker-dot { stroke-width: 2; }
+.marker-correct { fill: #e3f0eb; stroke: var(--correct); }
+.marker-wrong { fill: #f5e6e4; stroke: var(--wrong); }
+.marker-pending { fill: #f3eddf; stroke: var(--pending); }
+.marker-muted { fill: #edf1ef; stroke: #9aa6a2; }
+.marker-symbol { fill: var(--ink); font-size: 12px; font-weight: 900; }
+.chart-legend { display: flex; flex-wrap: wrap; gap: 14px; color: var(--muted); font-size: 11px; }
+.chart-legend span { display: inline-flex; align-items: center; gap: 6px; }
+.legend-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
+.correct-dot { background: var(--correct); }
+.wrong-dot { background: var(--wrong); }
+.pending-dot { background: var(--pending); }
+.legend-band { width: 18px; height: 8px; border-radius: 3px; background: rgba(143,138,184,.28); display: inline-block; }
+.learning-stack { display: grid; gap: 12px; }
+.learning-item { padding: 16px; border-radius: 18px; background: rgba(255,255,255,.56); border: 1px solid var(--line); }
+.learning-top { display: flex; justify-content: space-between; gap: 10px; font-size: 12px; }
+.learning-top span:first-child { color: var(--muted); }
+.learning-value { font-weight: 800; }
+.mini-track { height: 7px; border-radius: 99px; background: #edf1ef; margin-top: 10px; overflow: hidden; }
+.mini-fill { height: 100%; border-radius: inherit; background: linear-gradient(90deg, var(--sage), var(--lavender)); }
+.chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.chip { padding: 8px 10px; border-radius: 999px; background: rgba(245,230,222,.72); color: #846257; border: 1px solid rgba(201,144,120,.16); font-size: 10px; font-weight: 750; }
+.chip-good { background: var(--mint); color: var(--sage-deep); }
+.history-panel { margin-top: 18px; }
+.table-wrap { overflow: auto; max-height: 520px; border-radius: 18px; border: 1px solid var(--line); background: rgba(255,255,255,.45); }
+table { width: 100%; border-collapse: collapse; font-size: 12px; }
+th, td { padding: 13px 12px; border-bottom: 1px solid var(--line); text-align: left; white-space: nowrap; }
+th { position: sticky; top: 0; z-index: 2; background: rgba(246,249,248,.96); color: var(--muted); font-weight: 700; }
+.direction-mini { display: inline-flex; min-width: 46px; justify-content: center; padding: 5px 8px; border-radius: 999px; font-size: 10px; font-weight: 850; }
+.direction-mini.up { background: var(--mint); color: var(--sage-deep); }
+.direction-mini.down { background: var(--peach-soft); color: #9c625f; }
+.table-result { display: inline-flex; padding: 5px 8px; border-radius: 999px; font-size: 10px; font-weight: 800; }
+.result-correct { color: var(--correct); background: rgba(77,139,118,.10); }
+.result-wrong { color: var(--wrong); background: rgba(189,114,110,.10); }
+.result-pending { color: var(--pending); background: rgba(155,134,92,.10); }
+.result-muted { color: var(--muted); background: rgba(114,129,125,.08); }
+.empty, .empty-chart { text-align: center; color: var(--muted); padding: 60px 18px; }
+.footer { margin-top: 24px; padding: 20px 4px 0; display: flex; justify-content: space-between; align-items: center; gap: 16px; color: var(--muted); font-size: 11px; border-top: 1px solid var(--line); }
+.footer a { color: var(--sage-deep); text-decoration: none; font-weight: 800; }
+.footer a:hover { text-decoration: underline; }
+@media (max-width: 980px) {
+  .hero, .content-grid { grid-template-columns: 1fr; }
+  .metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 620px) {
+  .shell { width: 93%; padding-top: 18px; }
+  .topbar { align-items: flex-start; }
+  .brand p { display: none; }
+  .hero { border-radius: 26px; padding: 22px; }
+  .direction { font-size: 62px; }
+  .metrics { grid-template-columns: 1fr; }
+  .panel { border-radius: 22px; padding: 18px; }
+  .footer { flex-direction: column; align-items: flex-start; }
+}
+"""
 
     return f'''<!doctype html>
 <html lang="en" dir="ltr">
@@ -433,38 +656,105 @@ def render(latest: dict[str, Any], history: list[dict[str, Any]]) -> str:
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
   <meta http-equiv="refresh" content="300">
-  <meta name="theme-color" content="#090d16">
+  <meta name="theme-color" content="#f4f7f5">
+  <meta name="description" content="Adaptive next-candle BTC direction and price-range forecast">
   <title>BTC Next-Candle Forecast</title>
-  <style>
-    :root{{color-scheme:dark;--line:#263246;--text:#eef2ff;--muted:#9ca3af;--good:#34d399;--bad:#fb7185;--wait:#fbbf24;--blue:#60a5fa}}
-    *{{box-sizing:border-box}}html{{-webkit-text-size-adjust:100%}}body{{margin:0;min-height:100vh;background:radial-gradient(circle at top,#172033 0,#090d16 48%);color:var(--text);font-family:Inter,ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif}}
-    .wrap{{width:min(1240px,94%);margin:28px auto 60px;padding-bottom:env(safe-area-inset-bottom)}}header{{display:flex;justify-content:space-between;gap:16px;align-items:flex-start;margin-bottom:18px}}h1{{margin:0;font-size:clamp(28px,7vw,44px);letter-spacing:-.03em}}.sub{{color:var(--muted);margin-top:8px;line-height:1.65;max-width:820px}}.badge{{padding:9px 13px;border:1px solid var(--line);border-radius:999px;white-space:nowrap;background:#0d1422;font-weight:700}}
-    .grid{{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:12px}}.card{{min-width:0;background:rgba(17,24,39,.94);border:1px solid var(--line);border-radius:16px;padding:16px;box-shadow:0 16px 40px rgba(0,0,0,.18)}}.label{{color:var(--muted);font-size:13px;margin-bottom:9px}}.value{{font-size:clamp(18px,4vw,25px);font-weight:750;overflow-wrap:anywhere}}.meta{{color:var(--muted);font-size:12px;margin-top:6px}}.good{{color:var(--good)}}.bad{{color:var(--bad)}}.wait{{color:var(--wait)}}.wide{{grid-column:span 5}}.half{{grid-column:span 2}}.section{{margin-top:14px}}.section h2{{font-size:18px;margin:0 0 12px}}
-    .chart{{width:100%;height:auto;min-height:240px;display:block;border:1px solid var(--line);border-radius:12px;background:#0b1220}}.grid-line{{stroke:#263246;stroke-width:1}}.axis-label{{fill:#94a3b8;font-size:11px}}.price-line{{fill:none;stroke:var(--blue);stroke-width:2.5}}.range-line{{stroke:#64748b;stroke-width:4;stroke-linecap:round;opacity:.7}}.marker-correct{{fill:var(--good)}}.marker-wrong{{fill:var(--bad)}}.marker-pending{{fill:var(--wait)}}.marker-muted{{fill:#94a3b8}}.marker-correct-text{{color:var(--good)}}.marker-wrong-text{{color:var(--bad)}}.marker-pending-text{{color:var(--wait)}}.legend{{display:flex;flex-wrap:wrap;gap:14px;color:var(--muted);font-size:12px;margin-top:10px}}.empty-chart{{height:220px;display:grid;place-items:center;color:var(--muted);border:1px solid var(--line);border-radius:12px}}
-    table{{width:100%;border-collapse:collapse;font-size:13px}}th,td{{padding:11px 9px;border-bottom:1px solid var(--line);text-align:left;white-space:nowrap}}th{{color:var(--muted);font-weight:600;position:sticky;top:0;background:#111827}}.scroll{{overflow:auto;max-height:480px;-webkit-overflow-scrolling:touch}}.empty{{text-align:center;color:var(--muted)}}.result{{display:inline-flex;border-radius:999px;padding:4px 8px;font-size:11px;font-weight:800;letter-spacing:.04em;border:1px solid currentColor}}.correct{{color:var(--good);background:rgba(52,211,153,.08)}}.wrong{{color:var(--bad);background:rgba(251,113,133,.08)}}.pending{{color:var(--wait);background:rgba(251,191,36,.08)}}.muted-result{{color:#94a3b8;background:rgba(148,163,184,.08)}}pre{{white-space:pre-wrap;overflow-wrap:anywhere;color:#d1d5db;margin:0;font-size:12px}}footer{{color:var(--muted);text-align:center;margin-top:20px;line-height:1.8}}
-    @media(max-width:1050px){{.grid{{grid-template-columns:repeat(2,minmax(0,1fr))}}.wide,.half{{grid-column:span 2}}header{{flex-direction:column}}}}@media(max-width:520px){{.wrap{{width:92%;margin-top:18px}}.grid{{grid-template-columns:1fr}}.wide,.half{{grid-column:span 1}}.card{{padding:14px;border-radius:14px}}.chart{{min-height:190px}}h1{{font-size:30px}}}}
-  </style>
+  <style>{styles}</style>
 </head>
-<body><div class="wrap">
-<header><div><h1>BTC Next-Candle Forecast</h1><div class="sub">Every forecast is created only after an hourly candle closes. It estimates an {esc(interval_probability)} probable range for the next candle close. Results remain pending until the target candle has fully closed and are immutable after resolution.</div></div><div class="badge {'good' if run_ok else 'bad'}">{'Run successful' if run_ok else 'FAIL-SAFE'}</div></header>
-<main class="grid">
-<div class="card"><div class="label">Source candle close</div><div class="value">{esc(reference_close)}</div></div>
-<div class="card"><div class="label">Next close range</div><div class="value">{esc(latest_range)}</div></div>
-<div class="card"><div class="label">Median estimate</div><div class="value">{esc(median_close)}</div><div class="meta">Not a guaranteed price</div></div>
-<div class="card"><div class="label">Scenario</div><div class="value">{esc(scenario)}</div></div>
-<div class="card"><div class="label">Evaluation after</div><div class="value">{esc(target_close_time)}</div></div>
-<div class="card"><div class="label">Decision</div><div class="value {action_class}">{esc(action)}</div></div>
-<div class="card"><div class="label">Interval coverage</div><div class="value">{esc(coverage_text)}</div><div class="meta">{inside} of {scored} resolved closes inside range</div></div>
-<div class="card"><div class="label">Direction accuracy</div><div class="value">{esc(direction_text)}</div><div class="meta">{direction_correct} of {direction_scored} directional forecasts</div></div>
-<div class="card"><div class="label">Expected net edge</div><div class="value">{esc(edge)}</div></div>
-<div class="card"><div class="label">Adaptive learner</div><div class="value">{esc(adaptive_status)}</div><div class="meta">Active horizons: {esc(active_text)}</div></div>
-<section class="card wide section"><h2>Source closes and probable next-close ranges</h2>{chart(history)}</section>
-<section class="card wide section"><h2>Adaptive learning performance</h2><div class="scroll"><table><thead><tr><th>Horizon</th><th>Mode</th><th>Direction samples</th><th>Event samples</th><th>Base Brier</th><th>Online Brier</th><th>Base accuracy</th><th>Online accuracy</th></tr></thead><tbody>{adaptive_rows(adaptive)}</tbody></table></div></section>
-<section class="card half section"><h2>Forecast timing and model status</h2><pre>{esc(details_text)}</pre></section>
-<section class="card half section"><h2>Trade decision blockers</h2><pre>{esc(blockers_text)}</pre></section>
-<section class="card wide section"><h2>Latest 30 next-candle forecasts</h2><div class="scroll"><table><thead><tr><th>Source candle UTC</th><th>Source close</th><th>Scenario</th><th>Probable close range</th><th>Interval</th><th>Target closes at</th><th>Actual close</th><th>Range result</th><th>Direction result</th><th>Action</th></tr></thead><tbody>{rows(history)}</tbody></table></div></section>
-</main><footer>Research and paper-trading only. The median is an estimate and the range is probabilistic, not guaranteed.<br>Last server run: {esc(value(latest.get('run_finished_at')))}</footer>
-</div></body></html>'''
+<body>
+<div class="shell">
+  <nav class="topbar">
+    <div class="brand">
+      <div class="brand-mark">₿</div>
+      <div>
+        <h1>BTC Next-Candle Forecast</h1>
+        <p>Direction-first forecasting with adaptive price learning</p>
+      </div>
+    </div>
+    <div class="run-pill {'failed' if not run_ok else ''}">
+      <span class="run-dot"></span>
+      {'System healthy' if run_ok else 'Fail-safe active'}
+    </div>
+  </nav>
+
+  <main>
+    <section class="hero">
+      <div class="hero-main">
+        <div class="eyebrow">Next closed 1-hour candle</div>
+        <div class="direction-row">
+          <div class="direction {direction_class}">{esc(direction)}</div>
+          <div class="confidence-badge">{esc(confidence)} confidence · {esc(signal_strength)}</div>
+        </div>
+        <p class="hero-copy">
+          The model expects the next candle to close <strong>{'above' if direction == 'UP' else 'below'} {esc(price(contract.get('reference_close')))}</strong>.
+          Direction is scored independently from the price interval. The forecast is frozen until the target candle closes.
+        </p>
+        <div class="probability">
+          <div class="probability-head"><span>Down {esc(percent(contract.get('probability_down')))}</span><span>Up {esc(percent(contract.get('probability_up')))}</span></div>
+          <div class="probability-track"><div class="probability-fill" style="width:{max(0.0, min(100.0, (probability_up or 0.5) * 100)):.2f}%"></div></div>
+        </div>
+      </div>
+
+      <aside class="hero-side">
+        <div>
+          <div class="range-label">Model-estimated next close</div>
+          <div class="range-value">{esc(price(contract.get('median_close')))}</div>
+          <div class="range-caption">Probable {esc(percent(contract.get('interval_probability'), 0))} interval generated from model residuals, not a generic candle range.</div>
+          <div class="range-scale"></div>
+          <div class="range-points"><span>{esc(price(contract.get('likely_close_low')))}</span><span>{esc(price(contract.get('median_close')))}</span><span>{esc(price(contract.get('likely_close_high')))}</span></div>
+        </div>
+        <div>
+          <div class="meta-line"><span>Forecast source</span><strong>{esc(source_label)}</strong></div>
+          <div class="meta-line"><span>Target closes</span><strong>{esc(compact_time(contract.get('target_close_time')))}</strong></div>
+          <div class="meta-line"><span>Evaluation</span><strong>{esc(evaluation_text)}</strong></div>
+        </div>
+      </aside>
+    </section>
+
+    <section class="metrics">
+      <article class="metric"><div class="metric-label">Direction accuracy</div><div class="metric-value">{esc(direction_rate_text)}</div><div class="metric-note">{direction_correct} correct across {direction_total} resolved forecasts</div></article>
+      <article class="metric"><div class="metric-label">Interval coverage</div><div class="metric-value">{esc(coverage_text)}</div><div class="metric-note">{interval_inside} closes inside {interval_total} resolved intervals</div></article>
+      <article class="metric"><div class="metric-label">Decision</div><div class="metric-value">{esc(action)}</div><div class="metric-note">Trade gates remain separate from direction forecasting</div></article>
+      <article class="metric"><div class="metric-label">Market regime</div><div class="metric-value">{esc(value(latest.get('regime')).replace('_', ' ').title())}</div><div class="metric-note">Scenario: {esc(value(contract.get('scenario')).replace('_', ' ').title())}</div></article>
+    </section>
+
+    <section class="content-grid">
+      <article class="panel">
+        <div class="panel-head"><div><h2>Price path and next forecast</h2><div class="panel-sub">Source closes, direction outcomes and the current model interval</div></div></div>
+        {chart(history)}
+      </article>
+
+      <aside class="panel">
+        <div class="panel-head"><div><h2>Adaptive learning</h2><div class="panel-sub">Performance-weighted Batch and Online fusion</div></div></div>
+        <div class="learning-stack">
+          <div class="learning-item"><div class="learning-top"><span>Batch influence</span><span class="learning-value">{esc(percent(batch_share))}</span></div><div class="mini-track"><div class="mini-fill" style="width:{batch_share*100:.2f}%"></div></div></div>
+          <div class="learning-item"><div class="learning-top"><span>Online influence</span><span class="learning-value">{esc(percent(online_share))}</span></div><div class="mini-track"><div class="mini-fill" style="width:{online_share*100:.2f}%"></div></div></div>
+          <div class="learning-item"><div class="learning-top"><span>Online evaluation samples</span><span class="learning-value">{esc(value(model_metrics.get('samples')))}</span></div><div class="range-caption">Online predictions receive weight only when Brier score, accuracy and return error remain competitive with the Batch champion.</div></div>
+          <div class="learning-item"><div class="learning-top"><span>Batch direction accuracy</span><span class="learning-value">{esc(percent(model_metrics.get('base_direction_accuracy')))}</span></div><div class="learning-top" style="margin-top:8px"><span>Online direction accuracy</span><span class="learning-value">{esc(percent(model_metrics.get('online_direction_accuracy')))}</span></div></div>
+        </div>
+        <div class="panel-head" style="margin-top:22px"><div><h2>Decision blockers</h2><div class="panel-sub">These affect trade execution, not the forecast score</div></div></div>
+        <div class="chips">{blocker_chips(latest.get('blockers'))}</div>
+      </aside>
+    </section>
+
+    <section class="panel history-panel">
+      <div class="panel-head"><div><h2>Forecast ledger</h2><div class="panel-sub">Immutable forecasts resolved only after the target candle closes</div></div></div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Source candle</th><th>Source close</th><th>Direction</th><th>Direction confidence</th><th>Expected close</th><th>Probable range</th><th>Actual close</th><th>Direction result</th><th>Interval result</th></tr></thead>
+          <tbody>{history_rows(history)}</tbody>
+        </table>
+      </div>
+    </section>
+  </main>
+
+  <footer class="footer">
+    <span>© 2026 Mahdi Ghahremani · ID: TheLouisMahdi · Research and paper-trading only.</span>
+    <a href="https://github.com/TheLouisMahdi" target="_blank" rel="noopener noreferrer">GitHub · @TheLouisMahdi</a>
+  </footer>
+</div>
+</body>
+</html>'''
 
 
 def main() -> int:
@@ -478,14 +768,23 @@ def main() -> int:
     provider = str(latest.get("provider") or "") or None
     history = resolve_outcomes(
         history,
-        load_candles(runtime_dir / "btc_hourly.sqlite3", provider),
+        load_candles(
+            runtime_dir / "btc_hourly.sqlite3",
+            provider,
+        ),
     )[-MAX_HISTORY:]
-    latest_key = latest.get("candle_time") or latest.get("run_finished_at")
+    latest_key = latest.get("candle_time") or latest.get(
+        "run_finished_at"
+    )
     latest = next(
         (
             item
             for item in reversed(history)
-            if (item.get("candle_time") or item.get("run_finished_at")) == latest_key
+            if (
+                item.get("candle_time")
+                or item.get("run_finished_at")
+            )
+            == latest_key
         ),
         latest,
     )
@@ -496,24 +795,22 @@ def main() -> int:
     write_json(site_dir / "latest.json", latest)
     write_json(site_dir / "history.json", history)
     (site_dir / ".nojekyll").write_text("", encoding="utf-8")
-    (site_dir / "index.html").write_text(render(latest, history), encoding="utf-8")
-    inside, scored, coverage = accuracy(history)
-    direction_correct, direction_scored, direction_rate = direction_accuracy(history)
+    (site_dir / "index.html").write_text(
+        render(latest, history),
+        encoding="utf-8",
+    )
+    correct, scored, rate = direction_accuracy(history)
+    inside, intervals, coverage = interval_coverage(history)
     print(
         json.dumps(
             {
                 "dashboard": "updated",
-                "resolved_intervals": scored,
-                "inside_range": inside,
+                "direction_resolved": scored,
+                "direction_correct": correct,
+                "direction_accuracy": rate,
+                "interval_resolved": intervals,
+                "interval_inside": inside,
                 "interval_coverage": coverage,
-                "resolved_directions": direction_scored,
-                "correct_directions": direction_correct,
-                "direction_accuracy": direction_rate,
-                "adaptive_status": (
-                    latest.get("adaptive", {}).get("status")
-                    if isinstance(latest.get("adaptive"), dict)
-                    else None
-                ),
             },
             indent=2,
         )
@@ -531,22 +828,29 @@ def _candle_map(candles: pd.DataFrame) -> dict[pd.Timestamp, dict[str, float]]:
             "low": float(row.low),
             "close": float(row.close),
         }
-        for row in candles.drop_duplicates("open_time", keep="last").itertuples(index=False)
+        for row in candles.drop_duplicates(
+            "open_time",
+            keep="last",
+        ).itertuples(index=False)
         if not pd.isna(row.close)
     }
 
 
-def _utc(value: Any) -> pd.Timestamp:
-    timestamp = pd.Timestamp(value)
-    return timestamp.tz_localize("UTC") if timestamp.tzinfo is None else timestamp.tz_convert("UTC")
+def _utc(value_: Any) -> pd.Timestamp:
+    timestamp = pd.Timestamp(value_)
+    return (
+        timestamp.tz_localize("UTC")
+        if timestamp.tzinfo is None
+        else timestamp.tz_convert("UTC")
+    )
 
 
-def _finite(value: Any) -> float | None:
+def _finite(value_: Any) -> float | None:
     try:
-        number_value = float(value)
+        numeric = float(value_)
     except (TypeError, ValueError):
         return None
-    return number_value if np.isfinite(number_value) else None
+    return numeric if np.isfinite(numeric) else None
 
 
 if __name__ == "__main__":
