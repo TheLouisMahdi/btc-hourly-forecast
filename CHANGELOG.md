@@ -1,5 +1,21 @@
 # Changelog
 
+## 3.2.0 — Direction-first adaptive price fusion
+
+- Made next-candle direction the primary forecast result.
+- Replaced `RANGE` direction output with explicit `UP` or `DOWN` plus confidence strength.
+- Added a dedicated incremental price learner for close direction and close return.
+- Added independent performance-weighted fusion for direction and price magnitude.
+- Added bounded online probabilities and returns to reduce unstable overconfidence.
+- Removed recent candle range as the primary interval source.
+- Centered price intervals on the fused Batch and Online return estimate.
+- Kept interval coverage as a secondary diagnostic separate from direction accuracy.
+- Added a persistent `price_adaptive_state.joblib` artifact and price summary.
+- Added tests for blend maturity, blend safety and direction-first outcome scoring.
+- Rebuilt the public dashboard with a soft modern visual system and calmer colors.
+- Added author identity, GitHub ID and copyright details to the dashboard footer.
+- Updated the README and project metadata for version 3.2.0.
+
 ## 3.1.0 — Next-candle probabilistic forecast contract
 
 - Replaced direction-only public outcomes with an 80% probable close range for the next closed hourly candle.
