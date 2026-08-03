@@ -22,7 +22,8 @@ LOGGER = logging.getLogger("github_weekly_retrain")
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description=(
-            "Retrain the structural breakout model from fresh configured history"
+            "Retrain deterministic long and short breakout models from "
+            "complete chronological BTC history"
         )
     )
     parser.add_argument("--output-dir", default="model-state-output")
@@ -52,7 +53,10 @@ def main() -> int:
     database = Database(settings)
     database.initialize()
     history_days = float(
-        settings.section("market").get("history_days", 365)
+        settings.section("market").get("history_days", 3650)
+    )
+    news_days = float(
+        settings.section("news").get("historical_days", 365)
     )
 
     started = pd.Timestamp.now(tz="UTC")
@@ -67,7 +71,7 @@ def main() -> int:
             settings,
             database,
             historical=True,
-            days=history_days,
+            days=news_days,
         )
     )
     recent_news = optional(
@@ -108,9 +112,12 @@ def main() -> int:
             "recent_news": recent_news,
             "training": training,
             "training_history_days": history_days,
+            "news_history_days": news_days,
             "forecast_target": "NEXT_CLOSED_1H_CANDLE",
-            "trade_setup": "STRUCTURAL_BREAKOUT",
+            "trade_setup": "DETERMINISTIC_DIRECTIONAL_BREAKOUT",
             "general_label": "CLOSE_TO_CLOSE_RETURN",
+            "sampling_strategy": "NONE",
+            "synthetic_events": 0,
         }
     )
     write_json(output_dir / "model_metadata.json", metadata)
