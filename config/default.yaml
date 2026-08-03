@@ -1,6 +1,6 @@
 project:
   name: BTC Hourly Regime Trader
-  version: 2.1.0
+  version: 3.0.0
   timezone: UTC
 
 paths:
@@ -9,6 +9,7 @@ paths:
   report_dir: artifacts/reports
   log_dir: logs
   runtime_state: data/runtime_state.json
+  adaptive_state: data/adaptive_state.joblib
 
 market:
   symbol: BTCUSDT
@@ -89,8 +90,22 @@ model:
   tree_weight: 0.70
   auto_retrain_days: 7
 
+adaptive:
+  enabled: true
+  bootstrap_rows: 1440
+  observation_limit: 1000
+  evaluation_window: 336
+  minimum_direction_samples: 72
+  minimum_event_samples: 12
+  minimum_brier_improvement: 0.003
+  maximum_accuracy_regression: 0.015
+  suspension_brier_margin: 0.02
+  blend_weight: 0.35
+  maximum_blend_weight: 0.55
+  event_weight: 2.0
+  new_sample_weight: 1.0
+
 qualification:
-  # General UP/DOWN metrics remain diagnostic; qualification is based on event trading skill.
   minimum_event_auc: 0.52
   minimum_tradeability_auc: 0.53
   minimum_event_samples: 60
@@ -115,7 +130,6 @@ strategy:
   stress_cost_multiplier: 1.50
   minimum_profit_buffer_bps: 8.0
   minimum_net_edge_bps: 8.0
-  # This threshold is P(event continuation), not generic UP/DOWN confidence.
   minimum_confidence:
     1: 0.56
     2: 0.57
