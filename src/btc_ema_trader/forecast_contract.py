@@ -31,9 +31,18 @@ class NextCandleForecast:
     probability_down: float
     direction: str
     direction_confidence: float
+    signal_strength: str
     scenario: str
     interval_method: str
     calibration_samples: int
+    forecast_source: str
+    batch_probability_up: float
+    online_probability_up: float
+    direction_blend_weight: float
+    batch_return: float
+    online_return: float
+    return_blend_weight: float
+    return_direction_consistent: bool
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -72,6 +81,7 @@ def build_next_candle_forecast(
     history: list[dict[str, Any]],
     interval_probability: float = DEFAULT_INTERVAL_PROBABILITY,
 ) -> dict[str, Any]:
+    del recent_candles
     source_open_time = _utc(record["candle_time"])
     source_close_time = source_open_time + pd.Timedelta(hours=1)
     target_open_time = source_close_time
@@ -80,29 +90,67 @@ def build_next_candle_forecast(
     if reference_close <= 0:
         raise ValueError("A positive source candle close is required")
 
+    adaptive = record.get("price_forecast_model")
+    if not isinstance(adaptive, dict):
+        adaptive = {}
     probability_source = record.get(
         "general_probabilities",
         record.get("probabilities"),
     )
-    probability_up = float(
-        np.clip(
-            _mapping_value(probability_source, 1, 0.5),
-            1e-4,
-            1 - 1e-4,
-        )
-    )
-    general_returns = record.get(
+    return_source = record.get(
         "general_return_estimates",
         record.get("returns"),
     )
-    median_return = _mapping_value(
-        general_returns,
-        1,
-        0.0,
+    probability_up = float(
+        np.clip(
+            _mapping_value(probability_source, 1, 0.5),
+            0.05,
+            0.95,
+        )
     )
-    residuals = _resolved_residuals(history)
-    market_half_range = _market_half_range(recent_candles)
+    median_return = float(
+        np.clip(
+            _mapping_value(return_source, 1, 0.0),
+            -0.05,
+            0.05,
+        )
+    )
 
+    batch_probability_up = _finite(
+        adaptive.get("batch_probability_up"),
+        probability_up,
+    )
+    online_probability_up = _finite(
+        adaptive.get("online_probability_up"),
+        probability_up,
+    )
+    direction_blend_weight = float(
+        np.clip(
+            _finite(adaptive.get("direction_blend_weight"), 0.0),
+            0.0,
+            1.0,
+        )
+    )
+    batch_return = _finite(
+        adaptive.get("batch_return"),
+        median_return,
+    )
+    online_return = _finite(
+        adaptive.get("online_return"),
+        median_return,
+    )
+    return_blend_weight = float(
+        np.clip(
+            _finite(adaptive.get("return_blend_weight"), 0.0),
+            0.0,
+            1.0,
+        )
+    )
+    forecast_source = str(
+        adaptive.get("source") or "BATCH_CHAMPION"
+    )
+
+    residuals = _resolved_residuals(history)
     if len(residuals) >= MINIMUM_RESIDUAL_SAMPLES:
         alpha = (1.0 - interval_probability) / 2.0
         lower_error, upper_error = np.quantile(
@@ -114,7 +162,7 @@ def build_next_candle_forecast(
         )
         likely_return_low = median_return + float(lower_error)
         likely_return_high = median_return + float(upper_error)
-        interval_method = "EMPIRICAL_PREQUENTIAL_RESIDUAL"
+        interval_method = "LIVE_PREQUENTIAL_MODEL_RESIDUALS"
         calibration_samples = min(
             len(residuals),
             MAXIMUM_RESIDUAL_SAMPLES,
@@ -125,34 +173,31 @@ def build_next_candle_forecast(
             lower_error, upper_error, samples = walk_forward
             likely_return_low = median_return + lower_error
             likely_return_high = median_return + upper_error
-            interval_method = "WALK_FORWARD_RESIDUAL_QUANTILES"
+            interval_method = "WALK_FORWARD_MODEL_RESIDUALS"
             calibration_samples = samples
         else:
-            return_mae = _model_return_mae(model_metrics)
-            robust_error = max(
-                return_mae,
-                market_half_range,
-                0.0015,
+            return_mae = max(
+                _model_return_mae(model_metrics),
+                0.0005,
             )
-            normal_multiplier = 1.2815515655446004
-            half_width = normal_multiplier * robust_error
+            half_width = 1.2815515655446004 * return_mae
             likely_return_low = median_return - half_width
             likely_return_high = median_return + half_width
-            interval_method = "MODEL_MAE_AND_MARKET_RANGE_FALLBACK"
-            calibration_samples = len(residuals)
+            interval_method = "MODEL_RETURN_ERROR_FALLBACK"
+            calibration_samples = 0
 
-    minimum_half_width = max(
-        market_half_range * 0.35,
-        0.0010,
+    return_mae = max(
+        _model_return_mae(model_metrics),
+        0.0005,
     )
-    center = median_return
+    minimum_half_width = max(return_mae * 0.35, 0.0004)
     current_half_width = max(
-        center - likely_return_low,
-        likely_return_high - center,
+        median_return - likely_return_low,
+        likely_return_high - median_return,
     )
     if current_half_width < minimum_half_width:
-        likely_return_low = center - minimum_half_width
-        likely_return_high = center + minimum_half_width
+        likely_return_low = median_return - minimum_half_width
+        likely_return_high = median_return + minimum_half_width
 
     likely_return_low, likely_return_high = sorted(
         (float(likely_return_low), float(likely_return_high))
@@ -167,22 +212,21 @@ def build_next_candle_forecast(
         reference_close * (1.0 + likely_return_high),
     )
 
-    if probability_up >= 0.58:
-        direction = "UP"
-        scenario = "BULLISH_BIAS"
-    elif probability_up <= 0.42:
-        direction = "DOWN"
-        scenario = "BEARISH_BIAS"
+    direction = "UP" if probability_up >= 0.5 else "DOWN"
+    direction_confidence = max(probability_up, 1.0 - probability_up)
+    if direction_confidence >= 0.67:
+        signal_strength = "HIGH"
+    elif direction_confidence >= 0.58:
+        signal_strength = "MODERATE"
     else:
-        direction = "RANGE"
-        scenario = "RANGE_BIAS"
-    direction_confidence = max(
-        probability_up,
-        1.0 - probability_up,
+        signal_strength = "LOW"
+    scenario = "BULLISH_BIAS" if direction == "UP" else "BEARISH_BIAS"
+    return_direction_consistent = (
+        median_return >= 0 if direction == "UP" else median_return < 0
     )
 
     return NextCandleForecast(
-        contract_version=1,
+        contract_version=2,
         target="NEXT_CLOSED_1H_CANDLE",
         interval_probability=float(interval_probability),
         source_open_time=source_open_time.isoformat(),
@@ -200,9 +244,18 @@ def build_next_candle_forecast(
         probability_down=float(1.0 - probability_up),
         direction=direction,
         direction_confidence=float(direction_confidence),
+        signal_strength=signal_strength,
         scenario=scenario,
         interval_method=interval_method,
         calibration_samples=int(calibration_samples),
+        forecast_source=forecast_source,
+        batch_probability_up=float(batch_probability_up),
+        online_probability_up=float(online_probability_up),
+        direction_blend_weight=float(direction_blend_weight),
+        batch_return=float(batch_return),
+        online_return=float(online_return),
+        return_blend_weight=float(return_blend_weight),
+        return_direction_consistent=bool(return_direction_consistent),
     ).to_dict()
 
 
@@ -211,11 +264,13 @@ def _resolved_residuals(
 ) -> list[float]:
     residuals: list[float] = []
     for item in history:
-        if item.get("prediction_result") not in {
-            "IN_RANGE",
-            "OUT_OF_RANGE",
-        }:
-            continue
+        interval_result = item.get("interval_result")
+        if interval_result not in {"IN_RANGE", "OUT_OF_RANGE"}:
+            if item.get("prediction_result") not in {
+                "IN_RANGE",
+                "OUT_OF_RANGE",
+            }:
+                continue
         contract = item.get("next_candle_forecast")
         if not isinstance(contract, dict):
             continue
@@ -274,37 +329,6 @@ def _horizon_metrics(
         return None
     horizon = metrics.get("1", metrics.get(1, {}))
     return horizon if isinstance(horizon, dict) else None
-
-
-def _market_half_range(candles: pd.DataFrame) -> float:
-    if (
-        candles.empty
-        or not {"high", "low", "close"}.issubset(
-            candles.columns
-        )
-    ):
-        return 0.0
-    close = pd.to_numeric(
-        candles["close"],
-        errors="coerce",
-    )
-    high = pd.to_numeric(
-        candles["high"],
-        errors="coerce",
-    )
-    low = pd.to_numeric(
-        candles["low"],
-        errors="coerce",
-    )
-    values = (
-        (high - low) / close.replace(0, np.nan)
-    ).replace([np.inf, -np.inf], np.nan).dropna()
-    if values.empty:
-        return 0.0
-    return max(
-        0.0,
-        float(values.tail(168).quantile(0.70)) / 2.0,
-    )
 
 
 def _mapping_value(
