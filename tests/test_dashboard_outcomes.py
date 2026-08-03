@@ -102,14 +102,8 @@ class DashboardOutcomeTests(unittest.TestCase):
             candles(),
             now=pd.Timestamp("2026-01-01T02:01:31Z"),
         )[0]
-        self.assertEqual(
-            result["prediction_result"],
-            "DIRECTION_CORRECT",
-        )
-        self.assertEqual(
-            result["direction_result"],
-            "DIRECTION_CORRECT",
-        )
+        self.assertEqual(result["prediction_result"], "DIRECTION_CORRECT")
+        self.assertEqual(result["direction_result"], "DIRECTION_CORRECT")
         self.assertEqual(result["interval_result"], "IN_RANGE")
         self.assertEqual(result["actual_close"], 102.0)
         self.assertAlmostEqual(result["actual_close_return"], 0.02)
@@ -132,10 +126,27 @@ class DashboardOutcomeTests(unittest.TestCase):
             candles(),
             now=pd.Timestamp("2026-01-01T02:01:31Z"),
         )[0]
-        self.assertEqual(
-            result["prediction_result"],
-            "DIRECTION_WRONG",
-        )
+        self.assertEqual(result["prediction_result"], "DIRECTION_WRONG")
+        self.assertEqual(result["interval_result"], "IN_RANGE")
+
+    def test_legacy_range_contract_keeps_interval_but_skips_direction(self) -> None:
+        legacy = contract()
+        legacy["contract_version"] = 1
+        legacy["direction"] = "RANGE"
+        history = [
+            {
+                "candle_time": "2026-01-01T00:00:00Z",
+                "run_status": "OK",
+                "next_candle_forecast": legacy,
+            }
+        ]
+        result = resolve_outcomes(
+            history,
+            candles(),
+            now=pd.Timestamp("2026-01-01T02:01:31Z"),
+        )[0]
+        self.assertEqual(result["prediction_result"], "LEGACY_NOT_SCORED")
+        self.assertEqual(result["direction_result"], "LEGACY_NOT_SCORED")
         self.assertEqual(result["interval_result"], "IN_RANGE")
 
     def test_resolved_outcome_is_immutable(self) -> None:
@@ -155,15 +166,9 @@ class DashboardOutcomeTests(unittest.TestCase):
             candles(close=120.0),
             now=pd.Timestamp("2026-01-01T04:00:00Z"),
         )[0]
-        self.assertEqual(
-            result["prediction_result"],
-            "DIRECTION_CORRECT",
-        )
+        self.assertEqual(result["prediction_result"], "DIRECTION_CORRECT")
         self.assertEqual(result["actual_close"], 102.0)
-        self.assertEqual(
-            result["resolved_at"],
-            "2026-01-01T02:01:31Z",
-        )
+        self.assertEqual(result["resolved_at"], "2026-01-01T02:01:31Z")
 
     def test_legacy_direction_only_forecast_is_not_scored(self) -> None:
         history = [
@@ -180,10 +185,7 @@ class DashboardOutcomeTests(unittest.TestCase):
             candles(),
             now=pd.Timestamp("2026-01-01T04:00:00Z"),
         )[0]
-        self.assertEqual(
-            result["prediction_result"],
-            "LEGACY_NOT_SCORED",
-        )
+        self.assertEqual(result["prediction_result"], "LEGACY_NOT_SCORED")
 
 
 if __name__ == "__main__":
