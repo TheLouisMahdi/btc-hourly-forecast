@@ -22,6 +22,7 @@ class NextCandleForecast:
     target_close_time: str
     reference_close: float
     median_return: float
+    raw_fused_return: float
     likely_return_low: float
     likely_return_high: float
     median_close: float
@@ -43,6 +44,7 @@ class NextCandleForecast:
     online_return: float
     return_blend_weight: float
     return_direction_consistent: bool
+    direction_alignment_applied: bool
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -108,7 +110,7 @@ def build_next_candle_forecast(
             0.95,
         )
     )
-    median_return = float(
+    raw_fused_return = float(
         np.clip(
             _mapping_value(return_source, 1, 0.0),
             -0.05,
@@ -131,13 +133,19 @@ def build_next_candle_forecast(
             1.0,
         )
     )
-    batch_return = _finite(
-        adaptive.get("batch_return"),
-        median_return,
+    batch_return = float(
+        np.clip(
+            _finite(adaptive.get("batch_return"), raw_fused_return),
+            -0.05,
+            0.05,
+        )
     )
-    online_return = _finite(
-        adaptive.get("online_return"),
-        median_return,
+    online_return = float(
+        np.clip(
+            _finite(adaptive.get("online_return"), raw_fused_return),
+            -0.05,
+            0.05,
+        )
     )
     return_blend_weight = float(
         np.clip(
@@ -148,6 +156,30 @@ def build_next_candle_forecast(
     )
     forecast_source = str(
         adaptive.get("source") or "BATCH_CHAMPION"
+    )
+
+    direction = "UP" if probability_up >= 0.5 else "DOWN"
+    direction_confidence = max(probability_up, 1.0 - probability_up)
+    move_magnitude = float(
+        np.clip(
+            (1.0 - return_blend_weight) * abs(batch_return)
+            + return_blend_weight * abs(online_return),
+            0.0,
+            0.05,
+        )
+    )
+    median_return = (
+        move_magnitude if direction == "UP" else -move_magnitude
+    )
+    raw_direction_consistent = (
+        raw_fused_return >= 0
+        if direction == "UP"
+        else raw_fused_return < 0
+    )
+    direction_alignment_applied = not np.isclose(
+        median_return,
+        raw_fused_return,
+        atol=1e-12,
     )
 
     residuals = _resolved_residuals(history)
@@ -212,8 +244,6 @@ def build_next_candle_forecast(
         reference_close * (1.0 + likely_return_high),
     )
 
-    direction = "UP" if probability_up >= 0.5 else "DOWN"
-    direction_confidence = max(probability_up, 1.0 - probability_up)
     if direction_confidence >= 0.67:
         signal_strength = "HIGH"
     elif direction_confidence >= 0.58:
@@ -221,9 +251,6 @@ def build_next_candle_forecast(
     else:
         signal_strength = "LOW"
     scenario = "BULLISH_BIAS" if direction == "UP" else "BEARISH_BIAS"
-    return_direction_consistent = (
-        median_return >= 0 if direction == "UP" else median_return < 0
-    )
 
     return NextCandleForecast(
         contract_version=2,
@@ -235,6 +262,7 @@ def build_next_candle_forecast(
         target_close_time=target_close_time.isoformat(),
         reference_close=float(reference_close),
         median_return=float(median_return),
+        raw_fused_return=float(raw_fused_return),
         likely_return_low=float(likely_return_low),
         likely_return_high=float(likely_return_high),
         median_close=float(median_close),
@@ -255,7 +283,8 @@ def build_next_candle_forecast(
         batch_return=float(batch_return),
         online_return=float(online_return),
         return_blend_weight=float(return_blend_weight),
-        return_direction_consistent=bool(return_direction_consistent),
+        return_direction_consistent=bool(raw_direction_consistent),
+        direction_alignment_applied=bool(direction_alignment_applied),
     ).to_dict()
 
 
