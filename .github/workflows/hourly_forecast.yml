@@ -7,6 +7,7 @@ on:
       - ".github/workflows/hourly_forecast.yml"
       - "src/**"
       - "scripts/github_hourly_forecast.py"
+      - "scripts/github_structural_forecast.py"
       - "scripts/github_common.py"
       - "tests/**"
       - "config/**"
@@ -85,8 +86,8 @@ jobs:
             done
           fi
 
-      - name: Run adaptive forecast
-        run: python scripts/github_hourly_forecast.py
+      - name: Run structural adaptive forecast
+        run: python scripts/github_structural_forecast.py
 
       - name: Resolve outcomes
         run: python scripts/github_dashboard.py
