@@ -33,7 +33,10 @@ def build_feature_set(
     structure_cfg = settings.section("structure")
     horizons = [
         int(horizon)
-        for horizon in model_cfg.get("horizons_hours", [1, 3, 6])
+        for horizon in model_cfg.get(
+            "horizons_hours",
+            [1, 3, 6],
+        )
     ]
 
     frame = (
@@ -42,7 +45,10 @@ def build_feature_set(
         .drop_duplicates("open_time")
         .reset_index(drop=True)
     )
-    frame["open_time"] = pd.to_datetime(frame["open_time"], utc=True)
+    frame["open_time"] = pd.to_datetime(
+        frame["open_time"],
+        utc=True,
+    )
     for column in (
         "open",
         "high",
@@ -53,7 +59,10 @@ def build_feature_set(
         "trades",
     ):
         if column in frame:
-            frame[column] = pd.to_numeric(frame[column], errors="coerce")
+            frame[column] = pd.to_numeric(
+                frame[column],
+                errors="coerce",
+            )
 
     close = frame["close"]
     high = frame["high"]
@@ -63,14 +72,23 @@ def build_feature_set(
     kama_er = int(cfg.get("kama_er_period", 10))
     kama_fast = int(cfg.get("kama_fast_period", 2))
     kama_slow = int(cfg.get("kama_slow_period", 30))
-    frame["kama"] = _kama(close, kama_er, kama_fast, kama_slow)
+    frame["kama"] = _kama(
+        close,
+        kama_er,
+        kama_fast,
+        kama_slow,
+    )
     frame["kama_slope_1"] = frame["kama"].pct_change()
     frame["kama_slope_3"] = frame["kama"].pct_change(3) / 3
     frame["kama_slope_12"] = frame["kama"].pct_change(12) / 12
     frame["price_vs_kama"] = close / frame["kama"] - 1
 
     for span in (24, 72, 168, 336):
-        ema = close.ewm(span=span, adjust=False, min_periods=span).mean()
+        ema = close.ewm(
+            span=span,
+            adjust=False,
+            min_periods=span,
+        ).mean()
         frame[f"ema_{span}"] = ema
         frame[f"price_vs_ema_{span}"] = close / ema - 1
         frame[f"ema_{span}_slope_6"] = ema.pct_change(6) / 6
@@ -91,8 +109,13 @@ def build_feature_set(
         min_periods=atr_period,
     ).mean()
     frame["atr_pct"] = frame["atr"] / close
-    frame["atr_z_72"] = _rolling_zscore(frame["atr_pct"], 72)
-    frame["atr_percentile_168"] = frame["atr_pct"].rolling(168).apply(
+    frame["atr_z_72"] = _rolling_zscore(
+        frame["atr_pct"],
+        72,
+    )
+    frame["atr_percentile_168"] = frame[
+        "atr_pct"
+    ].rolling(168).apply(
         _last_percentile_rank,
         raw=True,
     )
@@ -144,17 +167,20 @@ def build_feature_set(
     frame["di_spread"] = (plus_di - minus_di) / 100
 
     donchian_period = int(cfg.get("donchian_period", 20))
-    frame["donchian_high"] = high.shift(1).rolling(donchian_period).max()
-    frame["donchian_low"] = low.shift(1).rolling(donchian_period).min()
+    frame["donchian_high"] = high.shift(1).rolling(
+        donchian_period
+    ).max()
+    frame["donchian_low"] = low.shift(1).rolling(
+        donchian_period
+    ).min()
     frame["donchian_mid"] = (
         frame["donchian_high"] + frame["donchian_low"]
     ) / 2
     frame["donchian_position"] = (
-        (close - frame["donchian_low"])
-        / (
-            frame["donchian_high"] - frame["donchian_low"]
-        ).replace(0, np.nan)
-    )
+        close - frame["donchian_low"]
+    ) / (
+        frame["donchian_high"] - frame["donchian_low"]
+    ).replace(0, np.nan)
     frame["donchian_width_pct"] = (
         frame["donchian_high"] - frame["donchian_low"]
     ) / close
@@ -168,10 +194,15 @@ def build_feature_set(
     frame["bb_width"] = (
         frame["bb_upper"] - frame["bb_lower"]
     ) / frame["bb_mid"]
-    squeeze_lookback = int(cfg.get("squeeze_lookback", 120))
-    frame["bb_width_percentile"] = frame["bb_width"].rolling(
-        squeeze_lookback
-    ).apply(_last_percentile_rank, raw=True)
+    squeeze_lookback = int(
+        cfg.get("squeeze_lookback", 120)
+    )
+    frame["bb_width_percentile"] = frame[
+        "bb_width"
+    ].rolling(squeeze_lookback).apply(
+        _last_percentile_rank,
+        raw=True,
+    )
 
     rsi_period = int(cfg.get("rsi_period", 14))
     delta = close.diff()
@@ -189,13 +220,27 @@ def build_feature_set(
     frame["rsi14"] = 100 - 100 / (1 + rs)
     frame["rsi_centered"] = (frame["rsi14"] - 50) / 50
 
-    for lookback in (1, 2, 3, 6, 12, 24, 48, 72, 120, 168):
-        frame[f"return_{lookback}"] = close.pct_change(lookback)
+    for lookback in (
+        1,
+        2,
+        3,
+        6,
+        12,
+        24,
+        48,
+        72,
+        120,
+        168,
+    ):
+        frame[f"return_{lookback}"] = close.pct_change(
+            lookback
+        )
     log_return = np.log(close).diff()
     frame["log_return_1"] = log_return
     for lookback in (3, 6, 12, 24, 48, 72, 168):
         frame[f"realized_vol_{lookback}"] = (
-            log_return.rolling(lookback).std() * np.sqrt(lookback)
+            log_return.rolling(lookback).std()
+            * np.sqrt(lookback)
         )
 
     frame["range_pct"] = (high - low) / close
@@ -210,12 +255,20 @@ def build_feature_set(
     frame["close_location"] = (
         close - low
     ) / (high - low).replace(0, np.nan)
-    frame["range_expansion_atr"] = (high - low) / frame["atr"]
+    frame["range_expansion_atr"] = (
+        high - low
+    ) / frame["atr"]
 
     volume_log = np.log1p(frame["volume"])
     frame["volume_change_1"] = volume_log.diff()
-    frame["volume_z_24"] = _rolling_zscore(volume_log, 24)
-    frame["volume_z_72"] = _rolling_zscore(volume_log, 72)
+    frame["volume_z_24"] = _rolling_zscore(
+        volume_log,
+        24,
+    )
+    frame["volume_z_72"] = _rolling_zscore(
+        volume_log,
+        72,
+    )
     frame["volume_trend_24_72"] = (
         volume_log.rolling(24).mean()
         - volume_log.rolling(72).mean()
@@ -239,12 +292,18 @@ def build_feature_set(
     weekdays = frame["open_time"].dt.dayofweek
     frame["hour_sin"] = np.sin(2 * np.pi * hours / 24)
     frame["hour_cos"] = np.cos(2 * np.pi * hours / 24)
-    frame["weekday_sin"] = np.sin(2 * np.pi * weekdays / 7)
-    frame["weekday_cos"] = np.cos(2 * np.pi * weekdays / 7)
+    frame["weekday_sin"] = np.sin(
+        2 * np.pi * weekdays / 7
+    )
+    frame["weekday_cos"] = np.cos(
+        2 * np.pi * weekdays / 7
+    )
 
     frame = build_market_structure(frame, settings)
 
-    trend_adx = float(cfg.get("trend_adx_threshold", 18.0))
+    trend_adx = float(
+        cfg.get("trend_adx_threshold", 18.0)
+    )
     long_term_up = (
         (close > frame["ema_168"])
         & (frame["ema_168_slope_6"] > 0)
@@ -259,7 +318,9 @@ def build_feature_set(
         (frame["triangle_code"] != 0)
         | (
             frame["bb_width_percentile"]
-            <= float(cfg.get("squeeze_percentile", 0.20))
+            <= float(
+                cfg.get("squeeze_percentile", 0.20)
+            )
         )
     )
     frame["regime_code"] = np.select(
@@ -269,7 +330,11 @@ def build_feature_set(
     ).astype(int)
     frame["regime"] = np.select(
         [long_term_up, long_term_down, compression],
-        ["STRUCTURE_UP", "STRUCTURE_DOWN", "COMPRESSION"],
+        [
+            "STRUCTURE_UP",
+            "STRUCTURE_DOWN",
+            "COMPRESSION",
+        ],
         default="RANGE",
     )
     frame["event_continuation_bias"] = (
@@ -287,7 +352,9 @@ def build_feature_set(
             last_index = index
             last_direction = direction
         bars_since_event.append(
-            np.nan if last_index is None else float(index - last_index)
+            np.nan
+            if last_index is None
+            else float(index - last_index)
         )
         active_event_direction.append(last_direction)
     frame["bars_since_event"] = bars_since_event
@@ -298,9 +365,15 @@ def build_feature_set(
         frame["open_time"],
         settings,
     )
-    frame = frame.merge(news_features, on="open_time", how="left")
+    frame = frame.merge(
+        news_features,
+        on="open_time",
+        how="left",
+    )
     news_columns = [
-        column for column in frame.columns if column.startswith("news_")
+        column
+        for column in frame.columns
+        if column.startswith("news_")
     ]
     frame[news_columns] = frame[news_columns].fillna(0.0)
     frame["news_shock"] = (
@@ -310,7 +383,9 @@ def build_feature_set(
         )
         & (
             frame.get("news_relevance_3h", 0)
-            >= float(cfg.get("news_shock_min_relevance", 0.55))
+            >= float(
+                cfg.get("news_shock_min_relevance", 0.55)
+            )
         )
     ).astype(int)
 
@@ -364,6 +439,7 @@ def build_feature_set(
                 f"breakout_hold_h{horizon}",
                 f"breakout_success_h{horizon}",
                 f"false_breakout_h{horizon}",
+                f"neutral_breakout_h{horizon}",
                 f"event_continuation_h{horizon}",
                 f"tradeable_h{horizon}",
                 f"event_gross_return_h{horizon}",
@@ -376,7 +452,10 @@ def build_feature_set(
         if column not in excluded
         and pd.api.types.is_numeric_dtype(frame[column])
     ]
-    frame = frame.replace([np.inf, -np.inf], np.nan)
+    frame = frame.replace(
+        [np.inf, -np.inf],
+        np.nan,
+    )
     return FeatureSet(
         frame=frame,
         feature_columns=feature_columns,
@@ -394,10 +473,16 @@ def _attach_labels(
     base_cost = costs["base_cost_bps"] / 10_000
     profit_buffer = costs["profit_buffer_bps"] / 10_000
     target_atr = float(
-        strategy_cfg.get("label_target_atr_multiplier", 1.35)
+        strategy_cfg.get(
+            "label_target_atr_multiplier",
+            1.35,
+        )
     )
     stop_atr = float(
-        strategy_cfg.get("label_stop_atr_multiplier", 1.0)
+        strategy_cfg.get(
+            "label_stop_atr_multiplier",
+            1.0,
+        )
     )
     hold_buffer_atr = float(
         structure_cfg.get("label_hold_buffer_atr", 0.05)
@@ -409,7 +494,9 @@ def _attach_labels(
         raw_return = future_close / entry - 1
         frame[f"entry_price_h{horizon}"] = entry
         frame[f"future_return_h{horizon}"] = raw_return
-        frame[f"target_up_h{horizon}"] = (raw_return > 0).astype(float)
+        frame[f"target_up_h{horizon}"] = (
+            raw_return > 0
+        ).astype(float)
         frame.loc[
             raw_return.isna(),
             f"target_up_h{horizon}",
@@ -425,7 +512,9 @@ def _attach_labels(
         frame[f"mae_h{horizon}"] = mae
         frame[f"barrier_outcome_h{horizon}"] = barrier
 
-        event_direction = frame["event_direction"].astype(float)
+        event_direction = frame[
+            "event_direction"
+        ].astype(float)
         event_gross = event_direction * raw_return
         atr_move = frame["atr"] / entry
         event_gross = event_gross.where(
@@ -449,14 +538,40 @@ def _attach_labels(
                 False,
             ),
         )
-        hold = pd.Series(hold, index=frame.index, dtype=float)
+        hold = pd.Series(
+            hold,
+            index=frame.index,
+            dtype=float,
+        )
         success = (
             hold.astype(bool)
             & (barrier != -1)
             & (event_gross > 0)
         )
+        reentered_structure = np.where(
+            event_direction > 0,
+            future_close <= level,
+            np.where(
+                event_direction < 0,
+                future_close >= level,
+                False,
+            ),
+        )
+        reentered_structure = pd.Series(
+            reentered_structure,
+            index=frame.index,
+            dtype=bool,
+        )
+        false_breakout = (
+            (reentered_structure | (barrier == -1))
+            & (event_direction != 0)
+        )
+        neutral_breakout = (
+            (~success)
+            & (~false_breakout)
+            & (event_direction != 0)
+        )
         tradeable = success & (event_net >= profit_buffer)
-        false_breakout = (~success) & (event_direction != 0)
 
         missing = (
             (event_direction == 0)
@@ -467,16 +582,23 @@ def _attach_labels(
         continuation = success.astype(float)
         tradeable_float = tradeable.astype(float)
         false_breakout_float = false_breakout.astype(float)
+        neutral_breakout_float = neutral_breakout.astype(float)
         hold[missing] = np.nan
         continuation[missing] = np.nan
         tradeable_float[missing] = np.nan
         false_breakout_float[missing] = np.nan
+        neutral_breakout_float[missing] = np.nan
         event_gross[missing] = np.nan
         event_net[missing] = np.nan
 
         frame[f"breakout_hold_h{horizon}"] = hold
         frame[f"breakout_success_h{horizon}"] = continuation
-        frame[f"false_breakout_h{horizon}"] = false_breakout_float
+        frame[f"false_breakout_h{horizon}"] = (
+            false_breakout_float
+        )
+        frame[f"neutral_breakout_h{horizon}"] = (
+            neutral_breakout_float
+        )
         frame[f"event_continuation_h{horizon}"] = continuation
         frame[f"tradeable_h{horizon}"] = tradeable_float
         frame[f"event_gross_return_h{horizon}"] = event_gross
@@ -494,13 +616,18 @@ def _path_labels(
     mae = np.full(count, np.nan)
     barrier = np.full(count, np.nan)
     for index in range(count - horizon):
-        direction = int(frame.iloc[index]["event_direction"])
+        direction = int(
+            frame.iloc[index]["event_direction"]
+        )
         if direction == 0:
             continue
         entry = float(frame.iloc[index + 1]["open"])
         atr = float(frame.iloc[index]["atr"])
         invalidation = float(
-            frame.iloc[index].get("breakout_invalidation_level", np.nan)
+            frame.iloc[index].get(
+                "breakout_invalidation_level",
+                np.nan,
+            )
         )
         if (
             not np.isfinite(entry)
@@ -518,7 +645,9 @@ def _path_labels(
         if direction > 0:
             favorable = highs / entry - 1
             adverse = entry / lows - 1
-            target_price = entry + target_atr_multiplier * atr
+            target_price = (
+                entry + target_atr_multiplier * atr
+            )
             stop_price = (
                 invalidation
                 if np.isfinite(invalidation)
@@ -529,7 +658,9 @@ def _path_labels(
         else:
             favorable = entry / lows - 1
             adverse = highs / entry - 1
-            target_price = entry - target_atr_multiplier * atr
+            target_price = (
+                entry - target_atr_multiplier * atr
+            )
             stop_price = (
                 invalidation
                 if np.isfinite(invalidation)
@@ -556,7 +687,10 @@ def aggregate_news_hourly(
     candle_times: pd.Series,
     settings: Settings,
 ) -> pd.DataFrame:
-    open_times = pd.to_datetime(candle_times, utc=True)
+    open_times = pd.to_datetime(
+        candle_times,
+        utc=True,
+    )
     decision_times = pd.DatetimeIndex(
         open_times + pd.Timedelta(hours=1),
         name="decision_time",
@@ -609,10 +743,12 @@ def aggregate_news_hourly(
         errors="coerce",
     ).fillna(0.0)
     articles = articles.sort_values("available_at")
-    articles["decision_time"] = articles["available_at"].dt.ceil("h")
-    articles["weighted_sent"] = articles["sentiment"] * (
-        0.25 + articles["relevance"]
-    )
+    articles["decision_time"] = articles[
+        "available_at"
+    ].dt.ceil("h")
+    articles["weighted_sent"] = articles[
+        "sentiment"
+    ] * (0.25 + articles["relevance"])
     articles["negative"] = (
         articles["sentiment"] < -0.25
     ).astype(float)
@@ -624,10 +760,17 @@ def aggregate_news_hourly(
         negative_count=("negative", "sum"),
     ).reindex(decision_times, fill_value=0.0)
     for window in windows:
-        rolling = hourly.rolling(window=window, min_periods=1).sum()
+        rolling = hourly.rolling(
+            window=window,
+            min_periods=1,
+        ).sum()
         count = rolling["count"].replace(0, np.nan)
-        base[f"news_count_{window}h"] = rolling["count"].astype(float)
-        base[f"news_sent_sum_{window}h"] = rolling["sent_sum"].astype(float)
+        base[f"news_count_{window}h"] = rolling[
+            "count"
+        ].astype(float)
+        base[f"news_sent_sum_{window}h"] = rolling[
+            "sent_sum"
+        ].astype(float)
         base[f"news_sent_mean_{window}h"] = (
             rolling["sent_sum"] / count
         ).fillna(0.0)
@@ -646,7 +789,9 @@ def aggregate_news_hourly(
     ).sort_values("decision_time")
     latest = pd.merge_asof(
         decision_frame,
-        articles[["available_at"]].sort_values("available_at"),
+        articles[["available_at"]].sort_values(
+            "available_at"
+        ),
         left_on="decision_time",
         right_on="available_at",
         direction="backward",
@@ -656,7 +801,10 @@ def aggregate_news_hourly(
     ).dt.total_seconds().div(3600)
     base["news_age_hours"] = age.fillna(999.0).to_numpy()
     base["news_available"] = (
-        latest["available_at"].notna().astype(float).to_numpy()
+        latest["available_at"]
+        .notna()
+        .astype(float)
+        .to_numpy()
     )
     base["open_time"] = open_times.to_numpy()
     return base.reset_index(drop=True)
@@ -667,8 +815,12 @@ def sample_weights(
     settings: Settings,
 ) -> np.ndarray:
     cfg = settings.section("features")
-    event_weight = float(cfg.get("event_sample_weight", 4.0))
-    normal_weight = float(cfg.get("normal_sample_weight", 0.70))
+    event_weight = float(
+        cfg.get("event_sample_weight", 4.0)
+    )
+    normal_weight = float(
+        cfg.get("normal_sample_weight", 0.70)
+    )
     is_event = frame["is_event"].to_numpy(dtype=bool)
     score = pd.to_numeric(
         frame.get("event_score", 0.0),
@@ -676,11 +828,14 @@ def sample_weights(
     ).fillna(0.0).to_numpy(dtype=float)
     weights = np.where(
         is_event,
-        event_weight * (0.75 + np.clip(score, 0.0, 1.0)),
+        event_weight
+        * (0.75 + np.clip(score, 0.0, 1.0)),
         normal_weight,
     ).astype(float)
     recency = np.linspace(
-        float(cfg.get("oldest_sample_weight", 0.55)),
+        float(
+            cfg.get("oldest_sample_weight", 0.55)
+        ),
         1.0,
         len(frame),
     )
@@ -696,7 +851,9 @@ def _kama(
     values = series.to_numpy(dtype=float)
     result = np.full(len(values), np.nan)
     change = series.diff(er_period).abs()
-    volatility = series.diff().abs().rolling(er_period).sum()
+    volatility = series.diff().abs().rolling(
+        er_period
+    ).sum()
     efficiency = (
         change / volatility.replace(0, np.nan)
     ).clip(0, 1)
@@ -708,7 +865,9 @@ def _kama(
     first = er_period
     if len(values) <= first:
         return pd.Series(result, index=series.index)
-    result[first] = float(np.nanmean(values[: first + 1]))
+    result[first] = float(
+        np.nanmean(values[: first + 1])
+    )
     for index in range(first + 1, len(values)):
         if (
             not np.isfinite(values[index])
@@ -731,11 +890,15 @@ def _rolling_zscore(
     window: int,
 ) -> pd.Series:
     mean = series.rolling(window).mean()
-    std = series.rolling(window).std(ddof=0).replace(0, np.nan)
+    std = series.rolling(window).std(
+        ddof=0
+    ).replace(0, np.nan)
     return (series - mean) / std
 
 
-def _last_percentile_rank(values: np.ndarray) -> float:
+def _last_percentile_rank(
+    values: np.ndarray,
+) -> float:
     if len(values) == 0 or not np.isfinite(values[-1]):
         return np.nan
     valid = values[np.isfinite(values)]
