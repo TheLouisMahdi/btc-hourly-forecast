@@ -4,8 +4,8 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "btc-hourly-regime-trader"
-version = "4.0.0"
-description = "Causal multi-scale BTC structural breakout forecasting with dynamic support, resistance, triangle patterns and adaptive validation"
+version = "5.0.0"
+description = "Deterministic BTC resistance-breakout and support-breakdown models trained on unique chronological events without synthetic sampling"
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
