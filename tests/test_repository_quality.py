@@ -54,6 +54,7 @@ REQUIRED_FILES = {
     "docs/assets/candlestick-loop.svg",
     "pyproject.toml",
     "scripts/github_pages_dashboard.py",
+    "scripts/github_structural_forecast.py",
     "src/btc_ema_trader/contract_training.py",
     "src/btc_ema_trader/forecast_contract.py",
     "src/btc_ema_trader/market_structure.py",
@@ -234,6 +235,20 @@ class RepositoryQualityTests(unittest.TestCase):
         self.assertIn(
             "from .structure_training import train_feature_set",
             contract_training,
+        )
+
+    def test_hourly_workflow_uses_clean_structural_epoch(self) -> None:
+        root = Path(__file__).resolve().parents[1]
+        workflow = (
+            root / ".github" / "workflows" / "hourly_forecast.yml"
+        ).read_text(encoding="utf-8")
+        self.assertIn(
+            "python scripts/github_structural_forecast.py",
+            workflow,
+        )
+        self.assertNotIn(
+            "run: python scripts/github_hourly_forecast.py",
+            workflow,
         )
 
 
