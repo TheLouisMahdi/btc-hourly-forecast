@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from bisect import bisect_left, bisect_right
-from typing import Any
 
 import numpy as np
 import pandas as pd
@@ -227,10 +226,25 @@ def build_market_structure(
             max(scales),
         )
 
+        triangle_start = max(0, index - triangle_scale)
+        triangle_highs = _pivot_window(
+            high_pivots,
+            high_confirmations,
+            start=triangle_start,
+            stop=index - 1,
+            limit=maximum_pivots,
+        )
+        triangle_lows = _pivot_window(
+            low_pivots,
+            low_confirmations,
+            start=triangle_start,
+            stop=index - 1,
+            limit=maximum_pivots,
+        )
         triangle = detect_triangle(
             index=index,
-            high_pivots=high_pivots,
-            low_pivots=low_pivots,
+            high_pivots=triangle_highs,
+            low_pivots=triangle_lows,
             atr=current_atr,
             price=reference_price,
             lookback=triangle_scale,
