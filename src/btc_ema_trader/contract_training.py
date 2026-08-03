@@ -11,7 +11,7 @@ from .config import Settings
 from .features import FeatureSet, build_feature_set
 from .forecast_contract import attach_close_based_general_labels
 from .storage import Database
-from .training import train_feature_set
+from .structure_training import train_feature_set
 
 
 def train_from_database(
@@ -21,11 +21,13 @@ def train_from_database(
 ) -> dict[str, object]:
     market_cfg = settings.section("market")
     symbol = str(market_cfg.get("symbol", "BTCUSDT"))
+    history_days = float(market_cfg.get("history_days", 365))
     if provider is None:
         candidates = database.providers(symbol)
         if not candidates:
             raise ValueError(
-                "No candle history found. Run: btc-regime fetch --days 180"
+                "No candle history found. Run: btc-regime fetch "
+                f"--days {int(history_days)}"
             )
         provider = str(candidates[0]["provider"])
 
@@ -33,7 +35,6 @@ def train_from_database(
         provider=provider,
         symbol=symbol,
     )
-    history_days = float(market_cfg.get("history_days", 180))
     cutoff = candles["open_time"].max() - pd.Timedelta(
         days=history_days
     )
