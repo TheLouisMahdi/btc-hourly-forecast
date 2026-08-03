@@ -150,6 +150,10 @@ def main() -> int:
             "weekly_model_loaded": used_weekly_model,
         }
     )
+    record = preserve_existing_forecast(
+        previous_history,
+        record,
+    )
 
     history = append_unique(
         previous_history,
@@ -248,7 +252,33 @@ def attach_forecast_contract(
     output["prediction_result"] = "PENDING"
     output["direction_result"] = "PENDING"
     output["resolved_at"] = None
+    output["forecast_frozen"] = True
     return output
+
+
+def preserve_existing_forecast(
+    history: list[dict[str, Any]],
+    record: dict[str, Any],
+) -> dict[str, Any]:
+    key = record.get("candle_time")
+    if not key:
+        return record
+    existing = next(
+        (
+            item
+            for item in reversed(history)
+            if item.get("candle_time") == key
+            and isinstance(
+                item.get("next_candle_forecast"),
+                dict,
+            )
+            and item.get("run_status") == "OK"
+        ),
+        None,
+    )
+    if existing is None:
+        return record
+    return dict(existing)
 
 
 def load_history(path: Path) -> list[dict[str, Any]]:
