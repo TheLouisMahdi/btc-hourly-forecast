@@ -306,39 +306,7 @@ def preserve_existing_forecast(
     )
     if existing is None:
         return record
-
-    frozen_keys = {
-        "next_candle_forecast",
-        "forecast_contract_version",
-        "forecast_direction",
-        "selected_horizon",
-        "confidence",
-        "expected_return",
-        "target_candle_time",
-        "target_candle_open_time",
-        "target_candle_close_time",
-        "predicted_close_median",
-        "predicted_close_low",
-        "predicted_close_high",
-        "prediction_result",
-        "direction_result",
-        "interval_result",
-        "resolved_at",
-        "forecast_frozen",
-        "evaluation_available_at",
-        "seconds_until_evaluation",
-        "actual_close",
-        "actual_close_return",
-        "actual_direction",
-        "actual_candle_open",
-        "actual_candle_high",
-        "actual_candle_low",
-    }
-    output = dict(record)
-    for name in frozen_keys:
-        if name in existing:
-            output[name] = existing[name]
-    return output
+    return dict(existing)
 
 
 def load_history(path: Path) -> list[dict[str, Any]]:
