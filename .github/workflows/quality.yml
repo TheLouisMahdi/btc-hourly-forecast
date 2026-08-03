@@ -36,7 +36,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
 
 concurrency:
   group: repository-quality-${{ github.ref }}
@@ -45,7 +45,7 @@ concurrency:
 jobs:
   validate:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 25
     steps:
       - name: Checkout repository
         uses: actions/checkout@v6
@@ -63,8 +63,52 @@ jobs:
           python -m pip install -r requirements-github.txt
           python -m pip install -e . --no-deps
 
-      - name: Run unit tests
-        run: python -m unittest discover -s tests -v
+      - name: Run validation and capture diagnostics
+        id: validation
+        shell: bash
+        run: |
+          set +e
+          mkdir -p quality-state-output
+          python -m unittest discover -s tests -v > quality-state-output/tests.log 2>&1
+          test_exit=$?
+          python -m compileall -q src scripts > quality-state-output/compile.log 2>&1
+          compile_exit=$?
+          status=PASS
+          if [ "$test_exit" -ne 0 ] || [ "$compile_exit" -ne 0 ]; then
+            status=FAIL
+          fi
+          TEST_EXIT="$test_exit" COMPILE_EXIT="$compile_exit" STATUS="$status" python - <<'PY'
+          import json
+          import os
+          from datetime import datetime, timezone
+          from pathlib import Path
 
-      - name: Compile Python sources
-        run: python -m compileall -q src scripts
+          payload = {
+              "status": os.environ["STATUS"],
+              "commit_sha": os.environ.get("GITHUB_SHA"),
+              "workflow_run_id": os.environ.get("GITHUB_RUN_ID"),
+              "workflow_run_attempt": os.environ.get("GITHUB_RUN_ATTEMPT"),
+              "checked_at": datetime.now(timezone.utc).isoformat(),
+              "test_exit_code": int(os.environ["TEST_EXIT"]),
+              "compile_exit_code": int(os.environ["COMPILE_EXIT"]),
+          }
+          Path("quality-state-output/status.json").write_text(
+              json.dumps(payload, indent=2),
+              encoding="utf-8",
+          )
+          PY
+          echo "status=$status" >> "$GITHUB_OUTPUT"
+          exit 0
+
+      - name: Publish quality diagnostics
+        if: github.event_name != 'pull_request'
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: bash scripts/push_snapshot_branch.sh quality-state quality-state-output
+
+      - name: Enforce validation result
+        if: steps.validation.outputs.status != 'PASS'
+        run: |
+          cat quality-state-output/tests.log
+          cat quality-state-output/compile.log
+          exit 1
