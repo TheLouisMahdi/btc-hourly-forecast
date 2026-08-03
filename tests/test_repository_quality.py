@@ -60,6 +60,7 @@ REQUIRED_FILES = {
     "src/btc_ema_trader/directional_events.py",
     "src/btc_ema_trader/forecast_contract.py",
     "src/btc_ema_trader/market_structure.py",
+    "src/btc_ema_trader/market_structure_fast.py",
     "src/btc_ema_trader/price_adaptive.py",
     "src/btc_ema_trader/structure_training.py",
     "tests/test_breakout_labels.py",
@@ -67,6 +68,7 @@ REQUIRED_FILES = {
     "tests/test_directional_events.py",
     "tests/test_forecast_contract.py",
     "tests/test_market_structure.py",
+    "tests/test_market_structure_fast.py",
     "tests/test_price_adaptive.py",
 }
 
@@ -281,6 +283,17 @@ class RepositoryQualityTests(unittest.TestCase):
             "from .structure_training import train_feature_set",
             contract_training,
         )
+
+    def test_fast_structure_engine_is_canonical(self) -> None:
+        root = Path(__file__).resolve().parents[1]
+        contract = (
+            root
+            / "src"
+            / "btc_ema_trader"
+            / "contract_features.py"
+        ).read_text(encoding="utf-8")
+        self.assertIn("market_structure_fast", contract)
+        self.assertIn("build_fast_market_structure", contract)
 
     def test_hourly_workflow_uses_clean_structural_epoch(self) -> None:
         root = Path(__file__).resolve().parents[1]
