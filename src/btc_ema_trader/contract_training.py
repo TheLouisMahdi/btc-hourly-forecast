@@ -3,7 +3,7 @@ from __future__ import annotations
 import pandas as pd
 
 from .config import Settings
-from .features import build_feature_set
+from .features import FeatureSet, build_feature_set
 from .forecast_contract import attach_close_based_general_labels
 from .storage import Database
 from .training import train_feature_set
@@ -46,13 +46,17 @@ def train_from_database(
         settings,
         include_labels=True,
     )
-    feature_set.frame = attach_close_based_general_labels(
-        feature_set.frame,
-        feature_set.horizons,
+    prepared = FeatureSet(
+        frame=attach_close_based_general_labels(
+            feature_set.frame,
+            feature_set.horizons,
+        ),
+        feature_columns=feature_set.feature_columns,
+        horizons=feature_set.horizons,
     )
     return train_feature_set(
         settings,
-        feature_set,
+        prepared,
         provider=provider,
         symbol=symbol,
     )
