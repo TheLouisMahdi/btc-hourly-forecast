@@ -55,8 +55,10 @@ REQUIRED_FILES = {
     "pyproject.toml",
     "src/btc_ema_trader/contract_training.py",
     "src/btc_ema_trader/forecast_contract.py",
+    "src/btc_ema_trader/price_adaptive.py",
     "tests/test_dashboard_outcomes.py",
     "tests/test_forecast_contract.py",
+    "tests/test_price_adaptive.py",
 }
 
 
@@ -128,18 +130,29 @@ class RepositoryQualityTests(unittest.TestCase):
             readme,
         )
 
-    def test_readme_documents_immutable_interval_outcomes(self) -> None:
+    def test_readme_documents_direction_first_outcomes(self) -> None:
         root = Path(__file__).resolve().parents[1]
         readme = (root / "README.md").read_text(
             encoding="utf-8"
         )
         for required in (
             "NEXT_CLOSED_1H_CANDLE",
+            "DIRECTION_CORRECT",
+            "DIRECTION_WRONG",
             "IN_RANGE",
             "OUT_OF_RANGE",
             "immutable",
         ):
             self.assertIn(required, readme)
+
+    def test_dashboard_contains_project_identity(self) -> None:
+        root = Path(__file__).resolve().parents[1]
+        dashboard = (
+            root / "scripts" / "github_dashboard.py"
+        ).read_text(encoding="utf-8")
+        self.assertIn("Mahdi Ghahremani", dashboard)
+        self.assertIn("TheLouisMahdi", dashboard)
+        self.assertIn("https://github.com/TheLouisMahdi", dashboard)
 
     def test_model_is_configured_for_the_next_candle_only(self) -> None:
         root = Path(__file__).resolve().parents[1]
@@ -155,6 +168,10 @@ class RepositoryQualityTests(unittest.TestCase):
         self.assertEqual(
             config["forecast"]["target"],
             "NEXT_CLOSED_1H_CANDLE",
+        )
+        self.assertIn(
+            "price_adaptive_state",
+            config["paths"],
         )
 
 
