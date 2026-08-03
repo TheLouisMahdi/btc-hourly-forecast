@@ -44,13 +44,20 @@ def attach_close_based_general_labels(
     horizons: Iterable[int],
 ) -> pd.DataFrame:
     output = frame.copy()
-    source_close = pd.to_numeric(output["close"], errors="coerce")
+    source_close = pd.to_numeric(
+        output["close"],
+        errors="coerce",
+    )
     for raw_horizon in horizons:
         horizon = int(raw_horizon)
         future_close = source_close.shift(-horizon)
-        close_return = future_close / source_close.replace(0, np.nan) - 1.0
+        close_return = (
+            future_close / source_close.replace(0, np.nan) - 1.0
+        )
         output[f"future_return_h{horizon}"] = close_return
-        output[f"target_up_h{horizon}"] = (close_return > 0).astype(float)
+        output[f"target_up_h{horizon}"] = (
+            close_return > 0
+        ).astype(float)
         output.loc[
             close_return.isna(),
             f"target_up_h{horizon}",
@@ -88,8 +95,13 @@ def build_next_candle_forecast(
         "general_return_estimates",
         record.get("returns"),
     )
-    median_return = _mapping_value(general_returns, 1, 0.0)
+    median_return = _mapping_value(
+        general_returns,
+        1,
+        0.0,
+    )
     residuals = _resolved_residuals(history)
+    market_half_range = _market_half_range(recent_candles)
 
     if len(residuals) >= MINIMUM_RESIDUAL_SAMPLES:
         alpha = (1.0 - interval_probability) / 2.0
@@ -108,22 +120,29 @@ def build_next_candle_forecast(
             MAXIMUM_RESIDUAL_SAMPLES,
         )
     else:
-        return_mae = _model_return_mae(model_metrics)
-        market_half_range = _market_half_range(recent_candles)
-        robust_error = max(
-            return_mae,
-            market_half_range,
-            0.0015,
-        )
-        normal_multiplier = 1.2815515655446004
-        half_width = normal_multiplier * robust_error
-        likely_return_low = median_return - half_width
-        likely_return_high = median_return + half_width
-        interval_method = "MODEL_MAE_AND_MARKET_RANGE_FALLBACK"
-        calibration_samples = len(residuals)
+        walk_forward = _walk_forward_interval(model_metrics)
+        if walk_forward is not None:
+            lower_error, upper_error, samples = walk_forward
+            likely_return_low = median_return + lower_error
+            likely_return_high = median_return + upper_error
+            interval_method = "WALK_FORWARD_RESIDUAL_QUANTILES"
+            calibration_samples = samples
+        else:
+            return_mae = _model_return_mae(model_metrics)
+            robust_error = max(
+                return_mae,
+                market_half_range,
+                0.0015,
+            )
+            normal_multiplier = 1.2815515655446004
+            half_width = normal_multiplier * robust_error
+            likely_return_low = median_return - half_width
+            likely_return_high = median_return + half_width
+            interval_method = "MODEL_MAE_AND_MARKET_RANGE_FALLBACK"
+            calibration_samples = len(residuals)
 
     minimum_half_width = max(
-        _market_half_range(recent_candles) * 0.35,
+        market_half_range * 0.35,
         0.0010,
     )
     center = median_return
@@ -212,18 +231,49 @@ def _resolved_residuals(
     return residuals[-MAXIMUM_RESIDUAL_SAMPLES:]
 
 
+def _walk_forward_interval(
+    metrics: dict[str, Any] | None,
+) -> tuple[float, float, int] | None:
+    horizon = _horizon_metrics(metrics)
+    if horizon is None:
+        return None
+    lower = _optional_finite(
+        horizon.get("close_interval_residual_low")
+    )
+    upper = _optional_finite(
+        horizon.get("close_interval_residual_high")
+    )
+    samples = int(
+        _finite(
+            horizon.get("close_interval_oof_samples"),
+            0.0,
+        )
+    )
+    if lower is None or upper is None or samples <= 0:
+        return None
+    lower, upper = sorted((lower, upper))
+    return float(lower), float(upper), samples
+
+
 def _model_return_mae(
     metrics: dict[str, Any] | None,
 ) -> float:
-    if not isinstance(metrics, dict):
-        return 0.0
-    horizon = metrics.get("1", metrics.get(1, {}))
-    if not isinstance(horizon, dict):
+    horizon = _horizon_metrics(metrics)
+    if horizon is None:
         return 0.0
     return max(
         0.0,
         _finite(horizon.get("return_mae"), 0.0),
     )
+
+
+def _horizon_metrics(
+    metrics: dict[str, Any] | None,
+) -> dict[str, Any] | None:
+    if not isinstance(metrics, dict):
+        return None
+    horizon = metrics.get("1", metrics.get(1, {}))
+    return horizon if isinstance(horizon, dict) else None
 
 
 def _market_half_range(candles: pd.DataFrame) -> float:
@@ -234,9 +284,18 @@ def _market_half_range(candles: pd.DataFrame) -> float:
         )
     ):
         return 0.0
-    close = pd.to_numeric(candles["close"], errors="coerce")
-    high = pd.to_numeric(candles["high"], errors="coerce")
-    low = pd.to_numeric(candles["low"], errors="coerce")
+    close = pd.to_numeric(
+        candles["close"],
+        errors="coerce",
+    )
+    high = pd.to_numeric(
+        candles["high"],
+        errors="coerce",
+    )
+    low = pd.to_numeric(
+        candles["low"],
+        errors="coerce",
+    )
     values = (
         (high - low) / close.replace(0, np.nan)
     ).replace([np.inf, -np.inf], np.nan).dropna()
