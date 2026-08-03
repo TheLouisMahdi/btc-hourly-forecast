@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src="docs/assets/candlestick-loop.svg" alt="Animated BTC structural breakout chart" width="100%" />
+<img src="docs/assets/candlestick-loop.svg" alt="Animated BTC breakout chart" width="100%" />
 
 <br />
 
@@ -13,245 +13,190 @@
 </a>
 
 <a href="https://github.com/TheLouisMahdi/btc-hourly-forecast/actions/workflows/weekly_retrain.yml">
-  <img src="https://img.shields.io/github/actions/workflow/status/TheLouisMahdi/btc-hourly-forecast/weekly_retrain.yml?branch=main&style=for-the-badge&label=Structural%20Retraining&labelColor=47746b" alt="Structural retraining status" />
+  <img src="https://img.shields.io/github/actions/workflow/status/TheLouisMahdi/btc-hourly-forecast/weekly_retrain.yml?branch=main&style=for-the-badge&label=Directional%20Retraining&labelColor=47746b" alt="Directional retraining status" />
 </a>
 
 <br />
 <br />
 
-<img src="https://img.shields.io/badge/version-4.0.0-8f8ab8?style=flat-square" alt="Version 4.0.0" />
+<img src="https://img.shields.io/badge/version-5.0.0-8f8ab8?style=flat-square" alt="Version 5.0.0" />
 <img src="https://img.shields.io/badge/Python-3.11%2B-3776ab?style=flat-square&logo=python&logoColor=white" alt="Python 3.11 or newer" />
-<img src="https://img.shields.io/badge/trade_setup-structural_breakout-6f9b91?style=flat-square" alt="Structural breakout setup" />
+<img src="https://img.shields.io/badge/training-no_random_sampling-6f9b91?style=flat-square" alt="No random sampling" />
 <img src="https://img.shields.io/badge/mode-paper_trading_only-c99078?style=flat-square" alt="Paper trading only" />
 
 </div>
 
-## Overview
+# BTC Deterministic Directional Breakout Forecast
 
-**BTC Structural Breakout Forecast** is a research and paper-trading system built around one explicit market thesis:
+Version 5.0 separates two different trading problems that must not share one generic event model:
 
-- a confirmed resistance breakout can create a Long setup;
-- a confirmed support breakdown can create a Short setup;
-- dynamic long-term levels and triangle boundaries are treated as real market structure;
-- machine learning estimates whether the break is likely to hold, fail or remain untradeable after costs.
+- `RESISTANCE_BREAKOUT_LONG`: a real close crossing above confirmed resistance;
+- `SUPPORT_BREAKDOWN_SHORT`: a real close crossing below confirmed support.
 
-Version 4.0 replaces the previous generic event engine. The trading layer no longer starts from volume impulses, broad momentum events or a direction guess alone. It starts from a causal structural break and lets the model accept or reject that setup.
+Long and Short use separate candidate formulas, labels, targets, invalidation rules, probability thresholds, model heads and qualification results.
 
-The public dashboard still publishes one immutable `NEXT_CLOSED_1H_CANDLE` forecast after each fully closed hourly candle. That public direction forecast is separate from the multi-horizon structural trade decision.
+The public dashboard still publishes an immutable `NEXT_CLOSED_1H_CANDLE` direction and close interval. The trading layer independently evaluates breakout continuation over `3h`, `6h` and `12h` horizons.
 
-## Core design
+## Non-random training contract
 
 ```text
-Closed hourly candles
-        ↓
-Confirmed causal pivots
-        ↓
-Multi-scale static and dynamic levels
-        ↓
-Triangle and compression structure
-        ↓
-Confirmed resistance breakout or support breakdown
-        ↓
-Breakout-hold, false-breakout and net-tradeability models
-        ↓
-Qualified paper-trade decision
+sampling: NONE
+shuffle: false
+synthetic events: 0
+oversampling: false
+undersampling: false
+split: chronological expanding window
 ```
 
-The system deliberately separates three questions:
+Training is allowed to proceed only after the deterministic event inventory contains at least:
 
-1. **What is the next hourly close direction?**
-2. **Did a valid structural breakout occur?**
-3. **Is that breakout likely to hold and remain profitable after stressed costs?**
+- **2,000 unique resistance-breakout Long events**;
+- **2,000 unique support-breakdown Short events**.
 
-A correct answer to the first question does not automatically create a trade.
+The inventory gate also requires coverage across at least six calendar years, 24 quarters, four structure scales, three volatility buckets, three market regimes and 48 diversity groups per direction.
 
-## Causal market structure
+Events are never duplicated to meet the target. When the real inventory is insufficient, training fails with an explicit inventory error.
 
-All structure is calculated without using future candles.
+## Historical data
 
-### Confirmed pivots
+The configured batch retraining window is ten years of real hourly BTC candles, targeting at least 80,000 chronological rows.
 
-A pivot is available only after its right-side confirmation bars have closed. The original turning point may be earlier, but the model cannot use it until confirmation time.
+Provider priority:
 
-This avoids retrospective chart drawing that would look accurate historically but could not have existed during live execution.
+1. Coinbase BTC-USD spot;
+2. Binance BTC-USDT spot;
+3. Binance BTC-USDT futures;
+4. OKX BTC-USDT swap.
 
-### Multi-scale levels
+The selected provider is stored in the model artifact and runtime state. Providers are fallbacks, not mixed rows inside one training run.
 
-The engine analyzes four hourly windows:
+News history remains limited to the recent configured window. Directional breakout heads exclude news fields so missing old news cannot become an artificial regime indicator.
 
-| Window | Approximate role |
-|---|---|
-| `48h` | Local short-term structure |
-| `120h` | Swing structure |
-| `240h` | Medium-term structure |
-| `480h` | Long-term dynamic structure |
+## Deterministic event mining
 
-For every scale it estimates:
+The miner evaluates confirmed support and resistance across these hourly scales:
 
-- static rolling support and resistance;
-- pivot-derived dynamic trend lines;
-- normalized line slope;
-- line fit quality;
-- touch count;
-- channel width in ATR units;
-- distance from price to the active level.
+```text
+24h · 48h · 96h · 168h · 336h · 720h
+```
 
-Raw absolute level values are excluded from model training. The model learns normalized distances, slopes, touches and quality so it is not tied to one historical BTC price range.
-
-## Triangle detection
-
-The causal pattern engine recognizes:
-
-| Pattern | Structure |
-|---|---|
-| `SYMMETRICAL` | Falling resistance and rising support |
-| `ASCENDING` | Approximately flat resistance and rising support |
-| `DESCENDING` | Falling resistance and approximately flat support |
-
-A triangle requires:
-
-- at least two confirmed upper pivots;
-- at least two confirmed lower pivots;
-- converging boundaries;
-- minimum contraction;
-- acceptable line fit;
-- bounded current width;
-- sufficient pattern quality.
-
-The model receives triangle type, contraction, quality, width and estimated apex distance as features.
-
-## Structural events
-
-Only these primary trade events are supported:
-
-| Event | Trade direction |
-|---|---|
-| `RESISTANCE_BREAKOUT_LONG` | Long |
-| `TRIANGLE_BREAKOUT_LONG` | Long |
-| `SUPPORT_BREAKDOWN_SHORT` | Short |
-| `TRIANGLE_BREAKDOWN_SHORT` | Short |
-
-A breakout candle must satisfy configurable confirmation rules:
-
-- close beyond the structural level by an ATR-normalized buffer;
-- limited extension beyond the level;
-- minimum candle-body strength;
-- acceptable close location inside the candle;
-- minimum relative volume;
-- event cooldown to prevent duplicate setup counting.
+A candidate requires a real close-to-close crossing. Remaining above resistance or below support after an earlier break is not counted as a new event.
 
 Each event stores:
 
 ```text
-Event ID
-Breakout source
-Breakout level
-Invalidation level
-Event direction
-Event score
-Triangle type
-Structure regime
+unique event ID
+open time
+Long or Short direction
+breakout source and scale
+breakout level
+structural invalidation level
+ATR-normalized crossing distance
+level touches and age
+line slope and fit quality
+event score
+market regime and volatility context
+diversity key
 ```
 
-## True and false breakout labels
+Near-duplicate events are removed deterministically using time separation and ATR-normalized level similarity.
 
-The model is not trained merely to predict whether price rises after a signal.
+## Direction-specific formulas
 
-For each `1h`, `3h` and `6h` trade horizon, the label asks whether the structural break actually succeeded.
+### Resistance breakout Long
 
-A successful breakout must:
+The Long candidate formula emphasizes:
 
-- remain beyond the broken level at the evaluation horizon;
-- avoid the structural invalidation level;
-- produce positive event-aligned movement;
-- satisfy the path-aware target and stop logic;
-- remain profitable after execution costs and the required profit buffer.
+- resistance touch history;
+- positive candle-body strength;
+- close location near the upper candle range;
+- resistance crossing distance;
+- relative volume;
+- long-term upward structure;
+- resistance-line quality;
+- optional upper triangle-boundary quality.
 
-The training data stores:
+Long invalidation is placed below the broken level. Long target distance and required hold ratio are configured separately for every trade horizon.
+
+### Support breakdown Short
+
+The Short candidate formula independently emphasizes:
+
+- support touch history;
+- negative candle-body strength;
+- close location near the lower candle range;
+- support crossing distance;
+- relative volume;
+- long-term downward structure;
+- support-line quality;
+- optional lower triangle-boundary quality.
+
+Short invalidation is placed above the broken level. Short targets, hold requirements and probability thresholds are intentionally different from Long settings.
+
+## Labels
+
+Every real event is evaluated from the open of the next hourly candle.
+
+For each `3h`, `6h` and `12h` trade horizon, the path is classified using the direction-specific target and structural invalidation:
+
+- `SUCCESS`: target is reached before invalidation, the final close remains beyond the broken level and the required hold ratio is satisfied;
+- `FALSE_BREAKOUT`: invalidation is hit first or the final close re-enters the broken structure;
+- `NEUTRAL`: neither success nor a confirmed false breakout occurs;
+- `TRADEABLE`: success remains positive after execution costs and the configured profit buffer.
+
+The model also learns event-aligned return, maximum favorable excursion, maximum adverse excursion and level-hold ratio.
+
+## Model architecture
+
+Each horizon contains:
+
+- one general next-close direction classifier;
+- one general close-return regressor;
+- one independent Long success classifier;
+- one independent Long tradeability classifier;
+- one independent Long return regressor;
+- one independent Short success classifier;
+- one independent Short tradeability classifier;
+- one independent Short return regressor.
+
+The batch artifact uses:
 
 ```text
-breakout_hold_h*
-breakout_success_h*
-false_breakout_h*
-event_continuation_h*
-tradeable_h*
-event_gross_return_h*
-event_net_return_h*
+schema_version: 5
+model_id prefix: directional-breakout-hourly-
 ```
 
-This makes false breakouts a first-class failure mode rather than hiding them inside a generic direction label.
+All older artifacts are rejected by the runtime.
 
-## Model objectives
+## Validation
 
-The weekly Batch champion contains separate models for each trade horizon:
+General next-close prediction uses chronological `TimeSeriesSplit` validation.
 
-- general close direction;
-- general close return;
-- breakout success probability;
-- breakout tradeability probability;
-- breakout-aligned return.
+Long and Short event models use independent expanding-window Walk-Forward validation with a time embargo. Every Out-of-Fold event is evaluated once, after all training events used for that fold.
 
-Trade horizons are:
+Qualification is direction-specific. Long can qualify without Short, and Short can qualify without Long. A direction-horizon pair must pass:
 
-```text
-1h · 3h · 6h
-```
-
-The public price forecast remains a next-candle `1h` contract.
-
-## Training and validation
-
-Version 4.0 performs full retraining from a rolling `365-day` market window.
-
-The configured process uses:
-
-- six chronological Walk-Forward folds;
-- a six-hour embargo gap;
-- recency weighting without discarding older regimes;
-- stronger weights for confirmed structural events;
-- calibrated tree and linear classifier blending;
-- realistic execution costs;
-- stress-adjusted net expectancy;
-- event-type and triangle-type diagnostics.
-
-The new model artifact uses schema version `4` and the ID prefix:
-
-```text
-structure-breakout-hourly-
-```
-
-Older model artifacts are rejected and cannot silently enter the new runtime.
-
-## Qualification
-
-A horizon is not tradable merely because its direction accuracy is above 50%.
-
-It must pass all configured checks, including:
-
-- minimum structural event count;
-- breakout-success AUC;
+- minimum chronological OOF event count;
+- success AUC;
 - tradeability AUC;
-- probability calibration;
-- minimum breakout hold rate;
-- maximum false-breakout rate;
-- minimum number of selected Out-of-Fold trades;
+- success calibration error;
+- tradeability calibration error;
+- minimum selected OOF trades;
 - minimum OOF hit rate;
-- positive stress-adjusted expectancy;
-- sufficient positive Walk-Forward folds.
+- positive stress-adjusted net expectancy;
+- minimum positive-fold fraction.
 
-If no horizon qualifies, the system remains in `WAIT`.
+A qualified Long model never grants permission to a Short trade, or vice versa.
 
-## Structural risk management
+## Risk and decision gates
 
-The trade plan is anchored to the broken structure.
+A trade requires a fresh structural event and a qualified model for that same direction and selected horizon.
 
-The preferred stop is placed behind the stored structural invalidation level. ATR-based risk remains a bounded fallback, not the primary definition.
-
-A trade can still be blocked by:
+Possible blockers include:
 
 ```text
 MODEL_NOT_QUALIFIED
-SELECTED_HORIZON_NOT_QUALIFIED
+SELECTED_DIRECTION_NOT_QUALIFIED
 NO_NEW_STRUCTURE_BREAKOUT
 WEAK_BREAKOUT_STRUCTURE
 BREAKOUT_LEVEL_UNAVAILABLE
@@ -262,7 +207,7 @@ BREAKOUT_HORIZON_DISAGREEMENT
 INSUFFICIENT_STRESS_NET_EDGE
 ```
 
-The system is intentionally conservative and remains paper-trading only.
+The preferred stop is anchored to the event invalidation level. ATR risk is only a bounded fallback.
 
 ## Public forecast contract
 
@@ -271,14 +216,12 @@ For a source candle with open time `T`:
 | Field | Time |
 |---|---|
 | Source candle opens | `T` |
-| Source candle closes and forecast is created | `T + 1h` |
+| Forecast is created after source close | `T + 1h` |
 | Target candle opens | `T + 1h` |
 | Target candle closes | `T + 2h` |
-| Outcome becomes eligible | after target close plus settlement delay |
+| Resolution becomes eligible | target close plus settlement delay |
 
-Every contract is frozen and immutable after creation.
-
-Direction outcomes:
+The frozen direction result is one of:
 
 ```text
 PENDING
@@ -287,63 +230,34 @@ DIRECTION_WRONG
 LEGACY_NOT_SCORED
 ```
 
-Interval outcomes remain independent:
+Interval scoring is separate:
 
 ```text
 IN_RANGE
 OUT_OF_RANGE
 ```
 
-A wide interval cannot make an incorrect direction appear correct.
+A wide interval cannot turn a wrong direction into a correct prediction.
 
-## Adaptive learning
+## Adaptive status
 
-Two persistent adaptive layers remain available:
-
-| Layer | Purpose |
-|---|---|
-| Trade adaptive state | Breakout success, tradeability and event-return correction |
-| Price adaptive state | Next-close direction and return correction |
-
-Both states reset when the Batch champion changes. Online influence begins at zero and receives bounded weight only after chronological prequential evaluation shows that it remains competitive with the Batch model.
-
-The state branches are:
-
-| Branch | Purpose |
-|---|---|
-| `forecast-state` | Immutable forecast ledger |
-| `model-state` | Latest structural Batch champion and reports |
-| `adaptive-state` | Persistent adaptive learners |
+The general next-close price learner remains available. The previous generic online trade learner is disabled in version 5 because it does not contain independent Long and Short heads. It must not modify directional breakout probabilities until a direction-specific online architecture passes its own prequential validation.
 
 ## Automation
 
-### Structural retraining
-
 The weekly workflow:
 
-1. downloads the configured 365-day hourly history;
-2. collects historical and recent news;
-3. builds causal market structure;
-4. detects structural breakouts and triangle events;
-5. creates path-aware success and false-breakout labels;
-6. runs Walk-Forward validation;
-7. applies structural qualification;
-8. publishes the new schema-v4 champion only after successful completion.
+1. fetches the configured ten-year hourly market history;
+2. fetches the bounded news-history window;
+3. calculates causal market structure;
+4. mines unique Long and Short events deterministically;
+5. enforces the 2,000-per-direction diversity gate;
+6. creates direction-specific path labels;
+7. trains separate Long and Short heads;
+8. runs chronological OOF validation;
+9. publishes a schema-v5 artifact only after successful completion.
 
-### Hourly forecast
-
-The hourly workflow:
-
-1. restores the latest structural champion and adaptive states;
-2. runs all repository tests;
-3. refreshes closed market candles and news;
-4. builds current causal structure;
-5. updates adaptive learners from mature labels;
-6. creates one immutable next-candle forecast;
-7. evaluates any newly closed target candle;
-8. persists forecast and adaptive state.
-
-Dashboard deployment is independent from model execution so a temporary data or model failure cannot keep an old interface forever.
+The hourly workflow restores only the latest compatible artifact, refreshes recent closed candles, creates one immutable next-candle forecast and evaluates a trade only when the current event direction is independently qualified.
 
 ## Local setup
 
@@ -353,25 +267,13 @@ python -m pip install --upgrade pip
 python -m pip install -e .
 ```
 
-Fetch one year and train from scratch:
+Fetch and train from the configured real history:
 
 ```bash
-btc-regime fetch --days 365
+btc-regime fetch --days 3650
 btc-regime news --historical --days 365
 btc-regime news
 btc-regime train
-```
-
-Or run the full bootstrap:
-
-```bash
-btc-regime bootstrap --days 365
-```
-
-Run one cycle:
-
-```bash
-btc-regime cycle --force
 ```
 
 Run tests:
@@ -383,39 +285,26 @@ python -m unittest discover -s tests -v
 ## Repository layout
 
 ```text
-.github/workflows/             Quality, retraining, forecast and Pages workflows
-config/default.yaml            Structural, model, adaptive and risk configuration
+config/default.yaml
 scripts/github_weekly_retrain.py
 scripts/github_hourly_forecast.py
-scripts/github_dashboard.py
 src/btc_ema_trader/
-  market_structure.py          Causal pivots, levels, triangles and breakouts
-  features.py                  Structural features and breakout labels
-  structure_training.py        Walk-Forward training and qualification
-  model.py                     Schema-v4 Batch models
-  strategy.py                  Structural entry and risk gates
-  adaptive.py                  Incremental trade learner
-  price_adaptive.py            Incremental next-close learner
-  forecast_contract.py         Immutable next-candle contract
-tests/                         Causality, structure, forecast and repository tests
+  market.py                 Multi-year deterministic market ingestion
+  market_structure.py       Causal pivots, levels and triangles
+  directional_events.py     Long and Short mining, labels and inventory gate
+  contract_features.py      Shared training/runtime feature contract
+  structure_training.py     Separate chronological Long and Short training
+  model.py                  Schema-v5 directional model bundle
+  strategy.py               Direction-specific qualification and risk gates
+  forecast_contract.py      Immutable next-candle public contract
+tests/
 ```
 
-## Current status and limitations
+## Status
 
-Version 4.0 is a full model redesign, not evidence of profitability by itself.
+Version 5.0 defines the required training contract and architecture. It does not claim profitability. A model is usable only after the GitHub retraining workflow confirms the real event inventory, completes schema-v5 Walk-Forward evaluation and publishes direction-specific qualification results.
 
-The new architecture must complete fresh Walk-Forward training and then accumulate immutable live evidence. Trust should be based on:
-
-- structural event count;
-- false-breakout rate;
-- breakout hold rate;
-- calibrated probabilities;
-- stress-adjusted expectancy;
-- live results across different volatility regimes.
-
-Until those results are sufficient, the project must be treated as transparent market-model research rather than a proven trading product.
-
-This repository is not financial advice.
+This repository is research software and is not financial advice.
 
 ---
 
