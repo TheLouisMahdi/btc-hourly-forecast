@@ -4,7 +4,10 @@ import unittest
 
 import pandas as pd
 
-from btc_ema_trader.forecast_contract import build_next_candle_forecast
+from btc_ema_trader.forecast_contract import (
+    attach_close_based_general_labels,
+    build_next_candle_forecast,
+)
 
 
 class ForecastContractTests(unittest.TestCase):
@@ -12,8 +15,10 @@ class ForecastContractTests(unittest.TestCase):
         record = {
             "candle_time": "2026-01-01T00:00:00Z",
             "price": 100.0,
-            "probabilities": {"1": 0.60},
-            "returns": {"1": 0.01},
+            "general_probabilities": {"1": 0.60},
+            "general_return_estimates": {"1": 0.01},
+            "probabilities": {"1": 0.10},
+            "returns": {"1": -0.50},
         }
         recent = pd.DataFrame(
             {
@@ -28,12 +33,48 @@ class ForecastContractTests(unittest.TestCase):
             recent,
             [],
         )
-        self.assertEqual(result["source_close_time"], "2026-01-01T01:00:00+00:00")
-        self.assertEqual(result["target_open_time"], "2026-01-01T01:00:00+00:00")
-        self.assertEqual(result["target_close_time"], "2026-01-01T02:00:00+00:00")
-        self.assertEqual(result["target"], "NEXT_CLOSED_1H_CANDLE")
-        self.assertLess(result["likely_close_low"], result["median_close"])
-        self.assertGreater(result["likely_close_high"], result["median_close"])
+        self.assertEqual(
+            result["source_close_time"],
+            "2026-01-01T01:00:00+00:00",
+        )
+        self.assertEqual(
+            result["target_open_time"],
+            "2026-01-01T01:00:00+00:00",
+        )
+        self.assertEqual(
+            result["target_close_time"],
+            "2026-01-01T02:00:00+00:00",
+        )
+        self.assertEqual(
+            result["target"],
+            "NEXT_CLOSED_1H_CANDLE",
+        )
+        self.assertAlmostEqual(result["median_return"], 0.01)
+        self.assertAlmostEqual(result["probability_up"], 0.60)
+        self.assertLess(
+            result["likely_close_low"],
+            result["median_close"],
+        )
+        self.assertGreater(
+            result["likely_close_high"],
+            result["median_close"],
+        )
+
+    def test_close_based_labels_use_source_and_future_closes(self) -> None:
+        frame = pd.DataFrame(
+            {
+                "close": [100.0, 110.0, 99.0],
+                "future_return_h1": [999.0, 999.0, 999.0],
+                "target_up_h1": [0.0, 0.0, 0.0],
+            }
+        )
+        result = attach_close_based_general_labels(frame, [1])
+        self.assertAlmostEqual(result.loc[0, "future_return_h1"], 0.10)
+        self.assertAlmostEqual(result.loc[1, "future_return_h1"], -0.10)
+        self.assertEqual(result.loc[0, "target_up_h1"], 1.0)
+        self.assertEqual(result.loc[1, "target_up_h1"], 0.0)
+        self.assertTrue(pd.isna(result.loc[2, "future_return_h1"]))
+        self.assertTrue(pd.isna(result.loc[2, "target_up_h1"]))
 
     def test_resolved_history_calibrates_the_interval(self) -> None:
         history = []
@@ -44,17 +85,23 @@ class ForecastContractTests(unittest.TestCase):
                 {
                     "prediction_result": "IN_RANGE",
                     "actual_close_return": actual,
-                    "next_candle_forecast": {"median_return": predicted},
+                    "next_candle_forecast": {
+                        "median_return": predicted
+                    },
                 }
             )
         record = {
             "candle_time": "2026-01-01T00:00:00Z",
             "price": 100.0,
-            "probabilities": {1: 0.40},
-            "returns": {1: -0.002},
+            "general_probabilities": {1: 0.40},
+            "general_return_estimates": {1: -0.002},
         }
         recent = pd.DataFrame(
-            {"high": [101.0], "low": [99.0], "close": [100.0]}
+            {
+                "high": [101.0],
+                "low": [99.0],
+                "close": [100.0],
+            }
         )
         result = build_next_candle_forecast(
             record,
