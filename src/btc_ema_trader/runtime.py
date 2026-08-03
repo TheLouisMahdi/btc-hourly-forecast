@@ -7,8 +7,9 @@ from typing import Any
 
 import pandas as pd
 
-from .adaptive import AdaptiveEngine
+from .adaptive_runtime import AdaptiveEngine
 from .config import Settings
+from .contract_training import train_from_database
 from .costs import execution_cost_breakdown
 from .features import build_feature_set
 from .market import MarketDataClient
@@ -16,7 +17,6 @@ from .model import latest_bundle
 from .news import collect_and_store
 from .storage import Database
 from .strategy import make_decision
-from .training import train_from_database
 
 LOGGER = logging.getLogger(__name__)
 _THREAD: threading.Thread | None = None
