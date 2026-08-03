@@ -57,9 +57,61 @@ jobs:
         run: python -m unittest discover -s tests -v
 
       - name: Fetch real history and retrain directional model
-        run: python scripts/github_weekly_retrain.py
+        id: retraining
+        shell: bash
+        run: |
+          set +e
+          mkdir -p training-diagnostics-output
+          python scripts/github_weekly_retrain.py > training-diagnostics-output/training.log 2>&1
+          retrain_exit=$?
+          status=PASS
+          if [ "$retrain_exit" -ne 0 ]; then
+            status=FAIL
+          fi
+          RETRAIN_EXIT="$retrain_exit" STATUS="$status" python - <<'PY'
+          import json
+          import os
+          from datetime import datetime, timezone
+          from pathlib import Path
+
+          metadata_path = Path("model-state-output/model_metadata.json")
+          metadata = None
+          if metadata_path.exists():
+              try:
+                  metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
+              except Exception:
+                  metadata = None
+          payload = {
+              "status": os.environ["STATUS"],
+              "commit_sha": os.environ.get("GITHUB_SHA"),
+              "workflow_run_id": os.environ.get("GITHUB_RUN_ID"),
+              "workflow_run_attempt": os.environ.get("GITHUB_RUN_ATTEMPT"),
+              "checked_at": datetime.now(timezone.utc).isoformat(),
+              "retrain_exit_code": int(os.environ["RETRAIN_EXIT"]),
+              "model_metadata": metadata,
+          }
+          Path("training-diagnostics-output/status.json").write_text(
+              json.dumps(payload, indent=2),
+              encoding="utf-8",
+          )
+          PY
+          echo "status=$status" >> "$GITHUB_OUTPUT"
+          exit 0
+
+      - name: Publish retraining diagnostics
+        if: always()
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: bash scripts/push_snapshot_branch.sh training-diagnostics training-diagnostics-output
+
+      - name: Enforce retraining result
+        if: steps.retraining.outputs.status != 'PASS'
+        run: |
+          cat training-diagnostics-output/training.log
+          exit 1
 
       - name: Publish latest batch model
+        if: steps.retraining.outputs.status == 'PASS'
         env:
           GITHUB_TOKEN: ${{ github.token }}
         run: bash scripts/push_snapshot_branch.sh model-state model-state-output
