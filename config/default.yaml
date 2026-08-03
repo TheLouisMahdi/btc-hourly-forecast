@@ -1,6 +1,6 @@
 project:
-  name: BTC Structural Breakout Forecast
-  version: 4.0.0
+  name: BTC Deterministic Directional Breakout Forecast
+  version: 5.0.0
   timezone: UTC
 
 paths:
@@ -15,18 +15,24 @@ paths:
 market:
   symbol: BTCUSDT
   interval: 1h
-  history_days: 365
+  history_days: 3650
   provider: auto
-  provider_order: [binance_futures, bybit_linear, okx_swap]
-  request_timeout_seconds: 20
-  max_retries: 4
+  provider_order:
+    - coinbase_spot
+    - binance_spot
+    - binance_futures
+    - okx_swap
+  request_timeout_seconds: 25
+  max_retries: 5
   retry_backoff_seconds: 1.5
-  minimum_history_rows: 8000
-  maximum_gap_hours: 2
+  minimum_history_rows: 80000
+  maximum_gap_hours: 3
   quote_stale_seconds: 90
+  coinbase_base_url: https://api.exchange.coinbase.com
+  coinbase_product: BTC-USD
+  binance_spot_base_url: https://api.binance.com
   binance_futures_base_url: https://fapi.binance.com
   bybit_base_url: https://api.bybit.com
-  okx_swap_base_url: https://www.okx.com
   okx_base_url: https://www.okx.com
   okx_instrument: BTC-USDT-SWAP
 
@@ -60,7 +66,7 @@ features:
   squeeze_lookback: 120
   squeeze_percentile: 0.20
   trend_adx_threshold: 18.0
-  event_sample_weight: 4.0
+  event_sample_weight: 3.0
   normal_sample_weight: 0.70
   oldest_sample_weight: 0.55
   news_windows_hours: [1, 3, 6, 12, 24]
@@ -68,48 +74,151 @@ features:
   news_shock_min_relevance: 0.55
 
 structure:
-  lookback_hours: [48, 120, 240, 480]
+  lookback_hours: [24, 48, 96, 168, 336, 720]
   pivot_left_bars: 3
   pivot_right_bars: 3
-  maximum_pivots_per_line: 8
-  level_touch_tolerance_atr: 0.30
-  event_cooldown_hours: 4
-  breakout_buffer_atr: 0.10
-  breakout_crossing_tolerance_atr: 0.05
-  breakout_maximum_extension_atr: 1.50
-  breakout_minimum_body_atr: 0.20
-  breakout_minimum_volume_z: -0.25
-  breakout_invalidation_atr: 0.35
-  long_minimum_close_location: 0.65
-  short_maximum_close_location: 0.35
-  triangle_lookback_hours: 120
-  triangle_minimum_contraction: 0.15
-  triangle_maximum_width_percent: 0.08
-  triangle_minimum_line_r2: 0.25
-  triangle_minimum_slope_atr: 0.005
-  triangle_flat_slope_atr: 0.018
-  triangle_minimum_quality: 0.45
+  maximum_pivots_per_line: 10
+  level_touch_tolerance_atr: 0.35
+  event_cooldown_hours: 2
+  breakout_buffer_atr: 0.04
+  breakout_crossing_tolerance_atr: 0.08
+  breakout_maximum_extension_atr: 2.40
+  breakout_minimum_body_atr: 0.04
+  breakout_minimum_volume_z: -1.50
+  breakout_invalidation_atr: 0.60
+  long_minimum_close_location: 0.52
+  short_maximum_close_location: 0.48
+  triangle_lookback_hours: 240
+  triangle_minimum_contraction: 0.08
+  triangle_maximum_width_percent: 0.14
+  triangle_minimum_line_r2: 0.15
+  triangle_minimum_slope_atr: 0.003
+  triangle_flat_slope_atr: 0.025
+  triangle_minimum_quality: 0.25
+  label_hold_buffer_atr: 0.04
+
+event_mining:
+  structure_scales_hours: [24, 48, 96, 168, 336, 720]
+  minimum_event_separation_hours: 2
+  duplicate_level_similarity_atr: 0.35
+  sampling_strategy: NONE
+  synthetic_events: false
+  shuffle: false
+
+event_inventory:
+  minimum_events_per_direction: 2000
+  minimum_years: 6
+  minimum_quarters: 24
+  minimum_structure_scales: 4
+  minimum_diversity_keys: 48
+  minimum_volatility_buckets: 3
+  minimum_regimes: 3
+
+long_breakout:
+  crossing_tolerance_atr: 0.08
+  candidate_minimum_cross_atr: 0.015
+  candidate_maximum_extension_atr: 2.20
+  candidate_minimum_body_atr: 0.04
+  candidate_minimum_close_location: 0.52
+  candidate_minimum_volume_z: -1.50
+  candidate_minimum_touches: 1
+  touch_tolerance_atr: 0.35
+  minimum_triangle_quality: 0.25
+  invalidation_atr: 0.55
+  label_hold_buffer_atr: 0.04
+  target_atr_by_horizon:
+    1: 0.55
+    3: 0.90
+    6: 1.30
+    12: 1.90
+  minimum_hold_ratio_by_horizon:
+    1: 1.00
+    3: 0.34
+    6: 0.45
+    12: 0.50
+  minimum_success_probability:
+    3: 0.58
+    6: 0.60
+    12: 0.62
+  minimum_tradeability_probability:
+    3: 0.56
+    6: 0.58
+    12: 0.60
+
+short_breakdown:
+  crossing_tolerance_atr: 0.10
+  candidate_minimum_cross_atr: 0.020
+  candidate_maximum_extension_atr: 2.40
+  candidate_minimum_body_atr: 0.05
+  candidate_maximum_close_location: 0.48
+  candidate_minimum_volume_z: -1.30
+  candidate_minimum_touches: 1
+  touch_tolerance_atr: 0.38
+  minimum_triangle_quality: 0.25
+  invalidation_atr: 0.65
   label_hold_buffer_atr: 0.05
+  target_atr_by_horizon:
+    1: 0.60
+    3: 1.00
+    6: 1.45
+    12: 2.10
+  minimum_hold_ratio_by_horizon:
+    1: 1.00
+    3: 0.34
+    6: 0.42
+    12: 0.48
+  minimum_success_probability:
+    3: 0.59
+    6: 0.61
+    12: 0.63
+  minimum_tradeability_probability:
+    3: 0.57
+    6: 0.59
+    12: 0.61
 
 model:
-  horizons_hours: [1, 3, 6]
+  horizons_hours: [1, 3, 6, 12]
+  trade_horizons_hours: [3, 6, 12]
   horizon_weights:
-    1: 0.20
-    3: 0.45
-    6: 0.35
-  random_state: 42
-  walk_forward_splits: 6
-  validation_gap_hours: 6
-  min_train_rows: 5000
-  minimum_training_events: 30
-  max_iter: 320
-  learning_rate: 0.035
-  max_leaf_nodes: 15
-  min_samples_leaf: 36
-  l2_regularization: 2.0
-  logistic_weight: 0.35
-  tree_weight: 0.65
-  auto_retrain_days: 7
+    1: 1.0
+    3: 0.0
+    6: 0.0
+    12: 0.0
+  general_walk_forward_splits: 4
+  event_walk_forward_splits: 6
+  validation_gap_hours: 12
+  min_train_rows: 60000
+  auto_retrain_days: 14
+  learning_rate: 0.025
+  max_iter: 150
+  max_leaf_nodes: 9
+  min_samples_leaf: 80
+  l2_regularization: 4.0
+  logistic_c: 0.10
+  logistic_weight: 0.40
+  tree_weight: 0.60
+
+long_model:
+  minimum_fit_samples: 300
+  learning_rate: 0.025
+  max_iter: 260
+  max_leaf_nodes: 11
+  min_samples_leaf: 28
+  l2_regularization: 3.0
+  logistic_c: 0.16
+  logistic_weight: 0.32
+  tree_weight: 0.68
+
+short_model:
+  minimum_fit_samples: 300
+  learning_rate: 0.022
+  max_iter: 300
+  max_leaf_nodes: 9
+  min_samples_leaf: 34
+  l2_regularization: 4.2
+  logistic_c: 0.12
+  logistic_weight: 0.38
+  tree_weight: 0.62
 
 forecast:
   target: NEXT_CLOSED_1H_CANDLE
@@ -128,32 +237,33 @@ forecast:
   online_return_mae_tolerance: 0.00008
 
 adaptive:
-  enabled: true
+  enabled: false
+  disabled_reason: DIRECTIONAL_V5_REQUIRES_SEPARATE_ONLINE_HEADS
   bootstrap_rows: 2160
   observation_limit: 1500
   evaluation_window: 504
   minimum_direction_samples: 168
-  minimum_event_samples: 60
+  minimum_event_samples: 300
   minimum_brier_improvement: 0.004
   maximum_accuracy_regression: 0.010
   suspension_brier_margin: 0.015
-  blend_weight: 0.25
-  maximum_blend_weight: 0.40
-  event_weight: 3.0
+  blend_weight: 0.20
+  maximum_blend_weight: 0.30
+  event_weight: 2.0
   new_sample_weight: 1.0
 
 qualification:
-  minimum_event_auc: 0.54
-  minimum_tradeability_auc: 0.55
-  minimum_event_samples: 80
-  maximum_event_calibration_error: 0.10
+  minimum_oof_events_per_direction: 1000
+  long_minimum_success_auc: 0.54
+  short_minimum_success_auc: 0.54
+  long_minimum_tradeability_auc: 0.54
+  short_minimum_tradeability_auc: 0.54
+  maximum_success_calibration_error: 0.10
   maximum_tradeability_calibration_error: 0.10
-  minimum_breakout_hold_rate: 0.42
-  maximum_false_breakout_rate: 0.58
   minimum_positive_fold_fraction: 0.50
-  minimum_oof_trades: 20
-  minimum_oof_hit_rate: 0.52
-  minimum_qualified_horizons: 1
+  minimum_oof_trades: 30
+  minimum_oof_hit_rate: 0.53
+  minimum_qualified_directions: 1
   require_positive_oof_expectancy: true
 
 strategy:
@@ -169,25 +279,25 @@ strategy:
   stress_cost_multiplier: 1.50
   minimum_profit_buffer_bps: 8.0
   minimum_net_edge_bps: 8.0
-  minimum_event_score: 0.45
+  minimum_event_score: 0.30
   minimum_confidence:
-    1: 0.58
-    3: 0.60
-    6: 0.61
-  minimum_tradeability_probability:
-    1: 0.56
     3: 0.58
-    6: 0.59
+    6: 0.60
+    12: 0.62
+  minimum_tradeability_probability:
+    3: 0.56
+    6: 0.58
+    12: 0.60
   minimum_horizon_agreement: 0.6667
-  maximum_atr_percent: 3.0
+  maximum_atr_percent: 4.0
   block_during_news_shock: true
   require_fresh_news: false
   risk_per_trade_fraction: 0.0020
   account_equity_usd: 1000.0
   maximum_leverage: 3.0
-  stop_atr_multiplier: 1.15
-  minimum_stop_percent: 0.0040
-  maximum_stop_percent: 0.014
+  stop_atr_multiplier: 1.10
+  minimum_stop_percent: 0.0035
+  maximum_stop_percent: 0.018
   target_r_multiple: 1.80
   label_target_atr_multiplier: 1.50
   label_stop_atr_multiplier: 1.0
