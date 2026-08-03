@@ -4,6 +4,8 @@ import re
 import unittest
 from pathlib import Path
 
+import yaml
+
 PERSIAN_PATTERN = re.compile(
     r"[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF]"
 )
@@ -51,6 +53,10 @@ REQUIRED_FILES = {
     "SECURITY.md",
     "docs/assets/candlestick-loop.svg",
     "pyproject.toml",
+    "src/btc_ema_trader/contract_training.py",
+    "src/btc_ema_trader/forecast_contract.py",
+    "tests/test_dashboard_outcomes.py",
+    "tests/test_forecast_contract.py",
 }
 
 
@@ -110,7 +116,9 @@ class RepositoryQualityTests(unittest.TestCase):
 
     def test_readme_uses_repository_owned_animation(self) -> None:
         root = Path(__file__).resolve().parents[1]
-        readme = (root / "README.md").read_text(encoding="utf-8")
+        readme = (root / "README.md").read_text(
+            encoding="utf-8"
+        )
         self.assertIn(
             "docs/assets/candlestick-loop.svg",
             readme,
@@ -118,6 +126,35 @@ class RepositoryQualityTests(unittest.TestCase):
         self.assertNotIn(
             "capsule-render.vercel.app",
             readme,
+        )
+
+    def test_readme_documents_immutable_interval_outcomes(self) -> None:
+        root = Path(__file__).resolve().parents[1]
+        readme = (root / "README.md").read_text(
+            encoding="utf-8"
+        )
+        for required in (
+            "NEXT_CLOSED_1H_CANDLE",
+            "IN_RANGE",
+            "OUT_OF_RANGE",
+            "immutable",
+        ):
+            self.assertIn(required, readme)
+
+    def test_model_is_configured_for_the_next_candle_only(self) -> None:
+        root = Path(__file__).resolve().parents[1]
+        config = yaml.safe_load(
+            (root / "config" / "default.yaml").read_text(
+                encoding="utf-8"
+            )
+        )
+        self.assertEqual(
+            config["model"]["horizons_hours"],
+            [1],
+        )
+        self.assertEqual(
+            config["forecast"]["target"],
+            "NEXT_CLOSED_1H_CANDLE",
         )
 
 
