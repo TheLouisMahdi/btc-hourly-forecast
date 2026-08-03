@@ -11,46 +11,52 @@ from btc_ema_trader.forecast_contract import (
 
 
 class ForecastContractTests(unittest.TestCase):
-    def test_contract_targets_exactly_the_next_closed_hour(self) -> None:
+    def test_contract_targets_next_close_and_preserves_model_fusion(self) -> None:
         record = {
             "candle_time": "2026-01-01T00:00:00Z",
             "price": 100.0,
-            "general_probabilities": {"1": 0.60},
-            "general_return_estimates": {"1": 0.01},
-            "probabilities": {"1": 0.10},
-            "returns": {"1": -0.50},
+            "general_probabilities": {"1": 0.61},
+            "general_return_estimates": {"1": 0.012},
+            "price_forecast_model": {
+                "source": "BATCH_AND_ONLINE",
+                "batch_probability_up": 0.58,
+                "online_probability_up": 0.67,
+                "fused_probability_up": 0.61,
+                "direction_blend_weight": 0.33,
+                "batch_return": 0.008,
+                "online_return": 0.02,
+                "fused_return": 0.012,
+                "return_blend_weight": 0.33,
+            },
         }
-        recent = pd.DataFrame(
-            {
-                "high": [101.0, 102.0, 103.0],
-                "low": [99.0, 99.5, 100.0],
-                "close": [100.0, 101.0, 102.0],
-            }
-        )
         result = build_next_candle_forecast(
             record,
-            {"1": {"return_mae": 0.01}},
-            recent,
+            {
+                "1": {
+                    "return_mae": 0.01,
+                    "close_interval_oof_samples": 300,
+                    "close_interval_residual_low": -0.008,
+                    "close_interval_residual_high": 0.009,
+                }
+            },
+            pd.DataFrame(),
             [],
         )
-        self.assertEqual(
-            result["source_close_time"],
-            "2026-01-01T01:00:00+00:00",
-        )
-        self.assertEqual(
-            result["target_open_time"],
-            "2026-01-01T01:00:00+00:00",
-        )
+        self.assertEqual(result["contract_version"], 2)
         self.assertEqual(
             result["target_close_time"],
             "2026-01-01T02:00:00+00:00",
         )
+        self.assertEqual(result["direction"], "UP")
+        self.assertEqual(result["forecast_source"], "BATCH_AND_ONLINE")
+        self.assertAlmostEqual(result["median_return"], 0.012)
+        self.assertAlmostEqual(result["batch_probability_up"], 0.58)
+        self.assertAlmostEqual(result["online_probability_up"], 0.67)
+        self.assertAlmostEqual(result["direction_blend_weight"], 0.33)
         self.assertEqual(
-            result["target"],
-            "NEXT_CLOSED_1H_CANDLE",
+            result["interval_method"],
+            "WALK_FORWARD_MODEL_RESIDUALS",
         )
-        self.assertAlmostEqual(result["median_return"], 0.01)
-        self.assertAlmostEqual(result["probability_up"], 0.60)
         self.assertLess(
             result["likely_close_low"],
             result["median_close"],
@@ -59,6 +65,23 @@ class ForecastContractTests(unittest.TestCase):
             result["likely_close_high"],
             result["median_close"],
         )
+
+    def test_direction_is_always_up_or_down(self) -> None:
+        record = {
+            "candle_time": "2026-01-01T00:00:00Z",
+            "price": 100.0,
+            "general_probabilities": {"1": 0.499},
+            "general_return_estimates": {"1": 0.0},
+        }
+        result = build_next_candle_forecast(
+            record,
+            {"1": {"return_mae": 0.005}},
+            pd.DataFrame(),
+            [],
+        )
+        self.assertEqual(result["direction"], "DOWN")
+        self.assertEqual(result["signal_strength"], "LOW")
+        self.assertNotEqual(result["direction"], "RANGE")
 
     def test_close_based_labels_use_source_and_future_closes(self) -> None:
         frame = pd.DataFrame(
@@ -76,50 +99,15 @@ class ForecastContractTests(unittest.TestCase):
         self.assertTrue(pd.isna(result.loc[2, "future_return_h1"]))
         self.assertTrue(pd.isna(result.loc[2, "target_up_h1"]))
 
-    def test_walk_forward_residuals_calibrate_initial_interval(self) -> None:
-        record = {
-            "candle_time": "2026-01-01T00:00:00Z",
-            "price": 100.0,
-            "general_probabilities": {1: 0.50},
-            "general_return_estimates": {1: 0.002},
-        }
-        recent = pd.DataFrame(
-            {
-                "high": [100.4],
-                "low": [99.6],
-                "close": [100.0],
-            }
-        )
-        metrics = {
-            "1": {
-                "return_mae": 0.02,
-                "close_interval_oof_samples": 500,
-                "close_interval_residual_low": -0.006,
-                "close_interval_residual_high": 0.008,
-            }
-        }
-        result = build_next_candle_forecast(
-            record,
-            metrics,
-            recent,
-            [],
-        )
-        self.assertEqual(
-            result["interval_method"],
-            "WALK_FORWARD_RESIDUAL_QUANTILES",
-        )
-        self.assertEqual(result["calibration_samples"], 500)
-        self.assertAlmostEqual(result["likely_return_low"], -0.004)
-        self.assertAlmostEqual(result["likely_return_high"], 0.010)
-
-    def test_resolved_history_calibrates_the_interval(self) -> None:
+    def test_live_residuals_calibrate_the_interval(self) -> None:
         history = []
         for index in range(30):
             predicted = 0.001
             actual = predicted + (-0.004 + index * 0.0003)
             history.append(
                 {
-                    "prediction_result": "IN_RANGE",
+                    "direction_result": "DIRECTION_CORRECT",
+                    "interval_result": "IN_RANGE",
                     "actual_close_return": actual,
                     "next_candle_forecast": {
                         "median_return": predicted
@@ -132,26 +120,18 @@ class ForecastContractTests(unittest.TestCase):
             "general_probabilities": {1: 0.40},
             "general_return_estimates": {1: -0.002},
         }
-        recent = pd.DataFrame(
-            {
-                "high": [101.0],
-                "low": [99.0],
-                "close": [100.0],
-            }
-        )
         result = build_next_candle_forecast(
             record,
             {"1": {"return_mae": 0.02}},
-            recent,
+            pd.DataFrame(),
             history,
         )
         self.assertEqual(
             result["interval_method"],
-            "EMPIRICAL_PREQUENTIAL_RESIDUAL",
+            "LIVE_PREQUENTIAL_MODEL_RESIDUALS",
         )
         self.assertEqual(result["calibration_samples"], 30)
         self.assertEqual(result["direction"], "DOWN")
-        self.assertEqual(result["scenario"], "BEARISH_BIAS")
 
 
 if __name__ == "__main__":
