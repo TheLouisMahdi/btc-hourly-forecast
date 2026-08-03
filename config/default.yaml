@@ -100,7 +100,7 @@ model:
   walk_forward_splits: 6
   validation_gap_hours: 6
   min_train_rows: 5000
-  minimum_training_events: 120
+  minimum_training_events: 60
   max_iter: 320
   learning_rate: 0.035
   max_leaf_nodes: 15
@@ -147,6 +147,8 @@ qualification:
   minimum_event_samples: 80
   maximum_event_calibration_error: 0.10
   maximum_tradeability_calibration_error: 0.10
+  minimum_breakout_hold_rate: 0.42
+  maximum_false_breakout_rate: 0.58
   minimum_positive_fold_fraction: 0.50
   minimum_oof_trades: 20
   minimum_oof_hit_rate: 0.52
@@ -166,6 +168,7 @@ strategy:
   stress_cost_multiplier: 1.50
   minimum_profit_buffer_bps: 8.0
   minimum_net_edge_bps: 8.0
+  minimum_event_score: 0.45
   minimum_confidence:
     1: 0.58
     3: 0.60
