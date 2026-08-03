@@ -1,0 +1,148 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="360" viewBox="0 0 1200 360" role="img" aria-labelledby="title desc">
+  <title id="title">Animated BTC hourly candlestick chart</title>
+  <desc id="desc">A dark animated candlestick chart representing the adaptive BTC hourly forecasting pipeline.</desc>
+  <defs>
+    <linearGradient id="background" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#020617"/>
+      <stop offset="0.52" stop-color="#071426"/>
+      <stop offset="1" stop-color="#062032"/>
+    </linearGradient>
+    <radialGradient id="cyanGlow" cx="0.15" cy="0.12" r="0.55">
+      <stop offset="0" stop-color="#22d3ee" stop-opacity="0.22"/>
+      <stop offset="1" stop-color="#22d3ee" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="tealGlow" cx="0.88" cy="0.8" r="0.5">
+      <stop offset="0" stop-color="#14b8a6" stop-opacity="0.18"/>
+      <stop offset="1" stop-color="#14b8a6" stop-opacity="0"/>
+    </radialGradient>
+    <filter id="softGlow" x="-30%" y="-30%" width="160%" height="160%">
+      <feGaussianBlur stdDeviation="7" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+    <style>
+      .label { font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+      .grid { stroke: #1e293b; stroke-width: 1; opacity: .72; }
+      .bull { fill: #22d3ee; stroke: #a5f3fc; stroke-width: 1.2; }
+      .bull-wick { stroke: #67e8f9; stroke-width: 3; stroke-linecap: round; }
+      .bear { fill: #f97316; stroke: #fed7aa; stroke-width: 1.2; }
+      .bear-wick { stroke: #fdba74; stroke-width: 3; stroke-linecap: round; }
+    </style>
+  </defs>
+
+  <rect width="1200" height="360" rx="26" fill="url(#background)"/>
+  <rect width="1200" height="360" rx="26" fill="url(#cyanGlow)"/>
+  <rect width="1200" height="360" rx="26" fill="url(#tealGlow)"/>
+  <rect x="1" y="1" width="1198" height="358" rx="25" fill="none" stroke="#164e63" stroke-opacity=".75"/>
+
+  <g class="grid">
+    <path d="M60 110H1140M60 155H1140M60 200H1140M60 245H1140M60 290H1140"/>
+    <path d="M100 95V310M180 95V310M260 95V310M340 95V310M420 95V310M500 95V310M580 95V310M660 95V310M740 95V310M820 95V310M900 95V310M980 95V310M1060 95V310M1140 95V310"/>
+  </g>
+
+  <text x="60" y="48" class="label" fill="#e6fffb" font-size="30" font-weight="750" letter-spacing=".8">BTC HOURLY FORECAST</text>
+  <text x="61" y="76" class="label" fill="#94a3b8" font-size="16">Adaptive learning • delayed labels • fail-safe paper trading</text>
+
+  <g transform="translate(905 28)">
+    <rect width="235" height="48" rx="20" fill="#0f766e" fill-opacity=".62" stroke="#2dd4bf" stroke-width="1.5"/>
+    <circle cx="24" cy="24" r="6" fill="#5eead4" filter="url(#softGlow)">
+      <animate attributeName="r" values="5;8;5" dur="1.8s" repeatCount="indefinite"/>
+      <animate attributeName="opacity" values=".7;1;.7" dur="1.8s" repeatCount="indefinite"/>
+    </circle>
+    <text x="43" y="30" class="label" fill="#ccfbf1" font-size="13" font-weight="650" letter-spacing=".7">ADAPTIVE PIPELINE</text>
+  </g>
+
+  <g transform="translate(96 0)">
+    <g>
+      <animateTransform attributeName="transform" type="translate" values="0 18;0 0;0 0" keyTimes="0;.16;1" dur="6.8s" begin="0s" repeatCount="indefinite"/>
+      <animate attributeName="opacity" values="0;1;1" keyTimes="0;.14;1" dur="6.8s" begin="0s" repeatCount="indefinite"/>
+      <path class="bull-wick" d="M0 192V272"/>
+      <rect class="bull" x="-13" y="214" width="26" height="38" rx="5"/>
+    </g>
+    <g transform="translate(72)">
+      <animateTransform attributeName="transform" type="translate" values="72 18;72 0;72 0" keyTimes="0;.16;1" dur="6.8s" begin=".28s" repeatCount="indefinite"/>
+      <animate attributeName="opacity" values="0;1;1" keyTimes="0;.14;1" dur="6.8s" begin=".28s" repeatCount="indefinite"/>
+      <path class="bear-wick" d="M0 178V284"/>
+      <rect class="bear" x="-13" y="218" width="26" height="30" rx="5"/>
+    </g>
+    <g transform="translate(144)">
+      <animate attributeName="opacity" values="0;1;1" keyTimes="0;.14;1" dur="6.8s" begin=".56s" repeatCount="indefinite"/>
+      <path class="bear-wick" d="M0 205V258"/>
+      <rect class="bear" x="-13" y="225" width="26" height="10" rx="4"/>
+    </g>
+    <g transform="translate(216)">
+      <animate attributeName="opacity" values="0;1;1" keyTimes="0;.14;1" dur="6.8s" begin=".84s" repeatCount="indefinite"/>
+      <path class="bear-wick" d="M0 194V268"/>
+      <rect class="bear" x="-13" y="230" width="26" height="12" rx="4"/>
+    </g>
+    <g transform="translate(288)">
+      <animate attributeName="opacity" values="0;1;1" keyTimes="0;.14;1" dur="6.8s" begin="1.12s" repeatCount="indefinite"/>
+      <path class="bull-wick" d="M0 188V260"/>
+      <rect class="bull" x="-13" y="210" width="26" height="36" rx="5"/>
+    </g>
+    <g transform="translate(360)">
+      <animate attributeName="opacity" values="0;1;1" keyTimes="0;.14;1" dur="6.8s" begin="1.4s" repeatCount="indefinite"/>
+      <path class="bull-wick" d="M0 158V248"/>
+      <rect class="bull" x="-13" y="186" width="26" height="34" rx="5"/>
+    </g>
+    <g transform="translate(432)">
+      <animate attributeName="opacity" values="0;1;1" keyTimes="0;.14;1" dur="6.8s" begin="1.68s" repeatCount="indefinite"/>
+      <path class="bull-wick" d="M0 116V230"/>
+      <rect class="bull" x="-13" y="166" width="26" height="48" rx="5"/>
+    </g>
+    <g transform="translate(504)">
+      <animate attributeName="opacity" values="0;1;1" keyTimes="0;.14;1" dur="6.8s" begin="1.96s" repeatCount="indefinite"/>
+      <path class="bear-wick" d="M0 132V220"/>
+      <rect class="bear" x="-13" y="166" width="26" height="23" rx="5"/>
+    </g>
+    <g transform="translate(576)">
+      <animate attributeName="opacity" values="0;1;1" keyTimes="0;.14;1" dur="6.8s" begin="2.24s" repeatCount="indefinite"/>
+      <path class="bear-wick" d="M0 152V224"/>
+      <rect class="bear" x="-13" y="184" width="26" height="18" rx="5"/>
+    </g>
+    <g transform="translate(648)">
+      <animate attributeName="opacity" values="0;1;1" keyTimes="0;.14;1" dur="6.8s" begin="2.52s" repeatCount="indefinite"/>
+      <path class="bull-wick" d="M0 128V244"/>
+      <rect class="bull" x="-13" y="174" width="26" height="42" rx="5"/>
+    </g>
+    <g transform="translate(720)">
+      <animate attributeName="opacity" values="0;1;1" keyTimes="0;.14;1" dur="6.8s" begin="2.8s" repeatCount="indefinite"/>
+      <path class="bear-wick" d="M0 154V260"/>
+      <rect class="bear" x="-13" y="190" width="26" height="42" rx="5"/>
+    </g>
+    <g transform="translate(792)">
+      <animate attributeName="opacity" values="0;1;1" keyTimes="0;.14;1" dur="6.8s" begin="3.08s" repeatCount="indefinite"/>
+      <path class="bull-wick" d="M0 136V238"/>
+      <rect class="bull" x="-13" y="176" width="26" height="38" rx="5"/>
+    </g>
+    <g transform="translate(864)">
+      <animate attributeName="opacity" values="0;1;1" keyTimes="0;.14;1" dur="6.8s" begin="3.36s" repeatCount="indefinite"/>
+      <path class="bull-wick" d="M0 112V216"/>
+      <rect class="bull" x="-13" y="150" width="26" height="46" rx="5"/>
+    </g>
+  </g>
+
+  <g filter="url(#softGlow)">
+    <line x1="60" y1="94" x2="60" y2="310" stroke="#22d3ee" stroke-width="2" opacity=".72">
+      <animate attributeName="x1" values="60;1140;60" dur="6.8s" repeatCount="indefinite"/>
+      <animate attributeName="x2" values="60;1140;60" dur="6.8s" repeatCount="indefinite"/>
+      <animate attributeName="opacity" values="0;.8;0" dur="6.8s" repeatCount="indefinite"/>
+    </line>
+  </g>
+
+  <g transform="translate(1048 145)" filter="url(#softGlow)">
+    <path d="M0 42V2" stroke="#a7f3d0" stroke-width="4" stroke-linecap="round"/>
+    <path d="M-9 12L0 2L9 12" fill="none" stroke="#a7f3d0" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+    <animateTransform attributeName="transform" type="translate" values="1048 153;1048 142;1048 153" dur="1.5s" repeatCount="indefinite"/>
+  </g>
+
+  <g class="label" font-size="13">
+    <circle cx="63" cy="333" r="6" fill="#22d3ee"/>
+    <text x="78" y="338" fill="#cbd5e1">Bullish candle</text>
+    <circle cx="205" cy="333" r="6" fill="#f97316"/>
+    <text x="220" y="338" fill="#cbd5e1">Bearish candle</text>
+    <text x="956" y="338" fill="#64748b">1h • 2h • 3h horizons</text>
+  </g>
+</svg>
