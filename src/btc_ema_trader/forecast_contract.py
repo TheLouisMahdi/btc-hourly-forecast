@@ -55,25 +55,43 @@ def build_next_candle_forecast(
         raise ValueError("A positive source candle close is required")
 
     probability_up = float(
-        np.clip(_mapping_value(record.get("probabilities"), 1, 0.5), 1e-4, 1 - 1e-4)
+        np.clip(
+            _mapping_value(record.get("probabilities"), 1, 0.5),
+            1e-4,
+            1 - 1e-4,
+        )
     )
-    median_return = _mapping_value(record.get("returns"), 1, 0.0)
+    general_returns = record.get(
+        "general_return_estimates",
+        record.get("returns"),
+    )
+    median_return = _mapping_value(general_returns, 1, 0.0)
     residuals = _resolved_residuals(history)
 
     if len(residuals) >= MINIMUM_RESIDUAL_SAMPLES:
         alpha = (1.0 - interval_probability) / 2.0
         lower_error, upper_error = np.quantile(
-            np.asarray(residuals[-MAXIMUM_RESIDUAL_SAMPLES:], dtype=float),
+            np.asarray(
+                residuals[-MAXIMUM_RESIDUAL_SAMPLES:],
+                dtype=float,
+            ),
             [alpha, 1.0 - alpha],
         )
         likely_return_low = median_return + float(lower_error)
         likely_return_high = median_return + float(upper_error)
         interval_method = "EMPIRICAL_PREQUENTIAL_RESIDUAL"
-        calibration_samples = min(len(residuals), MAXIMUM_RESIDUAL_SAMPLES)
+        calibration_samples = min(
+            len(residuals),
+            MAXIMUM_RESIDUAL_SAMPLES,
+        )
     else:
         return_mae = _model_return_mae(model_metrics)
         market_half_range = _market_half_range(recent_candles)
-        robust_error = max(return_mae, market_half_range, 0.0015)
+        robust_error = max(
+            return_mae,
+            market_half_range,
+            0.0015,
+        )
         normal_multiplier = 1.2815515655446004
         half_width = normal_multiplier * robust_error
         likely_return_low = median_return - half_width
@@ -81,7 +99,10 @@ def build_next_candle_forecast(
         interval_method = "MODEL_MAE_AND_MARKET_RANGE_FALLBACK"
         calibration_samples = len(residuals)
 
-    minimum_half_width = max(_market_half_range(recent_candles) * 0.35, 0.0010)
+    minimum_half_width = max(
+        _market_half_range(recent_candles) * 0.35,
+        0.0010,
+    )
     center = median_return
     current_half_width = max(
         center - likely_return_low,
@@ -95,8 +116,14 @@ def build_next_candle_forecast(
         (float(likely_return_low), float(likely_return_high))
     )
     median_close = reference_close * (1.0 + median_return)
-    likely_close_low = max(0.0, reference_close * (1.0 + likely_return_low))
-    likely_close_high = max(likely_close_low, reference_close * (1.0 + likely_return_high))
+    likely_close_low = max(
+        0.0,
+        reference_close * (1.0 + likely_return_low),
+    )
+    likely_close_high = max(
+        likely_close_low,
+        reference_close * (1.0 + likely_return_high),
+    )
 
     if probability_up >= 0.58:
         direction = "UP"
@@ -107,7 +134,10 @@ def build_next_candle_forecast(
     else:
         direction = "RANGE"
         scenario = "RANGE_BIAS"
-    direction_confidence = max(probability_up, 1.0 - probability_up)
+    direction_confidence = max(
+        probability_up,
+        1.0 - probability_up,
+    )
 
     return NextCandleForecast(
         contract_version=1,
@@ -134,47 +164,78 @@ def build_next_candle_forecast(
     ).to_dict()
 
 
-def _resolved_residuals(history: list[dict[str, Any]]) -> list[float]:
+def _resolved_residuals(
+    history: list[dict[str, Any]],
+) -> list[float]:
     residuals: list[float] = []
     for item in history:
-        if item.get("prediction_result") not in {"IN_RANGE", "OUT_OF_RANGE"}:
+        if item.get("prediction_result") not in {
+            "IN_RANGE",
+            "OUT_OF_RANGE",
+        }:
             continue
         contract = item.get("next_candle_forecast")
         if not isinstance(contract, dict):
             continue
-        actual_return = _optional_finite(item.get("actual_close_return"))
-        predicted_return = _optional_finite(contract.get("median_return"))
+        actual_return = _optional_finite(
+            item.get("actual_close_return")
+        )
+        predicted_return = _optional_finite(
+            contract.get("median_return")
+        )
         if actual_return is None or predicted_return is None:
             continue
         residuals.append(actual_return - predicted_return)
     return residuals[-MAXIMUM_RESIDUAL_SAMPLES:]
 
 
-def _model_return_mae(metrics: dict[str, Any] | None) -> float:
+def _model_return_mae(
+    metrics: dict[str, Any] | None,
+) -> float:
     if not isinstance(metrics, dict):
         return 0.0
     horizon = metrics.get("1", metrics.get(1, {}))
     if not isinstance(horizon, dict):
         return 0.0
-    return max(0.0, _finite(horizon.get("return_mae"), 0.0))
+    return max(
+        0.0,
+        _finite(horizon.get("return_mae"), 0.0),
+    )
 
 
 def _market_half_range(candles: pd.DataFrame) -> float:
-    if candles.empty or not {"high", "low", "close"}.issubset(candles.columns):
+    if (
+        candles.empty
+        or not {"high", "low", "close"}.issubset(
+            candles.columns
+        )
+    ):
         return 0.0
     close = pd.to_numeric(candles["close"], errors="coerce")
     high = pd.to_numeric(candles["high"], errors="coerce")
     low = pd.to_numeric(candles["low"], errors="coerce")
-    values = ((high - low) / close.replace(0, np.nan)).replace([np.inf, -np.inf], np.nan).dropna()
+    values = (
+        (high - low) / close.replace(0, np.nan)
+    ).replace([np.inf, -np.inf], np.nan).dropna()
     if values.empty:
         return 0.0
-    return max(0.0, float(values.tail(168).quantile(0.70)) / 2.0)
+    return max(
+        0.0,
+        float(values.tail(168).quantile(0.70)) / 2.0,
+    )
 
 
-def _mapping_value(value: Any, key: int, default: float) -> float:
+def _mapping_value(
+    value: Any,
+    key: int,
+    default: float,
+) -> float:
     if not isinstance(value, dict):
         return float(default)
-    return _finite(value.get(key, value.get(str(key), default)), default)
+    return _finite(
+        value.get(key, value.get(str(key), default)),
+        default,
+    )
 
 
 def _finite(value: Any, default: float) -> float:
@@ -195,4 +256,8 @@ def _optional_finite(value: Any) -> float | None:
 
 def _utc(value: Any) -> pd.Timestamp:
     timestamp = pd.Timestamp(value)
-    return timestamp.tz_localize("UTC") if timestamp.tzinfo is None else timestamp.tz_convert("UTC")
+    return (
+        timestamp.tz_localize("UTC")
+        if timestamp.tzinfo is None
+        else timestamp.tz_convert("UTC")
+    )
