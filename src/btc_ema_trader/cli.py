@@ -16,14 +16,22 @@ from .runtime import RuntimeEngine
 from .storage import Database
 
 LOGGER = logging.getLogger(__name__)
+MARKET_PROVIDERS = (
+    "auto",
+    "coinbase_spot",
+    "binance_spot",
+    "binance_futures",
+    "bybit_linear",
+    "okx_swap",
+)
 
 
 def parser() -> argparse.ArgumentParser:
     root = argparse.ArgumentParser(
         prog="btc-regime",
         description=(
-            "BTC structural breakout forecaster and fail-safe "
-            "paper-trade decision system"
+            "BTC deterministic directional breakout forecaster and "
+            "fail-safe paper-trade decision system"
         ),
     )
     root.add_argument("--config", default=None)
@@ -32,15 +40,10 @@ def parser() -> argparse.ArgumentParser:
     sub.add_parser("init")
 
     fetch = sub.add_parser("fetch")
-    fetch.add_argument("--days", type=float, default=365)
+    fetch.add_argument("--days", type=float, default=3650)
     fetch.add_argument(
         "--provider",
-        choices=[
-            "auto",
-            "binance_futures",
-            "bybit_linear",
-            "okx_swap",
-        ],
+        choices=MARKET_PROVIDERS,
         default="auto",
     )
 
@@ -51,24 +54,15 @@ def parser() -> argparse.ArgumentParser:
     train = sub.add_parser("train")
     train.add_argument(
         "--provider",
-        choices=[
-            "binance_futures",
-            "bybit_linear",
-            "okx_swap",
-        ],
+        choices=MARKET_PROVIDERS[1:],
         default=None,
     )
 
     bootstrap = sub.add_parser("bootstrap")
-    bootstrap.add_argument("--days", type=float, default=365)
+    bootstrap.add_argument("--days", type=float, default=3650)
     bootstrap.add_argument(
         "--provider",
-        choices=[
-            "auto",
-            "binance_futures",
-            "bybit_linear",
-            "okx_swap",
-        ],
+        choices=MARKET_PROVIDERS,
         default="auto",
     )
 
@@ -155,12 +149,15 @@ def dispatch(args, settings, database):
             days=args.days,
             provider=provider,
         )
+        news_days = float(
+            settings.section("news").get("historical_days", 365)
+        )
         news_backfill = _optional(
             lambda: collect_and_store(
                 settings,
                 database,
                 historical=True,
-                days=args.days,
+                days=news_days,
             )
         )
         recent_news = _optional(
@@ -220,6 +217,7 @@ def dispatch(args, settings, database):
                 "provider": bundle.provider,
                 "created_at": bundle.created_at,
                 "qualification": bundle.qualification,
+                "event_inventory": bundle.event_inventory,
             }
         except Exception as exc:
             model = {"error": str(exc)}
