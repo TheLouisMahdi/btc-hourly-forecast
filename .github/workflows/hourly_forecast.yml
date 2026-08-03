@@ -14,6 +14,9 @@ on:
     # GitHub schedules use UTC. Minute 17 avoids the busiest top-of-hour period.
     - cron: "17 * * * *"
   workflow_dispatch:
+  workflow_run:
+    workflows: ["Weekly BTC model retraining"]
+    types: [completed]
 
 permissions:
   contents: write
@@ -26,6 +29,7 @@ concurrency:
 
 jobs:
   forecast-and-deploy:
+    if: github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success'
     runs-on: ubuntu-latest
     timeout-minutes: 25
     environment:
