@@ -9,9 +9,9 @@ import pandas as pd
 
 from .adaptive_runtime import AdaptiveEngine
 from .config import Settings
+from .contract_features import build_feature_set
 from .contract_training import train_from_database
 from .costs import execution_cost_breakdown
-from .features import build_feature_set
 from .market import MarketDataClient
 from .model import latest_bundle
 from .news import collect_and_store
@@ -37,13 +37,13 @@ class RuntimeEngine:
                 state = json.loads(
                     self.state_path.read_text(encoding="utf-8")
                 )
-                state.setdefault("schema_version", 4)
+                state.setdefault("schema_version", 5)
                 return state
             except Exception:
                 pass
         now = pd.Timestamp.now(tz="UTC")
         state = {
-            "schema_version": 4,
+            "schema_version": 5,
             "session_start": now.isoformat(),
             "first_eligible_close": next_hour_boundary(now).isoformat(),
             "last_processed_open_time": None,
@@ -58,7 +58,7 @@ class RuntimeEngine:
         now = pd.Timestamp.now(tz="UTC")
         self.state.update(
             {
-                "schema_version": 4,
+                "schema_version": 5,
                 "session_start": now.isoformat(),
                 "first_eligible_close": next_hour_boundary(now).isoformat(),
                 "last_processed_open_time": None,
@@ -132,12 +132,12 @@ class RuntimeEngine:
             if model_age_days > float(
                 self.settings.section("model").get(
                     "auto_retrain_days",
-                    7,
+                    14,
                 )
             ):
                 if self.settings.section("live").get(
                     "auto_retrain",
-                    True,
+                    False,
                 ):
                     train_from_database(
                         self.settings,
@@ -186,7 +186,7 @@ class RuntimeEngine:
                 <= float(
                     self.settings.section("market").get(
                         "maximum_gap_hours",
-                        2,
+                        3,
                     )
                 )
             )
@@ -203,7 +203,7 @@ class RuntimeEngine:
                 > float(
                     self.settings.section("model").get(
                         "auto_retrain_days",
-                        7,
+                        14,
                     )
                 ),
                 "news_stale": news_age
@@ -250,6 +250,16 @@ class RuntimeEngine:
                 "event_direction": int(
                     latest_row.get("event_direction", 0)
                 ),
+                "event_scale_hours": int(
+                    latest_row.get("event_scale_hours", 0)
+                ),
+                "breakout_source": str(
+                    latest_row.get("breakout_source", "NONE")
+                ),
+                "breakout_level": latest_row.get("breakout_level"),
+                "breakout_invalidation_level": latest_row.get(
+                    "breakout_invalidation_level"
+                ),
                 "bars_since_event": (
                     None
                     if pd.isna(latest_row.get("bars_since_event"))
@@ -277,6 +287,10 @@ class RuntimeEngine:
                 "qualification_passed": bool(
                     bundle.qualification.get("passed", False)
                 ),
+                "qualified_directions": bundle.qualification.get(
+                    "qualified_directions",
+                    {},
+                ),
                 "actual_cost_bps": costs["base_cost_bps"],
                 "adaptive": adaptive_summary,
                 "base_model": {
@@ -284,10 +298,22 @@ class RuntimeEngine:
                     "selected_horizon": base_prediction[
                         "selected_horizon"
                     ],
+                    "direction_qualified": base_prediction.get(
+                        "direction_qualified",
+                        False,
+                    ),
                     "probabilities": base_prediction["probabilities"],
                     "continuation": base_prediction["continuation"],
                     "tradeability": base_prediction["tradeability"],
                     "event_returns": base_prediction["event_returns"],
+                    "long_outputs": base_prediction.get(
+                        "long_outputs",
+                        {},
+                    ),
+                    "short_outputs": base_prediction.get(
+                        "short_outputs",
+                        {},
+                    ),
                 },
             }
             self.database.save_signal(payload)
