@@ -9,6 +9,7 @@ from typing import Any
 
 import pandas as pd
 
+from btc_ema_trader.forecast_contract import build_next_candle_forecast
 from btc_ema_trader.logging_setup import configure_logging
 from btc_ema_trader.market import fetch_and_store
 from btc_ema_trader.model import latest_bundle
@@ -54,10 +55,9 @@ def main() -> int:
     adaptive_state_dir.mkdir(parents=True, exist_ok=True)
     site_dir.mkdir(parents=True, exist_ok=True)
 
-    used_weekly_model = copy_latest_model_from_state(
-        root,
-        model_state_dir,
-    )
+    history_path = state_dir / "history.json"
+    previous_history = load_history(history_path)
+    used_weekly_model = copy_latest_model_from_state(root, model_state_dir)
     settings = build_github_settings(
         root,
         runtime_dir,
@@ -68,6 +68,7 @@ def main() -> int:
     database.initialize()
 
     started_at = pd.Timestamp.now(tz="UTC")
+    bundle = None
     try:
         bundle = latest_bundle(settings)
         market = fetch_and_store(
@@ -77,11 +78,20 @@ def main() -> int:
             provider=bundle.provider,
         )
         result = RuntimeEngine(settings, database).run_once(force=True)
-        status = (
-            "OK"
-            if result.get("status") != "FAIL_SAFE"
-            else "FAIL_SAFE"
-        )
+        status = "OK" if result.get("status") != "FAIL_SAFE" else "FAIL_SAFE"
+        if status == "OK" and result.get("candle_time"):
+            recent_candles = database.load_candles(
+                provider=bundle.provider,
+                symbol=bundle.symbol,
+                limit=168,
+            )
+            contract = build_next_candle_forecast(
+                result,
+                bundle.metrics,
+                recent_candles,
+                previous_history,
+            )
+            result = attach_forecast_contract(result, contract)
     except Exception as exc:
         LOGGER.exception("Hourly forecast failed")
         market = None
@@ -98,19 +108,13 @@ def main() -> int:
             "run_status": status,
             "run_started_at": started_at,
             "run_finished_at": finished_at,
-            "run_duration_seconds": (
-                finished_at - started_at
-            ).total_seconds(),
+            "run_duration_seconds": (finished_at - started_at).total_seconds(),
             "market_refresh": market,
             "weekly_model_loaded": used_weekly_model,
         }
     )
 
-    history_path = state_dir / "history.json"
-    history = append_unique(
-        load_history(history_path),
-        record,
-    )[-MAX_HISTORY:]
+    history = append_unique(previous_history, record)[-MAX_HISTORY:]
     write_json(state_dir / "latest.json", record)
     write_json(history_path, history)
     write_json(site_dir / "latest.json", record)
@@ -128,6 +132,32 @@ def main() -> int:
             "diagnostics were persisted."
         )
     return 0
+
+
+def attach_forecast_contract(
+    result: dict[str, Any],
+    contract: dict[str, Any],
+) -> dict[str, Any]:
+    output = dict(result)
+    output["trade_forecast_direction"] = output.get("forecast_direction")
+    output["trade_selected_horizon"] = output.get("selected_horizon")
+    output["trade_confidence"] = output.get("confidence")
+    output["next_candle_forecast"] = contract
+    output["forecast_contract_version"] = contract["contract_version"]
+    output["forecast_direction"] = contract["direction"]
+    output["selected_horizon"] = 1
+    output["confidence"] = contract["direction_confidence"]
+    output["expected_return"] = contract["median_return"]
+    output["target_candle_time"] = contract["target_open_time"]
+    output["target_candle_open_time"] = contract["target_open_time"]
+    output["target_candle_close_time"] = contract["target_close_time"]
+    output["predicted_close_median"] = contract["median_close"]
+    output["predicted_close_low"] = contract["likely_close_low"]
+    output["predicted_close_high"] = contract["likely_close_high"]
+    output["prediction_result"] = "PENDING"
+    output["direction_result"] = "PENDING"
+    output["resolved_at"] = None
+    return output
 
 
 def load_history(path: Path) -> list[dict[str, Any]]:
@@ -148,10 +178,7 @@ def append_unique(
     filtered = [
         item
         for item in history
-        if (
-            item.get("candle_time") or item.get("run_finished_at")
-        )
-        != key
+        if (item.get("candle_time") or item.get("run_finished_at")) != key
     ]
     filtered.append(record)
     return sorted(
