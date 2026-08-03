@@ -1,5 +1,14 @@
 # Changelog
 
+## Unreleased
+
+- Rebuilt the README as a concise English project overview.
+- Replaced the external header renderer with a repository-owned animated candlestick SVG.
+- Added contribution and security policies.
+- Added a shared editor configuration.
+- Added a dedicated repository-quality workflow for source and documentation changes.
+- Extended repository tests to enforce English-only text, required professional files and local README assets.
+
 ## 3.0.0 — Adaptive online learning
 
 - Added a persistent incremental learning layer for 1-hour, 2-hour and 3-hour horizons.
