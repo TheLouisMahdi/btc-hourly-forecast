@@ -29,6 +29,7 @@ class Settings:
     def ensure_runtime_dirs(self) -> None:
         self.path("database").parent.mkdir(parents=True, exist_ok=True)
         self.path("runtime_state").parent.mkdir(parents=True, exist_ok=True)
+        self.path("adaptive_state").parent.mkdir(parents=True, exist_ok=True)
         for key in ("model_dir", "report_dir", "log_dir"):
             self.path(key).mkdir(parents=True, exist_ok=True)
 
@@ -37,7 +38,11 @@ def load_settings(config_path: str | os.PathLike[str] | None = None) -> Settings
     explicit = config_path or os.environ.get("BTC_EMA_CONFIG")
     if explicit:
         config_file = Path(explicit).expanduser().resolve()
-        root = config_file.parent.parent if config_file.parent.name == "config" else config_file.parent
+        root = (
+            config_file.parent.parent
+            if config_file.parent.name == "config"
+            else config_file.parent
+        )
     else:
         root = Path.cwd().resolve()
         config_file = root / "config" / "default.yaml"
