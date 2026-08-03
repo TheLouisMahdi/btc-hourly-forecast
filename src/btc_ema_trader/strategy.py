@@ -72,31 +72,41 @@ def make_decision(
     )
     blockers: list[str] = []
 
-    qualified_horizons = {
-        int(horizon)
-        for horizon in qualification.get("qualified_horizons", [])
-    }
-    if not bool(qualification.get("passed", False)):
-        blockers.append("MODEL_NOT_QUALIFIED")
-    if selected_horizon not in qualified_horizons:
-        blockers.append("SELECTED_HORIZON_NOT_QUALIFIED")
-
     is_event = int(latest_row.get("is_event", 0)) == 1
     event_direction = int(latest_row.get("event_direction", 0))
+    direction_name = (
+        "LONG"
+        if event_direction > 0
+        else "SHORT"
+        if event_direction < 0
+        else "NONE"
+    )
     event_type = str(latest_row.get("event_type", "NONE"))
     event_score = float(latest_row.get("event_score", 0.0))
-    breakout_level = _finite(
-        latest_row.get("breakout_level")
-    )
+    breakout_level = _finite(latest_row.get("breakout_level"))
     invalidation_level = _finite(
         latest_row.get("breakout_invalidation_level")
     )
+
+    if not bool(qualification.get("passed", False)):
+        blockers.append("MODEL_NOT_QUALIFIED")
+    qualified_by_direction = qualification.get(
+        "qualified_directions",
+        {},
+    )
+    qualified_horizons = {
+        int(horizon)
+        for horizon in qualified_by_direction.get(direction_name, [])
+    }
+    if is_event and selected_horizon not in qualified_horizons:
+        blockers.append("SELECTED_DIRECTION_NOT_QUALIFIED")
+
     if not is_event or event_direction == 0:
         blockers.append("NO_NEW_STRUCTURE_BREAKOUT")
     elif event_type not in STRUCTURAL_EVENTS:
         blockers.append("UNSUPPORTED_STRUCTURE_EVENT")
     if is_event and event_score < float(
-        cfg.get("minimum_event_score", 0.45)
+        cfg.get("minimum_event_score", 0.30)
     ):
         blockers.append("WEAK_BREAKOUT_STRUCTURE")
     if is_event and breakout_level is None:
@@ -118,21 +128,34 @@ def make_decision(
     if is_event and trade_direction != expected_trade_direction:
         blockers.append("EVENT_DIRECTION_MISMATCH")
 
+    direction_cfg = settings.section(
+        "long_breakout"
+        if event_direction > 0
+        else "short_breakdown"
+        if event_direction < 0
+        else "strategy"
+    )
     minimum_confidence = _per_horizon(
-        cfg.get("minimum_confidence", {}),
+        direction_cfg.get(
+            "minimum_success_probability",
+            cfg.get("minimum_confidence", {}),
+        ),
         selected_horizon,
         0.60,
     )
     if confidence < minimum_confidence:
         blockers.append("LOW_BREAKOUT_SUCCESS_PROBABILITY")
     minimum_tradeability = _per_horizon(
-        cfg.get("minimum_tradeability_probability", {}),
+        direction_cfg.get(
+            "minimum_tradeability_probability",
+            cfg.get("minimum_tradeability_probability", {}),
+        ),
         selected_horizon,
         0.58,
     )
     if tradeability_probability < minimum_tradeability:
         blockers.append("LOW_TRADEABILITY_PROBABILITY")
-    if event_agreement < float(
+    if is_event and event_agreement < float(
         cfg.get("minimum_horizon_agreement", 2 / 3)
     ):
         blockers.append("BREAKOUT_HORIZON_DISAGREEMENT")
@@ -143,7 +166,7 @@ def make_decision(
     if not np.isfinite(atr_pct) or atr_pct <= 0:
         blockers.append("ATR_UNAVAILABLE")
     elif atr_pct * 100 > float(
-        cfg.get("maximum_atr_percent", 3.0)
+        cfg.get("maximum_atr_percent", 4.0)
     ):
         blockers.append("VOLATILITY_SHOCK")
     if int(latest_row.get("news_shock", 0)) == 1 and bool(
@@ -175,7 +198,13 @@ def make_decision(
         ):
             blockers.append("NEWS_STALE")
 
-    action = "LONG" if expected_trade_direction == "UP" else "SHORT"
+    action = (
+        "LONG"
+        if event_direction > 0
+        else "SHORT"
+        if event_direction < 0
+        else "WAIT"
+    )
     if blockers:
         action = "WAIT"
     trade_plan = build_trade_plan(
@@ -225,12 +254,12 @@ def build_trade_plan(
     atr = float(
         row.get(
             "atr",
-            price * float(cfg.get("minimum_stop_percent", 0.004)),
+            price * float(cfg.get("minimum_stop_percent", 0.0035)),
         )
     )
     invalidation = _finite(row.get("breakout_invalidation_level"))
     generic_stop_pct = float(
-        cfg.get("stop_atr_multiplier", 1.15)
+        cfg.get("stop_atr_multiplier", 1.10)
     ) * atr / price
     if direction == "UP" and invalidation is not None and invalidation < price:
         structural_stop_pct = (price - invalidation) / price
@@ -241,8 +270,8 @@ def build_trade_plan(
     stop_pct = float(
         np.clip(
             max(structural_stop_pct, generic_stop_pct * 0.65),
-            float(cfg.get("minimum_stop_percent", 0.0040)),
-            float(cfg.get("maximum_stop_percent", 0.014)),
+            float(cfg.get("minimum_stop_percent", 0.0035)),
+            float(cfg.get("maximum_stop_percent", 0.018)),
         )
     )
     selected_horizon = int(prediction["selected_horizon"])
@@ -288,6 +317,7 @@ def build_trade_plan(
         "event_id": row.get("event_id"),
         "event_type": row.get("event_type", "NONE"),
         "event_score": float(row.get("event_score", 0.0)),
+        "event_scale_hours": int(row.get("event_scale_hours", 0)),
         "breakout_source": row.get("breakout_source", "NONE"),
         "breakout_level": row.get("breakout_level"),
         "invalidation_level": row.get(
@@ -295,7 +325,7 @@ def build_trade_plan(
         ),
         "triangle_type": row.get("triangle_type", "NONE"),
         "regime": row.get("regime", "UNKNOWN"),
-        "trade_direction_source": "STRUCTURAL_BREAKOUT",
+        "trade_direction_source": "DETERMINISTIC_DIRECTIONAL_BREAKOUT",
         "entry_reference": price,
         "entry_definition": "OPEN_OF_NEXT_1H_CANDLE",
         "entry_style": str(
