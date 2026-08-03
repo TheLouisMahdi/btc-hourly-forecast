@@ -1,71 +1,252 @@
-# BTC Hourly Regime Trader v2
+<div align="center">
 
-نسخهٔ دوم پروژه، مدل EMA20/EMA50 را به‌طور کامل از هستهٔ تصمیم‌گیری حذف می‌کند. سیستم جدید روی کندل یک‌ساعته و ۱۸۰ روز تاریخچه کار می‌کند، اما به‌جای تقاطع دو میانگین ثابت، چهار **رویداد مستقل بازار** را تشخیص می‌دهد:
+<img src="https://capsule-render.vercel.app/api?type=waving&color=0:020617,48:0f766e,100:22d3ee&height=180&section=header&text=BTC%20Hourly%20Forecast&fontColor=e6fffb&fontSize=42&fontAlignY=38&desc=Event-driven%20market%20forecasting%20%7C%20Fail-safe%20paper-trade%20decisions&descAlignY=59&animation=fadeIn" alt="BTC Hourly Forecast header" width="100%" />
 
-1. شکست کانال Donchian
-2. خروج از فشردگی Bollinger
-3. ادامهٔ روند پس از Pullback به KAMA
-4. جهش جهت‌دار قیمت همراه افزایش حجم
+<img src="https://readme-typing-svg.demolab.com?font=JetBrains+Mono&weight=600&size=19&duration=2800&pause=850&color=22D3EE&center=true&vCenter=true&width=820&lines=One-hour+BTCUSDT+market+analysis;Regime+and+event-driven+forecasting;Automated+hourly+GitHub+Pages+dashboard;Research-first+and+paper-trading+only" alt="Animated project summary" />
 
-KAMA و ADX فقط برای تشخیص رژیم بازار استفاده می‌شوند. مدل همیشه جهت `UP` یا `DOWN` می‌دهد، ولی موتور معامله فقط در صورت وجود یک رویداد جدید و عبور از همهٔ Fail-safeها اجازهٔ `LONG` یا `SHORT` می‌دهد؛ در غیر این صورت خروجی معاملاتی `WAIT` است.
+<br />
 
-## اصلاحات اصلی v2
+<a href="https://thelouismahdi.github.io/btc-hourly-forecast/">
+  <img src="https://img.shields.io/badge/OPEN_LIVE_DASHBOARD-GITHUB_PAGES-22d3ee?style=for-the-badge&logo=githubpages&logoColor=020617" alt="Open live dashboard" />
+</a>
 
-- Dataset رویدادمحور با `event_id` یکتا
-- هر رویداد فقط یک نمونهٔ مستقل
-- ورود آموزشی روی `Open` کندل بعدی
-- خروج در ۱، ۲ یا ۳ کندل بعد
-- محاسبهٔ MFE، MAE و Triple Barrier محافظه‌کارانه
-- مدل جهت + مدل احتمال قابل‌معامله‌بودن
-- Probability calibration داخلی و گزارش Calibration Error
-- Walk-forward دارای Gap برابر بیشترین افق
-- Qualification جدا برای هر افق
-- انتخاب افق بر اساس Edge، احتمال معامله‌پذیری و ثبات فولدها
-- جلوگیری از بیش از یک معامله برای هر Event ID
-- تفکیک کارمزد Maker، Taker، Slippage و Stress Cost
-- اصلاح Resolve لایو بر اساس Open کندل بعدی و کسر هزینه فقط یک‌بار
-- جلوگیری از Leakage خبر با `available_at = max(published_at, first_seen_at)`
-- داشبورد مدیریتی جدید با همان ساختار قبلی
+<a href="https://github.com/TheLouisMahdi/btc-hourly-forecast/actions/workflows/hourly_forecast.yml">
+  <img src="https://img.shields.io/github/actions/workflow/status/TheLouisMahdi/btc-hourly-forecast/hourly_forecast.yml?branch=main&style=for-the-badge&label=Hourly%20Forecast&labelColor=020617" alt="Hourly forecast workflow" />
+</a>
 
-## اجرای پچ روی پروژه قبلی
+<br />
+<br />
 
-1. از پوشهٔ `data` و `artifacts` نسخهٔ پشتیبان بگیر.
-2. فایل‌های پچ را روی پروژه قبلی Copy/Replace کن.
-3. `start_retrain.bat` را اجرا کن.
-4. مدل قدیمی عمداً قابل استفاده نیست و پیام Retrain می‌دهد.
-5. دیتابیس قبلی به‌صورت خودکار ستون‌های v2 را اضافه می‌کند.
+<img src="https://img.shields.io/badge/version-2.1.0-14b8a6?style=flat-square" alt="Version 2.1.0" />
+<img src="https://img.shields.io/badge/Python-3.11%2B-3776ab?style=flat-square&logo=python&logoColor=white" alt="Python 3.11 or newer" />
+<img src="https://img.shields.io/badge/timeframe-1_hour-22d3ee?style=flat-square" alt="One-hour timeframe" />
+<img src="https://img.shields.io/badge/mode-paper_trading_only-f59e0b?style=flat-square" alt="Paper trading only" />
 
-## اجرای کامل از ابتدا
+</div>
 
-```bat
-start_first_run.bat
+---
+
+## Overview
+
+**BTC Hourly Forecast** is a research-oriented Bitcoin market analysis system built around one-hour candles, market-regime detection, event-based machine learning and conservative trade qualification.
+
+Instead of relying on a single moving-average crossover, the system detects independent market events, estimates whether an event is likely to continue, evaluates whether the expected move remains tradeable after costs, and applies a layered fail-safe policy before producing a paper-trade action.
+
+The project runs automatically with **GitHub Actions** and publishes a compact static dashboard through **GitHub Pages**. A local Gradio dashboard is also included for development and deeper inspection.
+
+> The system may forecast a direction while still returning `WAIT`. This is intentional: a directional prediction is not treated as a valid trade unless every qualification and risk gate passes.
+
+---
+
+## Core capabilities
+
+| Capability | Description |
+|---|---|
+| Hourly market pipeline | Processes `BTCUSDT` one-hour candles with a 180-day rolling history. |
+| Multiple data providers | Supports Binance Futures, Bybit Linear and OKX Swap with fallback ordering. |
+| Event-driven features | Detects breakout, squeeze-release, pullback-resume and volume-impulse events. |
+| Regime awareness | Uses KAMA, ADX, volatility and directional features to describe market conditions. |
+| News context | Aggregates recent RSS and GDELT data with time-aware availability controls. |
+| Multi-horizon models | Evaluates event continuation and tradeability across 1, 2 and 3-hour horizons. |
+| Walk-forward evaluation | Uses time-ordered validation with a gap between training and evaluation windows. |
+| Cost-aware decisions | Includes maker/taker fees, slippage, stress costs and minimum edge requirements. |
+| Fail-safe execution | Blocks signals when model quality, freshness, risk or agreement requirements fail. |
+| Automated publishing | Generates a new static dashboard on GitHub Pages every hour. |
+
+---
+
+## Market events
+
+The decision engine focuses on four event families:
+
+| Event | Interpretation |
+|---|---|
+| `DONCHIAN_BREAKOUT` | Price breaks beyond a recent Donchian channel boundary. |
+| `SQUEEZE_RELEASE` | Volatility expands after a compressed Bollinger-band regime. |
+| `PULLBACK_RESUME` | Price returns toward KAMA and attempts to resume the prevailing direction. |
+| `VOLUME_IMPULSE` | A directional candle appears with an abnormal increase in volume. |
+
+KAMA and ADX are used primarily for regime context rather than as direct crossover signals.
+
+---
+
+## Decision pipeline
+
+```mermaid
+flowchart LR
+    A[Hourly market data] --> B[Feature engineering]
+    N[News and sentiment context] --> B
+    B --> C[Regime detection]
+    B --> D[Event detection]
+    C --> E[Continuation models]
+    D --> E
+    E --> F[Tradeability models]
+    F --> G[Qualification gates]
+    G --> H[Cost and risk filters]
+    H --> I{Final action}
+    I -->|All gates pass| J[LONG or SHORT]
+    I -->|Any gate fails| K[WAIT]
 ```
 
-## بازآموزی پس از نصب پچ
+The model layer produces probabilities. The strategy layer decides whether those probabilities are sufficiently reliable and economically meaningful after estimated trading costs.
 
-```bat
-start_retrain.bat
+---
+
+## Automated operation
+
+### Hourly forecast
+
+The hourly workflow runs at minute `17` of every UTC hour:
+
+```text
+.github/workflows/hourly_forecast.yml
 ```
 
-## اجرای لایو و داشبورد
+It restores the latest model and compact prediction history, downloads current inputs, creates one forecast, rebuilds the static dashboard and deploys it to GitHub Pages.
 
-```bat
-start_live.bat
+### Weekly retraining
+
+The retraining workflow runs every Sunday at `03:47 UTC`:
+
+```text
+.github/workflows/weekly_retrain.yml
 ```
 
-## فایل‌های خروجی مهم
+It downloads a fresh 180-day training window, evaluates the model with time-ordered splits and publishes the latest accepted model snapshot for subsequent hourly runs.
 
-- `artifacts/models/latest.joblib`
-- `artifacts/reports/latest_training_report.json`
-- `artifacts/reports/latest_metrics.csv`
-- `artifacts/reports/<model_id>_oof.csv`
-- `data/runtime_state.json`
-- `data/btc_ema_hourly.sqlite3`
+Model state and forecast history are stored on dedicated snapshot branches so the main branch remains clean and the repository history does not grow with a committed SQLite database every hour.
 
-## نکته ایمنی
+---
 
-این پروژه فقط Paper Trading است. ارسال سفارش واقعی پیاده‌سازی نشده و `paper_only: true` باید فعال بماند تا زمانی که حداقل یک افق، Qualification کامل خارج‌ازنمونه را پاس کند.
+## Fail-safe philosophy
 
-## Free scheduled deployment on GitHub
+A model is not considered trade-ready merely because it can output `UP` or `DOWN`.
 
-A stateless hourly GitHub Actions + GitHub Pages deployment is included in this package. See `GITHUB_FREE_DEPLOY_FA.md` for the exact Persian setup steps.
+The strategy can block a signal for reasons including:
+
+- no fresh qualifying market event;
+- insufficient event or tradeability probability;
+- failed out-of-sample qualification;
+- weak agreement between forecast horizons;
+- non-positive expected return after costs;
+- excessive volatility or stale market data;
+- news-shock restrictions;
+- cooldown or daily signal limits.
+
+This conservative design makes `WAIT` a normal and expected result rather than an error.
+
+---
+
+## Quick start
+
+### Requirements
+
+```text
+Python 3.11+
+Windows or Linux
+Internet access for market and news sources
+```
+
+### Clone and install
+
+```bash
+git clone https://github.com/TheLouisMahdi/btc-hourly-forecast.git
+cd btc-hourly-forecast
+python -m venv .venv
+```
+
+Activate the environment:
+
+```bash
+# Windows PowerShell
+.\.venv\Scripts\Activate.ps1
+
+# Linux / macOS
+source .venv/bin/activate
+```
+
+Install the project:
+
+```bash
+python -m pip install --upgrade pip
+python -m pip install -e .
+```
+
+### Windows launchers
+
+```text
+start_first_run.bat     Initial data collection, training and launch
+start_live.bat          Live engine and local dashboard
+start_retrain.bat       Manual model retraining
+start_status.bat        Current runtime status
+```
+
+The default local dashboard address is:
+
+```text
+http://127.0.0.1:7860
+```
+
+---
+
+## Repository structure
+
+```text
+.github/workflows/    Scheduled forecast and retraining automation
+artifacts/            Model snapshots and evaluation reports
+config/               Market, model, strategy and runtime settings
+data/                 Local database and runtime state
+docs/                 Architecture, evaluation and fail-safe documentation
+scripts/              GitHub automation and deployment helpers
+src/btc_ema_trader/   Core Python package
+tests/                Feature, model, runtime and strategy tests
+```
+
+---
+
+## Important outputs
+
+```text
+artifacts/models/latest.joblib
+artifacts/reports/latest_training_report.json
+artifacts/reports/latest_metrics.csv
+data/runtime_state.json
+data/btc_ema_hourly.sqlite3
+```
+
+The scheduled GitHub deployment additionally publishes compact `latest.json` and `history.json` snapshots for the static dashboard.
+
+---
+
+## Research and risk notice
+
+This repository is an experimental forecasting and **paper-trading** project.
+
+- It does not place real orders.
+- It does not guarantee predictive accuracy or profitability.
+- Historical and walk-forward results do not guarantee future performance.
+- Market-data, news and exchange APIs may be delayed, unavailable or incomplete.
+- Trading costs, liquidity and slippage can materially change real outcomes.
+
+The default configuration keeps `paper_only: true`, and that setting should remain enabled unless the system has been independently reviewed, validated and adapted for a clearly defined real-world risk framework.
+
+---
+
+## Author
+
+<div align="center">
+
+### Developed by **LouisMahdi**
+
+Built as an applied machine-learning and market-systems research project focused on transparent evaluation, conservative decision gates and automated reproducibility.
+
+<a href="https://github.com/TheLouisMahdi">
+  <img src="https://img.shields.io/badge/GitHub-TheLouisMahdi-14b8a6?style=for-the-badge&logo=github&logoColor=white&labelColor=020617" alt="TheLouisMahdi GitHub profile" />
+</a>
+
+<br />
+<br />
+
+<img src="https://capsule-render.vercel.app/api?type=waving&color=0:020617,48:0f766e,100:22d3ee&height=110&section=footer" alt="Footer" width="100%" />
+
+</div>
