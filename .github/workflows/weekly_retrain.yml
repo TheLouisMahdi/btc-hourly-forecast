@@ -8,6 +8,7 @@ on:
       - "config/default.yaml"
       - "src/btc_ema_trader/contract_training.py"
       - "src/btc_ema_trader/features.py"
+      - "src/btc_ema_trader/market.py"
       - "src/btc_ema_trader/market_structure.py"
       - "src/btc_ema_trader/model.py"
       - "src/btc_ema_trader/structure_training.py"
