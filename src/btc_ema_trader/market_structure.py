@@ -29,16 +29,21 @@ def build_market_structure(
 
     cfg = settings.section("structure")
     output = frame.copy().reset_index(drop=True)
-    high = pd.to_numeric(output["high"], errors="coerce").to_numpy(dtype=float)
-    low = pd.to_numeric(output["low"], errors="coerce").to_numpy(dtype=float)
-    close = pd.to_numeric(output["close"], errors="coerce").to_numpy(dtype=float)
-    atr = pd.to_numeric(output["atr"], errors="coerce").to_numpy(dtype=float)
-    body_atr = pd.to_numeric(output["body_atr"], errors="coerce").to_numpy(dtype=float)
-    close_location = pd.to_numeric(
-        output["close_location"], errors="coerce"
+    high = pd.to_numeric(
+        output["high"],
+        errors="coerce",
     ).to_numpy(dtype=float)
-    volume_z = pd.to_numeric(
-        output["volume_z_24"], errors="coerce"
+    low = pd.to_numeric(
+        output["low"],
+        errors="coerce",
+    ).to_numpy(dtype=float)
+    close = pd.to_numeric(
+        output["close"],
+        errors="coerce",
+    ).to_numpy(dtype=float)
+    atr = pd.to_numeric(
+        output["atr"],
+        errors="coerce",
     ).to_numpy(dtype=float)
 
     left = int(cfg.get("pivot_left_bars", 3))
@@ -65,47 +70,73 @@ def build_market_structure(
     if not scales:
         scales = (48, 120, 240)
 
-    n = len(output)
+    count = len(output)
     result: dict[str, np.ndarray] = {}
     for scale in scales:
         prefix = f"structure_{scale}h"
-        result[f"{prefix}_resistance"] = np.full(n, np.nan)
-        result[f"{prefix}_support"] = np.full(n, np.nan)
-        result[f"{prefix}_resistance_slope_atr"] = np.full(n, np.nan)
-        result[f"{prefix}_support_slope_atr"] = np.full(n, np.nan)
-        result[f"{prefix}_resistance_r2"] = np.full(n, np.nan)
-        result[f"{prefix}_support_r2"] = np.full(n, np.nan)
-        result[f"{prefix}_resistance_touches"] = np.zeros(n, dtype=float)
-        result[f"{prefix}_support_touches"] = np.zeros(n, dtype=float)
-        result[f"{prefix}_width_atr"] = np.full(n, np.nan)
+        result[f"{prefix}_resistance"] = np.full(count, np.nan)
+        result[f"{prefix}_support"] = np.full(count, np.nan)
+        result[f"{prefix}_resistance_slope_atr"] = np.full(
+            count,
+            np.nan,
+        )
+        result[f"{prefix}_support_slope_atr"] = np.full(
+            count,
+            np.nan,
+        )
+        result[f"{prefix}_resistance_r2"] = np.full(count, np.nan)
+        result[f"{prefix}_support_r2"] = np.full(count, np.nan)
+        result[f"{prefix}_resistance_touches"] = np.zeros(
+            count,
+            dtype=float,
+        )
+        result[f"{prefix}_support_touches"] = np.zeros(
+            count,
+            dtype=float,
+        )
+        result[f"{prefix}_width_atr"] = np.full(count, np.nan)
 
-    resistance = np.full(n, np.nan)
-    support = np.full(n, np.nan)
-    resistance_strength = np.zeros(n, dtype=float)
-    support_strength = np.zeros(n, dtype=float)
-    resistance_age = np.full(n, np.nan)
-    support_age = np.full(n, np.nan)
+    resistance = np.full(count, np.nan)
+    support = np.full(count, np.nan)
+    resistance_strength = np.zeros(count, dtype=float)
+    support_strength = np.zeros(count, dtype=float)
+    resistance_age = np.full(count, np.nan)
+    support_age = np.full(count, np.nan)
 
-    triangle_type = np.full(n, "NONE", dtype=object)
-    triangle_quality = np.zeros(n, dtype=float)
-    triangle_upper = np.full(n, np.nan)
-    triangle_lower = np.full(n, np.nan)
-    triangle_contraction = np.zeros(n, dtype=float)
-    triangle_apex_bars = np.full(n, np.nan)
+    triangle_type = np.full(count, "NONE", dtype=object)
+    triangle_quality = np.zeros(count, dtype=float)
+    triangle_upper = np.full(count, np.nan)
+    triangle_lower = np.full(count, np.nan)
+    triangle_contraction = np.zeros(count, dtype=float)
+    triangle_apex_bars = np.full(count, np.nan)
 
-    max_pivots = int(cfg.get("maximum_pivots_per_line", 8))
-    touch_atr = float(cfg.get("level_touch_tolerance_atr", 0.30))
-    triangle_scale = int(cfg.get("triangle_lookback_hours", 120))
+    maximum_pivots = int(
+        cfg.get("maximum_pivots_per_line", 8)
+    )
+    touch_atr = float(
+        cfg.get("level_touch_tolerance_atr", 0.30)
+    )
+    triangle_scale = int(
+        cfg.get("triangle_lookback_hours", 120)
+    )
 
-    for index in range(n):
+    for index in range(count):
         if index < min(scales):
             continue
         current_atr = atr[index]
-        reference_price = close[index - 1] if index > 0 else close[index]
+        reference_price = (
+            close[index - 1]
+            if index > 0
+            else close[index]
+        )
         if not np.isfinite(current_atr) or current_atr <= 0:
             continue
-        candidates_resistance: list[tuple[float, float, float]] = []
-        candidates_support: list[tuple[float, float, float]] = []
+        resistance_candidates: list[
+            tuple[float, float, float]
+        ] = []
+        support_candidates: list[
+            tuple[float, float, float]
+        ] = []
 
         for scale in scales:
             prefix = f"structure_{scale}h"
@@ -114,12 +145,12 @@ def build_market_structure(
                 pivot
                 for pivot in high_pivots
                 if start <= pivot.confirmed_at <= index - 1
-            ][-max_pivots:]
+            ][-maximum_pivots:]
             available_lows = [
                 pivot
                 for pivot in low_pivots
                 if start <= pivot.confirmed_at <= index - 1
-            ][-max_pivots:]
+            ][-maximum_pivots:]
             high_line = fit_pivot_line(
                 available_highs,
                 index,
@@ -133,7 +164,9 @@ def build_market_structure(
 
             static_high = _window_max(high, start, index)
             static_low = _window_min(low, start, index)
-            dynamic_high = high_line.value if high_line else np.nan
+            dynamic_high = (
+                high_line.value if high_line else np.nan
+            )
             dynamic_low = low_line.value if low_line else np.nan
 
             scale_resistance = _nearest_level_above(
@@ -148,10 +181,12 @@ def build_market_structure(
             result[f"{prefix}_support"][index] = scale_support
 
             if high_line:
-                result[f"{prefix}_resistance_slope_atr"][index] = (
-                    high_line.slope_atr
+                result[
+                    f"{prefix}_resistance_slope_atr"
+                ][index] = high_line.slope_atr
+                result[f"{prefix}_resistance_r2"][index] = (
+                    high_line.r2
                 )
-                result[f"{prefix}_resistance_r2"][index] = high_line.r2
             if low_line:
                 result[f"{prefix}_support_slope_atr"][index] = (
                     low_line.slope_atr
@@ -168,16 +203,20 @@ def build_market_structure(
                 scale_support,
                 current_atr * touch_atr,
             )
-            result[f"{prefix}_resistance_touches"][index] = high_touches
+            result[f"{prefix}_resistance_touches"][index] = (
+                high_touches
+            )
             result[f"{prefix}_support_touches"][index] = low_touches
-            if np.isfinite(scale_resistance) and np.isfinite(scale_support):
+            if np.isfinite(scale_resistance) and np.isfinite(
+                scale_support
+            ):
                 result[f"{prefix}_width_atr"][index] = (
                     scale_resistance - scale_support
                 ) / current_atr
 
             scale_weight = float(np.log1p(scale))
             if np.isfinite(scale_resistance):
-                candidates_resistance.append(
+                resistance_candidates.append(
                     (
                         scale_resistance,
                         scale_weight,
@@ -185,7 +224,7 @@ def build_market_structure(
                     )
                 )
             if np.isfinite(scale_support):
-                candidates_support.append(
+                support_candidates.append(
                     (
                         scale_support,
                         scale_weight,
@@ -195,12 +234,12 @@ def build_market_structure(
 
         chosen_resistance = choose_composite_level(
             reference_price,
-            candidates_resistance,
+            resistance_candidates,
             direction=1,
         )
         chosen_support = choose_composite_level(
             reference_price,
-            candidates_support,
+            support_candidates,
             direction=-1,
         )
         resistance[index] = chosen_resistance.value
@@ -229,7 +268,7 @@ def build_market_structure(
             atr=current_atr,
             price=reference_price,
             lookback=triangle_scale,
-            max_pivots=max_pivots,
+            max_pivots=maximum_pivots,
             cfg=cfg,
         )
         if triangle:
@@ -255,14 +294,19 @@ def build_market_structure(
         close - support
     ) / np.where(atr > 0, atr, np.nan)
     output["triangle_type"] = triangle_type
-    output["triangle_code"] = pd.Series(triangle_type).map(
-        {
-            "NONE": 0,
-            "SYMMETRICAL": 1,
-            "ASCENDING": 2,
-            "DESCENDING": -2,
-        }
-    ).fillna(0).astype(int)
+    output["triangle_code"] = (
+        pd.Series(triangle_type)
+        .map(
+            {
+                "NONE": 0,
+                "SYMMETRICAL": 1,
+                "ASCENDING": 2,
+                "DESCENDING": -2,
+            }
+        )
+        .fillna(0)
+        .astype(int)
+    )
     output["triangle_quality"] = triangle_quality
     output["triangle_upper"] = triangle_upper
     output["triangle_lower"] = triangle_lower
@@ -272,10 +316,7 @@ def build_market_structure(
         triangle_upper - triangle_lower
     ) / np.where(atr > 0, atr, np.nan)
 
-    event = detect_breakout_events(
-        output,
-        cfg,
-    )
+    event = detect_breakout_events(output, cfg)
     for column, values in event.items():
         output[column] = values
     return output
@@ -329,15 +370,27 @@ def confirmed_pivots(
         low_window = low[start:stop]
         candidate_high = high[pivot_at]
         candidate_low = low[pivot_at]
-        if np.isfinite(candidate_high) and np.isfinite(high_window).any():
+        if np.isfinite(candidate_high) and np.isfinite(
+            high_window
+        ).any():
             if candidate_high >= np.nanmax(high_window):
                 high_pivots.append(
-                    Pivot(pivot_at, confirmed_at, float(candidate_high))
+                    Pivot(
+                        pivot_at,
+                        confirmed_at,
+                        float(candidate_high),
+                    )
                 )
-        if np.isfinite(candidate_low) and np.isfinite(low_window).any():
+        if np.isfinite(candidate_low) and np.isfinite(
+            low_window
+        ).any():
             if candidate_low <= np.nanmin(low_window):
                 low_pivots.append(
-                    Pivot(pivot_at, confirmed_at, float(candidate_low))
+                    Pivot(
+                        pivot_at,
+                        confirmed_at,
+                        float(candidate_low),
+                    )
                 )
     return high_pivots, low_pivots
 
@@ -350,8 +403,14 @@ def fit_pivot_line(
     points = list(pivots)
     if len(points) < 2 or not np.isfinite(atr) or atr <= 0:
         return None
-    x = np.asarray([point.pivot_at for point in points], dtype=float)
-    y = np.asarray([point.value for point in points], dtype=float)
+    x = np.asarray(
+        [point.pivot_at for point in points],
+        dtype=float,
+    )
+    y = np.asarray(
+        [point.value for point in points],
+        dtype=float,
+    )
     if np.ptp(x) <= 0 or not np.isfinite(y).all():
         return None
     slope, intercept = np.polyfit(x, y, deg=1)
@@ -359,7 +418,11 @@ def fit_pivot_line(
     residual = y - fitted
     total = y - np.mean(y)
     denominator = float(np.sum(total**2))
-    r2 = 1.0 - float(np.sum(residual**2)) / denominator if denominator > 0 else 0.0
+    r2 = (
+        1.0 - float(np.sum(residual**2)) / denominator
+        if denominator > 0
+        else 0.0
+    )
     return PivotLine(
         value=float(slope * current_index + intercept),
         slope=float(slope),
@@ -397,41 +460,81 @@ def detect_triangle(
     if upper is None or lower is None:
         return None
     width_now = upper.value - lower.value
-    past_index = max(start, index - max(12, lookback // 2))
-    upper_past = upper.value - upper.slope * (index - past_index)
-    lower_past = lower.value - lower.slope * (index - past_index)
+    past_index = max(
+        start,
+        index - max(12, lookback // 2),
+    )
+    upper_past = upper.value - upper.slope * (
+        index - past_index
+    )
+    lower_past = lower.value - lower.slope * (
+        index - past_index
+    )
     width_past = upper_past - lower_past
-    if width_now <= 0 or width_past <= 0 or not np.isfinite(price) or price <= 0:
+    if (
+        width_now <= 0
+        or width_past <= 0
+        or not np.isfinite(price)
+        or price <= 0
+    ):
         return None
     contraction = 1.0 - width_now / width_past
-    minimum_contraction = float(cfg.get("triangle_minimum_contraction", 0.15))
-    maximum_width_pct = float(cfg.get("triangle_maximum_width_percent", 0.08))
-    minimum_r2 = float(cfg.get("triangle_minimum_line_r2", 0.25))
+    minimum_contraction = float(
+        cfg.get("triangle_minimum_contraction", 0.15)
+    )
+    maximum_width_percent = float(
+        cfg.get("triangle_maximum_width_percent", 0.08)
+    )
+    minimum_r2 = float(
+        cfg.get("triangle_minimum_line_r2", 0.25)
+    )
     if (
         contraction < minimum_contraction
-        or width_now / price > maximum_width_pct
+        or width_now / price > maximum_width_percent
         or upper.r2 < minimum_r2
         or lower.r2 < minimum_r2
     ):
         return None
 
-    minimum_slope = float(cfg.get("triangle_minimum_slope_atr", 0.005))
-    flat_slope = float(cfg.get("triangle_flat_slope_atr", 0.018))
+    minimum_slope = float(
+        cfg.get("triangle_minimum_slope_atr", 0.005)
+    )
+    flat_slope = float(
+        cfg.get("triangle_flat_slope_atr", 0.018)
+    )
     pattern = "NONE"
-    if upper.slope_atr < -minimum_slope and lower.slope_atr > minimum_slope:
+    if (
+        upper.slope_atr < -minimum_slope
+        and lower.slope_atr > minimum_slope
+    ):
         pattern = "SYMMETRICAL"
-    elif abs(upper.slope_atr) <= flat_slope and lower.slope_atr > minimum_slope:
+    elif (
+        abs(upper.slope_atr) <= flat_slope
+        and lower.slope_atr > minimum_slope
+    ):
         pattern = "ASCENDING"
-    elif upper.slope_atr < -minimum_slope and abs(lower.slope_atr) <= flat_slope:
+    elif (
+        upper.slope_atr < -minimum_slope
+        and abs(lower.slope_atr) <= flat_slope
+    ):
         pattern = "DESCENDING"
     if pattern == "NONE":
         return None
 
     slope_gap = lower.slope - upper.slope
-    apex_bars = width_now / slope_gap if slope_gap > 0 else np.nan
-    touches_quality = min(1.0, (len(highs) + len(lows)) / 8.0)
+    apex_bars = (
+        width_now / slope_gap
+        if slope_gap > 0
+        else np.nan
+    )
+    touches_quality = min(
+        1.0,
+        (len(highs) + len(lows)) / 8.0,
+    )
     fit_quality = (upper.r2 + lower.r2) / 2.0
-    contraction_quality = float(np.clip(contraction / 0.55, 0.0, 1.0))
+    contraction_quality = float(
+        np.clip(contraction / 0.55, 0.0, 1.0)
+    )
     quality = float(
         np.clip(
             0.35 * fit_quality
@@ -447,7 +550,11 @@ def detect_triangle(
         lower=float(lower.value),
         quality=quality,
         contraction=float(contraction),
-        apex_bars=float(apex_bars) if np.isfinite(apex_bars) else np.nan,
+        apex_bars=(
+            float(apex_bars)
+            if np.isfinite(apex_bars)
+            else np.nan
+        ),
     )
 
 
@@ -455,53 +562,93 @@ def detect_breakout_events(
     frame: pd.DataFrame,
     cfg: dict[str, Any],
 ) -> dict[str, np.ndarray]:
-    n = len(frame)
+    count = len(frame)
     close = frame["close"].to_numpy(dtype=float)
     atr = frame["atr"].to_numpy(dtype=float)
     body_atr = frame["body_atr"].to_numpy(dtype=float)
-    close_location = frame["close_location"].to_numpy(dtype=float)
+    close_location = frame[
+        "close_location"
+    ].to_numpy(dtype=float)
     volume_z = frame["volume_z_24"].to_numpy(dtype=float)
-    resistance = frame["structure_resistance"].to_numpy(dtype=float)
+    resistance = frame[
+        "structure_resistance"
+    ].to_numpy(dtype=float)
     support = frame["structure_support"].to_numpy(dtype=float)
-    resistance_strength = frame["resistance_strength"].to_numpy(dtype=float)
-    support_strength = frame["support_strength"].to_numpy(dtype=float)
-    triangle_upper = frame["triangle_upper"].to_numpy(dtype=float)
-    triangle_lower = frame["triangle_lower"].to_numpy(dtype=float)
-    triangle_quality = frame["triangle_quality"].to_numpy(dtype=float)
-    triangle_type = frame["triangle_type"].astype(str).to_numpy()
+    resistance_strength = frame[
+        "resistance_strength"
+    ].to_numpy(dtype=float)
+    support_strength = frame[
+        "support_strength"
+    ].to_numpy(dtype=float)
+    triangle_upper = frame[
+        "triangle_upper"
+    ].to_numpy(dtype=float)
+    triangle_lower = frame[
+        "triangle_lower"
+    ].to_numpy(dtype=float)
+    triangle_quality = frame[
+        "triangle_quality"
+    ].to_numpy(dtype=float)
+    triangle_type = frame[
+        "triangle_type"
+    ].astype(str).to_numpy()
 
-    event_type = np.full(n, "NONE", dtype=object)
-    event_direction = np.zeros(n, dtype=int)
-    event_score = np.zeros(n, dtype=float)
-    event_id = np.full(n, None, dtype=object)
-    breakout_level = np.full(n, np.nan)
-    invalidation_level = np.full(n, np.nan)
-    breakout_distance_atr = np.full(n, np.nan)
-    breakout_source = np.full(n, "NONE", dtype=object)
-    breakout_confirmed = np.zeros(n, dtype=int)
+    event_type = np.full(count, "NONE", dtype=object)
+    event_direction = np.zeros(count, dtype=int)
+    event_score = np.zeros(count, dtype=float)
+    event_id = np.full(count, None, dtype=object)
+    breakout_level = np.full(count, np.nan)
+    invalidation_level = np.full(count, np.nan)
+    breakout_distance_atr = np.full(count, np.nan)
+    breakout_source = np.full(count, "NONE", dtype=object)
+    breakout_confirmed = np.zeros(count, dtype=int)
 
-    buffer_atr = float(cfg.get("breakout_buffer_atr", 0.10))
-    maximum_extension = float(cfg.get("breakout_maximum_extension_atr", 1.50))
-    minimum_body = float(cfg.get("breakout_minimum_body_atr", 0.20))
-    minimum_volume = float(cfg.get("breakout_minimum_volume_z", -0.25))
-    long_close_location = float(cfg.get("long_minimum_close_location", 0.65))
-    short_close_location = float(cfg.get("short_maximum_close_location", 0.35))
-    triangle_min_quality = float(cfg.get("triangle_minimum_quality", 0.45))
+    buffer_atr = float(
+        cfg.get("breakout_buffer_atr", 0.10)
+    )
+    crossing_tolerance_atr = float(
+        cfg.get("breakout_crossing_tolerance_atr", 0.05)
+    )
+    maximum_extension = float(
+        cfg.get("breakout_maximum_extension_atr", 1.50)
+    )
+    minimum_body = float(
+        cfg.get("breakout_minimum_body_atr", 0.20)
+    )
+    minimum_volume = float(
+        cfg.get("breakout_minimum_volume_z", -0.25)
+    )
+    long_close_location = float(
+        cfg.get("long_minimum_close_location", 0.65)
+    )
+    short_close_location = float(
+        cfg.get("short_maximum_close_location", 0.35)
+    )
+    triangle_minimum_quality = float(
+        cfg.get("triangle_minimum_quality", 0.45)
+    )
     cooldown = int(cfg.get("event_cooldown_hours", 4))
     last_event_by_direction: dict[int, int] = {}
     sequence = 0
 
-    for index in range(n):
+    for index in range(1, count):
         if not np.isfinite(atr[index]) or atr[index] <= 0:
             continue
+        previous_close = close[index - 1]
+        if not np.isfinite(previous_close):
+            continue
         triangle_long = (
-            triangle_type[index] in {"SYMMETRICAL", "ASCENDING"}
-            and triangle_quality[index] >= triangle_min_quality
+            triangle_type[index]
+            in {"SYMMETRICAL", "ASCENDING"}
+            and triangle_quality[index]
+            >= triangle_minimum_quality
             and np.isfinite(triangle_upper[index])
         )
         triangle_short = (
-            triangle_type[index] in {"SYMMETRICAL", "DESCENDING"}
-            and triangle_quality[index] >= triangle_min_quality
+            triangle_type[index]
+            in {"SYMMETRICAL", "DESCENDING"}
+            and triangle_quality[index]
+            >= triangle_minimum_quality
             and np.isfinite(triangle_lower[index])
         )
         long_levels = [resistance[index]]
@@ -510,8 +657,14 @@ def detect_breakout_events(
             long_levels.append(triangle_upper[index])
         if triangle_short:
             short_levels.append(triangle_lower[index])
-        long_level = _nearest_level_below_or_equal(close[index], long_levels)
-        short_level = _nearest_level_above_or_equal(close[index], short_levels)
+        long_level = _nearest_level_below_or_equal(
+            close[index],
+            long_levels,
+        )
+        short_level = _nearest_level_above_or_equal(
+            close[index],
+            short_levels,
+        )
         long_distance = (
             (close[index] - long_level) / atr[index]
             if np.isfinite(long_level)
@@ -522,41 +675,86 @@ def detect_breakout_events(
             if np.isfinite(short_level)
             else np.nan
         )
+        long_crossed = (
+            np.isfinite(long_level)
+            and previous_close
+            <= long_level
+            + crossing_tolerance_atr * atr[index]
+        )
+        short_crossed = (
+            np.isfinite(short_level)
+            and previous_close
+            >= short_level
+            - crossing_tolerance_atr * atr[index]
+        )
         long_break = (
-            np.isfinite(long_distance)
-            and buffer_atr <= long_distance <= maximum_extension
+            long_crossed
+            and np.isfinite(long_distance)
+            and buffer_atr
+            <= long_distance
+            <= maximum_extension
             and body_atr[index] >= minimum_body
             and close_location[index] >= long_close_location
             and volume_z[index] >= minimum_volume
         )
         short_break = (
-            np.isfinite(short_distance)
-            and buffer_atr <= short_distance <= maximum_extension
+            short_crossed
+            and np.isfinite(short_distance)
+            and buffer_atr
+            <= short_distance
+            <= maximum_extension
             and body_atr[index] <= -minimum_body
             and close_location[index] <= short_close_location
             and volume_z[index] >= minimum_volume
         )
-        direction = 1 if long_break else -1 if short_break else 0
+        direction = (
+            1
+            if long_break
+            else -1
+            if short_break
+            else 0
+        )
         if direction == 0:
             continue
         previous_event = last_event_by_direction.get(direction)
-        if previous_event is not None and index - previous_event <= cooldown:
+        if (
+            previous_event is not None
+            and index - previous_event <= cooldown
+        ):
             continue
         sequence += 1
         triangle_break = (
             direction > 0
             and triangle_long
-            and np.isclose(long_level, triangle_upper[index], rtol=0, atol=atr[index] * 0.15)
+            and np.isclose(
+                long_level,
+                triangle_upper[index],
+                rtol=0,
+                atol=atr[index] * 0.15,
+            )
         ) or (
             direction < 0
             and triangle_short
-            and np.isclose(short_level, triangle_lower[index], rtol=0, atol=atr[index] * 0.15)
+            and np.isclose(
+                short_level,
+                triangle_lower[index],
+                rtol=0,
+                atol=atr[index] * 0.15,
+            )
         )
         if direction > 0:
             level = long_level
             strength = resistance_strength[index]
-            source = "TRIANGLE" if triangle_break else "DYNAMIC_RESISTANCE"
-            kind = "TRIANGLE_BREAKOUT_LONG" if triangle_break else "RESISTANCE_BREAKOUT_LONG"
+            source = (
+                "TRIANGLE"
+                if triangle_break
+                else "DYNAMIC_RESISTANCE"
+            )
+            event_name = (
+                "TRIANGLE_BREAKOUT_LONG"
+                if triangle_break
+                else "RESISTANCE_BREAKOUT_LONG"
+            )
             distance = long_distance
             invalidation = level - atr[index] * float(
                 cfg.get("breakout_invalidation_atr", 0.35)
@@ -565,8 +763,16 @@ def detect_breakout_events(
         else:
             level = short_level
             strength = support_strength[index]
-            source = "TRIANGLE" if triangle_break else "DYNAMIC_SUPPORT"
-            kind = "TRIANGLE_BREAKDOWN_SHORT" if triangle_break else "SUPPORT_BREAKDOWN_SHORT"
+            source = (
+                "TRIANGLE"
+                if triangle_break
+                else "DYNAMIC_SUPPORT"
+            )
+            event_name = (
+                "TRIANGLE_BREAKDOWN_SHORT"
+                if triangle_break
+                else "SUPPORT_BREAKDOWN_SHORT"
+            )
             distance = short_distance
             invalidation = level + atr[index] * float(
                 cfg.get("breakout_invalidation_atr", 0.35)
@@ -574,20 +780,42 @@ def detect_breakout_events(
             close_quality = 1.0 - close_location[index]
         quality = float(
             np.clip(
-                0.25 * np.clip(strength / 8.0, 0.0, 1.0)
-                + 0.20 * np.clip(abs(body_atr[index]) / 1.5, 0.0, 1.0)
-                + 0.15 * np.clip((volume_z[index] + 0.5) / 3.0, 0.0, 1.0)
-                + 0.15 * np.clip(close_quality, 0.0, 1.0)
-                + 0.15 * np.clip(1.0 - distance / maximum_extension, 0.0, 1.0)
-                + 0.10 * (triangle_quality[index] if triangle_break else 0.0),
+                0.25
+                * np.clip(strength / 8.0, 0.0, 1.0)
+                + 0.20
+                * np.clip(
+                    abs(body_atr[index]) / 1.5,
+                    0.0,
+                    1.0,
+                )
+                + 0.15
+                * np.clip(
+                    (volume_z[index] + 0.5) / 3.0,
+                    0.0,
+                    1.0,
+                )
+                + 0.15
+                * np.clip(close_quality, 0.0, 1.0)
+                + 0.15
+                * np.clip(
+                    1.0 - distance / maximum_extension,
+                    0.0,
+                    1.0,
+                )
+                + 0.10
+                * (
+                    triangle_quality[index]
+                    if triangle_break
+                    else 0.0
+                ),
                 0.0,
                 1.0,
             )
         )
-        timestamp = pd.Timestamp(frame.iloc[index]["open_time"]).strftime(
-            "%Y%m%dT%H%MZ"
-        )
-        event_type[index] = kind
+        timestamp = pd.Timestamp(
+            frame.iloc[index]["open_time"]
+        ).strftime("%Y%m%dT%H%MZ")
+        event_type[index] = event_name
         event_direction[index] = direction
         event_score[index] = quality
         event_id[index] = (
@@ -620,12 +848,18 @@ def count_level_touches(
     level: float,
     tolerance: float,
 ) -> int:
-    if not np.isfinite(level) or not np.isfinite(tolerance) or tolerance <= 0:
+    if (
+        not np.isfinite(level)
+        or not np.isfinite(tolerance)
+        or tolerance <= 0
+    ):
         return 0
     valid = values[np.isfinite(values)]
     if valid.size == 0:
         return 0
-    return int(np.sum(np.abs(valid - level) <= tolerance))
+    return int(
+        np.sum(np.abs(valid - level) <= tolerance)
+    )
 
 
 def choose_composite_level(
@@ -633,25 +867,54 @@ def choose_composite_level(
     candidates: list[tuple[float, float, float]],
     direction: int,
 ) -> CompositeLevel:
-    valid = [item for item in candidates if np.isfinite(item[0])]
+    valid = [
+        item
+        for item in candidates
+        if np.isfinite(item[0])
+    ]
     if not valid:
         return CompositeLevel(np.nan, 0.0)
     if direction > 0:
-        eligible = [item for item in valid if item[0] >= reference_price]
+        eligible = [
+            item
+            for item in valid
+            if item[0] >= reference_price
+        ]
         pool = eligible or valid
-        selected = min(pool, key=lambda item: abs(item[0] - reference_price))
+        selected = min(
+            pool,
+            key=lambda item: abs(
+                item[0] - reference_price
+            ),
+        )
     else:
-        eligible = [item for item in valid if item[0] <= reference_price]
+        eligible = [
+            item
+            for item in valid
+            if item[0] <= reference_price
+        ]
         pool = eligible or valid
-        selected = min(pool, key=lambda item: abs(item[0] - reference_price))
+        selected = min(
+            pool,
+            key=lambda item: abs(
+                item[0] - reference_price
+            ),
+        )
     nearby = [
         item
         for item in valid
         if abs(item[0] - selected[0])
         <= max(abs(reference_price) * 0.0025, 1e-9)
     ]
-    strength = sum(item[1] * (1.0 + min(item[2], 6.0) / 6.0) for item in nearby)
-    return CompositeLevel(float(selected[0]), float(strength))
+    strength = sum(
+        item[1]
+        * (1.0 + min(item[2], 6.0) / 6.0)
+        for item in nearby
+    )
+    return CompositeLevel(
+        float(selected[0]),
+        float(strength),
+    )
 
 
 def level_age(
@@ -665,42 +928,109 @@ def level_age(
         return np.nan
     start = max(0, current_index - lookback)
     for index in range(current_index - 1, start - 1, -1):
-        if np.isfinite(values[index]) and abs(values[index] - level) <= tolerance:
+        if (
+            np.isfinite(values[index])
+            and abs(values[index] - level) <= tolerance
+        ):
             return float(current_index - index)
     return np.nan
 
 
-def _window_max(values: np.ndarray, start: int, stop: int) -> float:
+def _window_max(
+    values: np.ndarray,
+    start: int,
+    stop: int,
+) -> float:
     window = values[start:stop]
-    return float(np.nanmax(window)) if np.isfinite(window).any() else np.nan
+    return (
+        float(np.nanmax(window))
+        if np.isfinite(window).any()
+        else np.nan
+    )
 
 
-def _window_min(values: np.ndarray, start: int, stop: int) -> float:
+def _window_min(
+    values: np.ndarray,
+    start: int,
+    stop: int,
+) -> float:
     window = values[start:stop]
-    return float(np.nanmin(window)) if np.isfinite(window).any() else np.nan
+    return (
+        float(np.nanmin(window))
+        if np.isfinite(window).any()
+        else np.nan
+    )
 
 
-def _nearest_level_above(reference: float, values: Iterable[float]) -> float:
-    valid = [float(value) for value in values if np.isfinite(value)]
+def _nearest_level_above(
+    reference: float,
+    values: Iterable[float],
+) -> float:
+    valid = [
+        float(value)
+        for value in values
+        if np.isfinite(value)
+    ]
     if not valid:
         return np.nan
-    above = [value for value in valid if value >= reference]
-    return min(above, default=min(valid, key=lambda value: abs(value - reference)))
+    above = [
+        value
+        for value in valid
+        if value >= reference
+    ]
+    return min(
+        above,
+        default=min(
+            valid,
+            key=lambda value: abs(value - reference),
+        ),
+    )
 
 
-def _nearest_level_below(reference: float, values: Iterable[float]) -> float:
-    valid = [float(value) for value in values if np.isfinite(value)]
+def _nearest_level_below(
+    reference: float,
+    values: Iterable[float],
+) -> float:
+    valid = [
+        float(value)
+        for value in values
+        if np.isfinite(value)
+    ]
     if not valid:
         return np.nan
-    below = [value for value in valid if value <= reference]
-    return max(below, default=min(valid, key=lambda value: abs(value - reference)))
+    below = [
+        value
+        for value in valid
+        if value <= reference
+    ]
+    return max(
+        below,
+        default=min(
+            valid,
+            key=lambda value: abs(value - reference),
+        ),
+    )
 
 
-def _nearest_level_below_or_equal(reference: float, values: Iterable[float]) -> float:
-    valid = [float(value) for value in values if np.isfinite(value) and value <= reference]
+def _nearest_level_below_or_equal(
+    reference: float,
+    values: Iterable[float],
+) -> float:
+    valid = [
+        float(value)
+        for value in values
+        if np.isfinite(value) and value <= reference
+    ]
     return max(valid) if valid else np.nan
 
 
-def _nearest_level_above_or_equal(reference: float, values: Iterable[float]) -> float:
-    valid = [float(value) for value in values if np.isfinite(value) and value >= reference]
+def _nearest_level_above_or_equal(
+    reference: float,
+    values: Iterable[float],
+) -> float:
+    valid = [
+        float(value)
+        for value in values
+        if np.isfinite(value) and value >= reference
+    ]
     return min(valid) if valid else np.nan
