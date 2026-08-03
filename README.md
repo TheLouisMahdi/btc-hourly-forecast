@@ -19,127 +19,168 @@
 <br />
 <br />
 
-<img src="https://img.shields.io/badge/version-3.0.0-14b8a6?style=flat-square" alt="Version 3.0.0" />
+<img src="https://img.shields.io/badge/version-3.1.0-14b8a6?style=flat-square" alt="Version 3.1.0" />
 <img src="https://img.shields.io/badge/Python-3.11%2B-3776ab?style=flat-square&logo=python&logoColor=white" alt="Python 3.11 or newer" />
-<img src="https://img.shields.io/badge/timeframe-1_hour-22d3ee?style=flat-square" alt="One-hour timeframe" />
+<img src="https://img.shields.io/badge/forecast-next_closed_1h_candle-22d3ee?style=flat-square" alt="Next closed one-hour candle" />
 <img src="https://img.shields.io/badge/mode-paper_trading_only-f59e0b?style=flat-square" alt="Paper trading only" />
 
 </div>
 
 ## Overview
 
-**BTC Hourly Forecast** is a research-oriented Bitcoin market analysis system for closed one-hour candles. It combines a weekly batch champion with a persistent adaptive correction layer that learns from newly matured labels.
+**BTC Next-Candle Forecast** is a research system that creates one forecast after each fully closed hourly Bitcoin candle.
 
-The system produces directional forecasts for 1-hour, 2-hour and 3-hour horizons, evaluates market events, estimates tradeability after execution costs and publishes a mobile-friendly static dashboard through GitHub Pages.
+The public forecast is not an exact future price. It is an **80% probable close range** for the next one-hour candle, together with a median estimate, directional bias and scenario label.
 
-A forecast does not automatically become a trade. Qualification, event, expected-edge, data-health and risk gates can return `WAIT` even when the directional prediction is confident.
+The forecast is evaluated only after the target candle has fully closed. A result becomes immutable after resolution and cannot change when later candles arrive.
 
-## Core capabilities
+## Forecast contract
 
-| Area | Implementation |
+For a source candle with open time `T`:
+
+| Field | Time |
 |---|---|
-| Market data | BTC perpetual hourly candles with provider fallback |
-| News data | Recent and historical crypto news features |
-| Batch model | Weekly walk-forward training on a rolling 180-day window |
-| Adaptive model | Incremental delayed-label learning with persisted state |
-| Horizons | Independent 1h, 2h and 3h outputs |
-| Event layer | Donchian breakout, squeeze release, pullback resume and volume impulse |
-| Safety | Qualification, cost, event, volatility, cooldown and data-health gates |
-| Delivery | Hourly GitHub Actions pipeline and static GitHub Pages dashboard |
+| Source candle opens | `T` |
+| Source candle closes and forecast is created | `T + 1h` |
+| Target candle opens | `T + 1h` |
+| Target candle closes | `T + 2h` |
+| Outcome becomes eligible | after `T + 2h` plus a short settlement delay |
 
-## Adaptive architecture
+The forecast record includes:
+
+```json
+{
+  "target": "NEXT_CLOSED_1H_CANDLE",
+  "interval_probability": 0.80,
+  "reference_close": 63250.0,
+  "median_close": 63340.0,
+  "likely_close_low": 62920.0,
+  "likely_close_high": 63780.0,
+  "scenario": "BULLISH_BIAS",
+  "target_close_time": "2026-08-03T18:00:00+00:00"
+}
+```
+
+`median_close` is an estimate, not a guaranteed price.
+
+## Outcome rules
+
+The primary result measures the probabilistic interval:
+
+| Result | Meaning |
+|---|---|
+| `PENDING` | The target candle has not fully closed yet. |
+| `IN_RANGE` | The final target close is inside the predicted range. |
+| `OUT_OF_RANGE` | The final target close is outside the predicted range. |
+| `LEGACY_NOT_SCORED` | The record predates the interval forecast contract. |
+
+Direction is scored separately as `DIRECTION_CORRECT`, `DIRECTION_WRONG` or `DIRECTION_NOT_SCORED`.
+
+A resolved result is immutable. Historical records are never reclassified from later price movement.
+
+## How the range is produced
+
+The interval combines:
+
+- the batch model's next-hour return estimate;
+- the model's historical out-of-sample return error;
+- recent hourly market ranges;
+- adaptive residuals from previously resolved live forecasts.
+
+Before enough live residuals exist, the system uses a conservative model-error and market-range fallback. After at least 20 resolved interval forecasts, it uses empirical prequential residual quantiles and continues recalibrating from newly closed candles.
+
+## Architecture
 
 ```mermaid
 flowchart LR
-    A[Closed hourly candles and news] --> B[Leakage-safe feature pipeline]
+    A[Closed hourly candle] --> B[Leakage-safe market and news features]
     B --> C[Weekly batch champion]
-    C --> D[Base probabilities and returns]
-    D --> E[Online adaptive learner]
-    E --> F{Promotion checks pass?}
-    F -- No --> G[Shadow mode]
-    F -- Yes --> H[Bounded adaptive blend]
-    G --> I[Fail-safe strategy gates]
-    H --> I
-    I --> J[Forecast and static dashboard]
-    J --> K[Delayed 1h, 2h and 3h labels]
-    K --> E
+    C --> D[Next-hour return and direction estimates]
+    D --> E[Adaptive correction layer]
+    E --> F[Probabilistic next-close range]
+    F --> G[Pending until target candle closes]
+    G --> H[Immutable interval and direction outcome]
+    H --> I[Residual calibration for future ranges]
+    I --> E
+    F --> J[Independent trade and risk gates]
 ```
 
-### Batch champion
+## Market scenarios
 
-- Uses a rolling 180-day market and news window.
-- Trains separate models for 1-hour, 2-hour and 3-hour horizons.
-- Uses chronological walk-forward evaluation with a validation gap.
-- Predicts direction, event continuation, tradeability and event-aligned return.
-- Retrains weekly and remains the fallback decision source.
+The forecast scenario is derived from the one-hour directional probability:
 
-### Adaptive learner
-
-- Uses incremental classifiers and regressors.
-- Predicts before observing each matured label.
-- Updates only after the relevant horizon has closed.
-- Tracks batch-versus-online Brier score, accuracy and return error.
-- Starts in `SHADOW` mode and activates per horizon only after configured promotion checks.
-- Uses a bounded blend instead of replacing the batch model.
-- Suspends automatically when recent performance degrades.
-- Persists between workflow runs in the `adaptive-state` branch.
-
-## Market events
-
-| Event | Description |
+| Scenario | Interpretation |
 |---|---|
-| `DONCHIAN_BREAKOUT` | Price breaks a recent channel with volume confirmation. |
-| `SQUEEZE_RELEASE` | Volatility compression releases outside the Bollinger envelope. |
-| `PULLBACK_RESUME` | A trend resumes after a controlled pullback toward KAMA. |
-| `VOLUME_IMPULSE` | A directional candle expands with abnormal volume. |
+| `BULLISH_BIAS` | The next close has a meaningful upward bias. |
+| `BEARISH_BIAS` | The next close has a meaningful downward bias. |
+| `RANGE_BIAS` | Directional evidence is weak and a range outcome is more appropriate. |
 
-The event model estimates whether the move continues, whether it remains tradeable after costs and whether the expected edge survives stress assumptions.
+The event layer separately monitors:
 
-## Decision gates
+- `DONCHIAN_BREAKOUT`
+- `SQUEEZE_RELEASE`
+- `PULLBACK_RESUME`
+- `VOLUME_IMPULSE`
 
-Common `WAIT` reasons are intentional safety controls:
+## Forecast versus trade decision
 
-| Gate | Meaning |
+The public forecast and the trade decision are separate contracts.
+
+The next-candle forecast can be valid while the trade action remains `WAIT`. Trade gates still require:
+
+- a qualified model;
+- a qualified selected horizon;
+- a new market event;
+- sufficient continuation probability;
+- sufficient tradeability probability;
+- positive stress-adjusted net edge;
+- healthy market data;
+- acceptable volatility, news and cooldown conditions.
+
+This prevents a probable price range from being misrepresented as an actionable trade.
+
+## Adaptive learning
+
+The adaptive layer:
+
+- restores its state on every hourly run;
+- predicts before observing a matured label;
+- learns only after the target candle closes;
+- compares online and batch performance prequentially;
+- calibrates future intervals from resolved forecast residuals;
+- remains in shadow mode until its promotion criteria pass;
+- falls back to the batch champion when performance degrades.
+
+Runtime state is stored outside `main`:
+
+| Branch | Purpose |
 |---|---|
-| `MODEL_NOT_QUALIFIED` | No model horizon has passed the required validation criteria. |
-| `SELECTED_HORIZON_NOT_QUALIFIED` | The currently selected horizon is not approved for trading decisions. |
-| `NO_NEW_MARKET_EVENT` | No fresh independent market event exists on the latest closed candle. |
-| `INSUFFICIENT_STRESS_NET_EDGE` | Expected return does not exceed stress-adjusted costs and the required profit buffer. |
+| `forecast-state` | Latest forecast and compact immutable outcome history. |
+| `model-state` | Latest weekly batch model and reports. |
+| `adaptive-state` | Persistent incremental learner and adaptive metrics. |
 
-These gates are not errors. They prevent weak forecasts from becoming paper-trade actions.
-
-## Delayed-label contract
-
-Forecast outcomes use the same timing convention as training:
-
-1. The source is a closed hourly candle.
-2. Entry is the open of the next hourly candle.
-3. Evaluation occurs at the close of the selected horizon.
-4. Results are recorded as `CORRECT`, `WRONG`, `PENDING` or `NOT_SCORED`.
-
-## Automation
+## Automated workflows
 
 ### Hourly forecast
 
-The hourly workflow:
+Every hour the pipeline:
 
-1. restores forecast, batch-model and adaptive state;
-2. runs repository quality tests;
-3. refreshes market and recent news data;
-4. resolves newly matured labels;
-5. updates the adaptive learner;
-6. produces the next forecast;
-7. renders the static dashboard;
-8. persists state snapshots;
-9. deploys GitHub Pages.
+1. restores forecast, batch and adaptive state;
+2. runs repository tests;
+3. fetches fresh market and news data;
+4. selects the latest fully closed hourly candle;
+5. creates one next-candle probabilistic forecast;
+6. keeps unresolved forecasts pending;
+7. resolves only targets whose candles have fully closed;
+8. freezes resolved outcomes;
+9. recalibrates future ranges from resolved residuals;
+10. deploys the static GitHub Pages dashboard.
 
 ### Weekly retraining
 
-The weekly workflow refreshes the 180-day market and news window, retrains the batch champion, publishes the model snapshot and triggers a fresh hourly evaluation.
+The batch model retrains weekly and whenever the forecast contract, model configuration or training code changes.
 
-## Quick start
-
-Create and activate a Python 3.11 environment, then install the project:
+## Local setup
 
 ```bash
 python -m venv .venv
@@ -147,25 +188,28 @@ python -m pip install --upgrade pip
 python -m pip install -e .
 ```
 
-Fetch data, collect news and train the first batch model:
+Fetch data and train:
 
 ```bash
-btc-regime bootstrap --days 180 --provider auto
+btc-regime fetch --days 180
+btc-regime news --historical --days 180
+btc-regime news
+btc-regime train
 ```
 
-Run one diagnostic cycle:
+Run one cycle:
 
 ```bash
 btc-regime cycle --force
 ```
 
-Start the local dashboard and runtime engine:
+Launch the local dashboard:
 
 ```bash
 btc-regime dashboard
 ```
 
-Run the complete test suite:
+Run tests:
 
 ```bash
 python -m unittest discover -s tests -v
@@ -174,46 +218,33 @@ python -m unittest discover -s tests -v
 ## Repository layout
 
 ```text
-.github/workflows/       Forecasting, retraining and quality automation
-config/                  Market, model, adaptive and risk configuration
-docs/assets/             Repository-owned visual assets
-scripts/                 GitHub automation and static dashboard rendering
-src/btc_ema_trader/      Core Python package
-tests/                   Adaptive, outcome and repository-quality tests
+.github/workflows/           Forecast, retraining and quality workflows
+config/default.yaml          Market, forecast, model and risk configuration
+docs/assets/                 Repository-owned visual assets
+scripts/github_dashboard.py  Immutable close-time outcome resolution
+scripts/github_hourly_forecast.py
+src/btc_ema_trader/
+  adaptive.py                Persistent incremental learner
+  forecast_contract.py       Next-candle probabilistic interval contract
+  features.py                Leakage-safe features and labels
+  model.py                   Weekly batch champion
+  runtime.py                 Hourly market and decision runtime
+  strategy.py                Trade and risk gates
+tests/                       Contract, adaptive and repository tests
 ```
 
-## State branches
+## Reliability rules
 
-Runtime artifacts are isolated from source code:
+- Only database rows marked `closed = 1` are used as completed candles.
+- Evaluation also requires the target close time to have passed.
+- A 90-second settlement delay protects against provider timing differences.
+- Legacy direction-only forecasts are excluded from interval accuracy.
+- Resolved outcomes are immutable.
+- The median estimate is never presented as an exact future price.
+- The system remains paper-trading only.
 
-| Branch | Purpose |
-|---|---|
-| `forecast-state` | Latest forecast and compact forecast history |
-| `model-state` | Latest weekly batch model and training reports |
-| `adaptive-state` | Incremental learner artifact and adaptive metrics |
+## Limitations
 
-The state branches are managed by GitHub Actions as force-updated snapshots.
+Bitcoin is non-stationary and highly noisy. An 80% interval is a calibrated probability target, not a promise that exactly 80% of every small sample will fall inside the range. Coverage must be assessed over a meaningful number of resolved forecasts.
 
-## Reliability and scope
-
-- The project is paper-trading only.
-- Bitcoin markets are noisy and non-stationary.
-- Online improvement is not guaranteed.
-- Higher directional accuracy does not guarantee positive trading expectancy.
-- The adaptive layer may remain in shadow mode if it does not demonstrate a reliable advantage.
-- Serialized model files must be treated as trusted artifacts and must not be loaded from unknown sources.
-- Historical and live outputs are research diagnostics, not financial advice.
-
-## Project standards
-
-- All code, comments, documentation and user-facing repository text must be written in English.
-- Changes must preserve chronological evaluation and delayed-label integrity.
-- Repository tests must pass before deployment.
-- Contribution guidance is available in [CONTRIBUTING.md](CONTRIBUTING.md).
-- Security reporting guidance is available in [SECURITY.md](SECURITY.md).
-
-<div align="center">
-
-Built for transparent, reproducible and conservative market-model research.
-
-</div>
+This repository is for transparent market-model research and is not financial advice.
