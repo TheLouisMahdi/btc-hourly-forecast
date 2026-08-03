@@ -6,6 +6,7 @@ on:
     paths:
       - ".github/workflows/pages_dashboard.yml"
       - "scripts/github_dashboard.py"
+      - "scripts/github_pages_dashboard.py"
       - "scripts/github_common.py"
       - "pyproject.toml"
       - "requirements-github.txt"
@@ -62,8 +63,8 @@ jobs:
             printf '{}\n' > .github_state/latest.json
           fi
 
-      - name: Render current dashboard
-        run: python scripts/github_dashboard.py --runtime-dir .dashboard_runtime
+      - name: Render structural dashboard
+        run: python scripts/github_pages_dashboard.py --runtime-dir .dashboard_runtime
 
       - name: Configure GitHub Pages
         uses: actions/configure-pages@v6
