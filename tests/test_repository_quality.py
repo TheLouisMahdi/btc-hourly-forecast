@@ -55,9 +55,12 @@ REQUIRED_FILES = {
     "pyproject.toml",
     "src/btc_ema_trader/contract_training.py",
     "src/btc_ema_trader/forecast_contract.py",
+    "src/btc_ema_trader/market_structure.py",
     "src/btc_ema_trader/price_adaptive.py",
+    "src/btc_ema_trader/structure_training.py",
     "tests/test_dashboard_outcomes.py",
     "tests/test_forecast_contract.py",
+    "tests/test_market_structure.py",
     "tests/test_price_adaptive.py",
 }
 
@@ -154,7 +157,7 @@ class RepositoryQualityTests(unittest.TestCase):
         self.assertIn("TheLouisMahdi", dashboard)
         self.assertIn("https://github.com/TheLouisMahdi", dashboard)
 
-    def test_model_is_configured_for_the_next_candle_only(self) -> None:
+    def test_model_is_configured_for_structural_breakouts(self) -> None:
         root = Path(__file__).resolve().parents[1]
         config = yaml.safe_load(
             (root / "config" / "default.yaml").read_text(
@@ -163,7 +166,11 @@ class RepositoryQualityTests(unittest.TestCase):
         )
         self.assertEqual(
             config["model"]["horizons_hours"],
-            [1],
+            [1, 3, 6],
+        )
+        self.assertEqual(
+            config["market"]["history_days"],
+            365,
         )
         self.assertEqual(
             config["forecast"]["target"],
@@ -172,6 +179,12 @@ class RepositoryQualityTests(unittest.TestCase):
         self.assertIn(
             "price_adaptive_state",
             config["paths"],
+        )
+        structure = config["structure"]
+        self.assertIn(480, structure["lookback_hours"])
+        self.assertGreaterEqual(
+            structure["triangle_lookback_hours"],
+            120,
         )
 
 
