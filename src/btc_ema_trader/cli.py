@@ -22,7 +22,7 @@ def parser() -> argparse.ArgumentParser:
     root = argparse.ArgumentParser(
         prog="btc-regime",
         description=(
-            "BTC next-candle close-range forecaster and fail-safe "
+            "BTC structural breakout forecaster and fail-safe "
             "paper-trade decision system"
         ),
     )
@@ -32,7 +32,7 @@ def parser() -> argparse.ArgumentParser:
     sub.add_parser("init")
 
     fetch = sub.add_parser("fetch")
-    fetch.add_argument("--days", type=float, default=180)
+    fetch.add_argument("--days", type=float, default=365)
     fetch.add_argument(
         "--provider",
         choices=[
@@ -60,7 +60,7 @@ def parser() -> argparse.ArgumentParser:
     )
 
     bootstrap = sub.add_parser("bootstrap")
-    bootstrap.add_argument("--days", type=float, default=180)
+    bootstrap.add_argument("--days", type=float, default=365)
     bootstrap.add_argument(
         "--provider",
         choices=[
@@ -111,7 +111,7 @@ def main(argv: list[str] | None = None) -> int:
         return 0
     except KeyboardInterrupt:
         return 130
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:
         LOGGER.exception("Command failed")
         print(
             f"ERROR: {type(exc).__name__}: {exc}",
@@ -221,7 +221,7 @@ def dispatch(args, settings, database):
                 "created_at": bundle.created_at,
                 "qualification": bundle.qualification,
             }
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             model = {"error": str(exc)}
         return {
             "providers": providers,
@@ -245,7 +245,7 @@ def dispatch(args, settings, database):
 def _optional(callback):
     try:
         return callback()
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:
         return {
             "status": "warning",
             "error": f"{type(exc).__name__}: {exc}",
