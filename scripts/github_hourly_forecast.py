@@ -137,7 +137,7 @@ def main() -> int:
         status = "FAIL_SAFE"
 
     finished_at = pd.Timestamp.now(tz="UTC")
-    record = json_safe(
+    fresh_record = json_safe(
         {
             **result,
             "run_status": status,
@@ -150,9 +150,13 @@ def main() -> int:
             "weekly_model_loaded": used_weekly_model,
         }
     )
+    fresh_adaptive_summary = fresh_record.get(
+        "adaptive",
+        {"status": "UNAVAILABLE"},
+    )
     record = preserve_existing_forecast(
         previous_history,
-        record,
+        fresh_record,
     )
 
     history = append_unique(
@@ -165,7 +169,7 @@ def main() -> int:
     write_json(site_dir / "history.json", history)
     write_json(
         adaptive_state_dir / "summary.json",
-        record.get("adaptive", {"status": "UNAVAILABLE"}),
+        fresh_adaptive_summary,
     )
     (site_dir / ".nojekyll").write_text("", encoding="utf-8")
 
