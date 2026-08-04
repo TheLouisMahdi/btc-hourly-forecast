@@ -175,7 +175,7 @@ def _label_path(
                 else (post_close[-1] - trigger) / trigger
             )
     net = gross - stress_cost if broke else 0.0
-    profitable = bool(broke and target_hit and net >= minimum_profit)
+    profitable = bool(broke and net >= minimum_profit)
     return {
         "break_label": int(broke),
         "profitable_label": int(profitable),
