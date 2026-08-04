@@ -17,6 +17,10 @@ from btc_ema_trader.forecast_contract import (
 from btc_ema_trader.logging_setup import configure_logging
 from btc_ema_trader.market import fetch_and_store
 from btc_ema_trader.model import latest_bundle
+from btc_ema_trader.negative_memory import (
+    install_runtime_guard,
+    load_boundary_memory,
+)
 from btc_ema_trader.price_adaptive import PriceAdaptiveEngine
 from btc_ema_trader.runtime import RuntimeEngine
 from btc_ema_trader.storage import Database
@@ -34,7 +38,10 @@ MAX_HISTORY = 24 * 30
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
-        description="Run one adaptive hourly forecast and persist its state"
+        description=(
+            "Run one adaptive hourly forecast with sandwiched negative-memory "
+            "protection and persist its state"
+        )
     )
     parser.add_argument("--state-dir", default=".github_state")
     parser.add_argument("--model-state-dir", default=".model_state")
@@ -75,6 +82,20 @@ def main() -> int:
     database = Database(settings)
     database.initialize()
 
+    memory = None
+    memory_error = None
+    memory_path = model_state_dir / "negative_memory.joblib"
+    if memory_path.exists():
+        try:
+            memory = load_boundary_memory(memory_path)
+        except Exception as exc:
+            memory_error = f"{type(exc).__name__}: {exc}"
+            LOGGER.exception("Negative-memory artifact could not be loaded")
+    require_memory = bool(
+        settings.section("negative_memory").get("require_for_trade", True)
+    )
+    install_runtime_guard(memory, require_for_trade=require_memory)
+
     started_at = pd.Timestamp.now(tz="UTC")
     price_summary: dict[str, Any] = {"status": "UNAVAILABLE"}
     try:
@@ -89,6 +110,13 @@ def main() -> int:
             settings,
             database,
         ).run_once(force=True)
+        boundary = (
+            result.get("trade_plan", {}).get("boundary_memory")
+            if isinstance(result.get("trade_plan"), dict)
+            else None
+        )
+        if isinstance(boundary, dict):
+            result["boundary_memory"] = boundary
         status = (
             "OK"
             if result.get("status") != "FAIL_SAFE"
@@ -148,6 +176,11 @@ def main() -> int:
             ).total_seconds(),
             "market_refresh": market,
             "weekly_model_loaded": used_weekly_model,
+            "negative_memory_loaded": memory is not None,
+            "negative_memory_model_id": (
+                None if memory is None else memory.model_id
+            ),
+            "negative_memory_error": memory_error,
         }
     )
     fresh_adaptive_summary = fresh_record.get(

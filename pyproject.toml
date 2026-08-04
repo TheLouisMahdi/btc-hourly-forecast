@@ -4,8 +4,8 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "btc-hourly-regime-trader"
-version = "5.1.0"
-description = "Cost-aware BTC directional breakout research with locked chronological economic holdout validation and champion-challenger promotion"
+version = "5.2.0"
+description = "Cost-aware BTC boundary-break research with sandwiched learned Bloom negative memory, hard-negative mining, and locked economic promotion"
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [

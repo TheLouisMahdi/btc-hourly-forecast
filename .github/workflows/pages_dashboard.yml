@@ -7,6 +7,7 @@ on:
       - ".github/workflows/pages_dashboard.yml"
       - "scripts/github_dashboard.py"
       - "scripts/github_pages_dashboard.py"
+      - "scripts/github_boundary_dashboard.py"
       - "scripts/github_common.py"
       - "pyproject.toml"
       - "requirements-github.txt"
@@ -63,8 +64,10 @@ jobs:
             printf '{}\n' > .github_state/latest.json
           fi
 
-      - name: Render structural dashboard
-        run: python scripts/github_pages_dashboard.py --runtime-dir .dashboard_runtime
+      - name: Render economic structural dashboard
+        run: |
+          python scripts/github_pages_dashboard.py --runtime-dir .dashboard_runtime
+          python scripts/github_boundary_dashboard.py
 
       - name: Configure GitHub Pages
         uses: actions/configure-pages@v6

@@ -58,7 +58,43 @@ def build_github_settings(
             "report_dir": str(report_dir),
         }
     )
+    values.setdefault("project", {}).update(
+        {
+            "name": "BTC Sandwiched Boundary Break Forecast",
+            "version": "5.2.0",
+        }
+    )
     values.setdefault("model", {})["auto_retrain_days"] = 10
+    values.setdefault("negative_memory", {}).update(
+        {
+            "enabled": True,
+            "require_for_trade": True,
+            "maximum_boundary_distance_atr": 0.85,
+            "minimum_boundary_distance_atr": -0.25,
+            "break_buffer_atr": 0.08,
+            "encounter_cooldown_hours": 3,
+            "support_max_approach_return_6": 0.0,
+            "resistance_min_approach_return_6": 0.0,
+            "minimum_samples_per_head": 500,
+            "hard_negative_weight": 3.0,
+            "front_memory_minimum_count": 2,
+            "front_memory_bad_rate": 0.80,
+            "bloom_false_positive_rate": 0.005,
+            "minimum_calibration_selected": 30,
+            "minimum_holdout_selected": 12,
+            "minimum_holdout_mean_net_return": 0.0,
+            "minimum_holdout_profitable_rate": 0.52,
+            "maximum_holdout_bad_acceptance": 0.48,
+            "fallback_minimum_break_probability": 0.62,
+            "fallback_maximum_bad_probability": 0.42,
+            "learning_rate": 0.035,
+            "max_iter": 220,
+            "max_leaf_nodes": 11,
+            "min_samples_leaf": 35,
+            "l2_regularization": 4.0,
+            "random_state": 20260804,
+        }
+    )
     values.setdefault("live", {}).update(
         {
             "auto_retrain": False,
@@ -89,6 +125,7 @@ def copy_latest_model_from_state(
         "latest_training_report.json",
         "latest_metrics.csv",
         "model_metadata.json",
+        "negative_memory_report.json",
     ):
         candidate = model_state_dir / filename
         if candidate.exists():

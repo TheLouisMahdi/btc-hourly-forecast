@@ -16,6 +16,7 @@ on:
       - "src/btc_ema_trader/market_structure.py"
       - "src/btc_ema_trader/market_structure_fast.py"
       - "src/btc_ema_trader/model.py"
+      - "src/btc_ema_trader/negative_memory*.py"
       - "src/btc_ema_trader/price_adaptive.py"
       - "src/btc_ema_trader/strategy.py"
       - "src/btc_ema_trader/structure_training.py"
@@ -66,12 +67,12 @@ jobs:
           mkdir -p incumbent-model-state
           if git ls-remote --exit-code --heads origin model-state >/dev/null 2>&1; then
             git fetch origin model-state --depth=1
-            for file in latest.joblib latest_training_report.json latest_metrics.csv economic_validation.json model_metadata.json; do
+            for file in latest.joblib latest_training_report.json latest_metrics.csv economic_validation.json model_metadata.json negative_memory.joblib negative_memory_report.json; do
               git show "origin/model-state:$file" > "incumbent-model-state/$file" 2>/dev/null || true
             done
           fi
 
-      - name: Train and economically validate challenger
+      - name: Train and jointly validate challenger
         id: retraining
         shell: bash
         run: |
@@ -101,6 +102,7 @@ jobs:
           cp model-state-output/promotion.json training-diagnostics-output/ 2>/dev/null || true
           cp model-state-output/economic_validation.json training-diagnostics-output/ 2>/dev/null || true
           cp model-state-output/model_metadata.json training-diagnostics-output/ 2>/dev/null || true
+          cp model-state-output/candidate_negative_memory_report.json training-diagnostics-output/ 2>/dev/null || true
           RETRAIN_EXIT="$retrain_exit" STATUS="$status" PROMOTION="$promotion" python - <<'PY'
           import json
           import os
@@ -136,7 +138,7 @@ jobs:
           cat training-diagnostics-output/training.log
           exit 1
 
-      - name: Publish promoted champion
+      - name: Publish promoted champion and negative memory
         if: >-
           steps.retraining.outputs.status == 'PASS' &&
           steps.retraining.outputs.promotion == 'PROMOTE'
@@ -149,5 +151,5 @@ jobs:
           steps.retraining.outputs.status == 'PASS' &&
           steps.retraining.outputs.promotion != 'PROMOTE'
         run: |
-          echo "Challenger trained successfully but did not pass the locked economic promotion gate."
+          echo "Challenger did not jointly pass the economic and sandwiched negative-memory promotion gates."
           cat model-state-output/promotion.json

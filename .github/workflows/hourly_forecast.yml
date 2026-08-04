@@ -64,13 +64,13 @@ jobs:
             git show origin/forecast-state:latest.json > .github_state/latest.json 2>/dev/null || true
           fi
 
-      - name: Restore weekly batch model
+      - name: Restore weekly batch model and negative memory
         shell: bash
         run: |
           mkdir -p .model_state
           if git ls-remote --exit-code --heads origin model-state >/dev/null 2>&1; then
             git fetch origin model-state --depth=1
-            for file in latest.joblib latest_training_report.json latest_metrics.csv model_metadata.json; do
+            for file in latest.joblib latest_training_report.json latest_metrics.csv model_metadata.json negative_memory.joblib negative_memory_report.json; do
               git show "origin/model-state:${file}" > ".model_state/${file}" 2>/dev/null || rm -f ".model_state/${file}"
             done
           fi
