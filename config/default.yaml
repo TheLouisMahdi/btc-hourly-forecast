@@ -226,7 +226,7 @@ short_model:
   tree_weight: 0.62
 
 forecast:
-  target: SECONDARY_NEXT_CLOSED_1H_CANDLE
+  target: NEXT_CLOSED_1H_CANDLE
   primary_target: OPEN_TRADE_TO_TARGET_STOP_OR_TIME_EXIT
   interval_probability: 0.80
   settlement_delay_seconds: 90
