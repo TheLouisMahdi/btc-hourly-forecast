@@ -5,6 +5,9 @@ from pathlib import Path
 from typing import Any
 
 import github_hourly_forecast
+from btc_ema_trader.runtime_history import (
+    fetch_latest_contiguous_and_store,
+)
 
 MODEL_PREFIX = "directional-breakout-hourly-"
 
@@ -33,6 +36,10 @@ def main() -> int:
         latest = _load_dict(latest_path)
         if latest and not _is_directional_record(latest):
             latest_path.write_text("{}\n", encoding="utf-8")
+
+    github_hourly_forecast.fetch_and_store = (
+        fetch_latest_contiguous_and_store
+    )
     return github_hourly_forecast.main()
 
 
