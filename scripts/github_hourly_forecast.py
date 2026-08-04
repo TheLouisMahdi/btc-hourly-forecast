@@ -24,6 +24,12 @@ from btc_ema_trader.negative_memory import (
 from btc_ema_trader.price_adaptive import PriceAdaptiveEngine
 from btc_ema_trader.runtime import RuntimeEngine
 from btc_ema_trader.storage import Database
+from btc_ema_trader.trade_lifecycle import (
+    AdaptiveTradeEngine,
+    active_trade,
+    open_trade_from_record,
+    resolve_open_trades,
+)
 
 from github_common import (
     build_github_settings,
@@ -34,13 +40,14 @@ from github_common import (
 
 LOGGER = logging.getLogger("github_hourly_forecast")
 MAX_HISTORY = 24 * 30
+MAX_TRADES = 1000
 
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description=(
-            "Run one adaptive hourly forecast with sandwiched negative-memory "
-            "protection and persist its state"
+            "Run one aggressive adaptive paper-trade cycle with persistent "
+            "target, stop, time-exit and online outcome learning"
         )
     )
     parser.add_argument("--state-dir", default=".github_state")
@@ -68,7 +75,9 @@ def main() -> int:
     site_dir.mkdir(parents=True, exist_ok=True)
 
     history_path = state_dir / "history.json"
+    trades_path = state_dir / "trades.json"
     previous_history = load_history(history_path)
+    trades = load_history(trades_path)
     used_weekly_model = copy_latest_model_from_state(
         root,
         model_state_dir,
@@ -92,12 +101,15 @@ def main() -> int:
             memory_error = f"{type(exc).__name__}: {exc}"
             LOGGER.exception("Negative-memory artifact could not be loaded")
     require_memory = bool(
-        settings.section("negative_memory").get("require_for_trade", True)
+        settings.section("negative_memory").get("require_for_trade", False)
     )
     install_runtime_guard(memory, require_for_trade=require_memory)
 
     started_at = pd.Timestamp.now(tz="UTC")
     price_summary: dict[str, Any] = {"status": "UNAVAILABLE"}
+    trade_summary: dict[str, Any] = {"status": "UNAVAILABLE"}
+    resolved_trades_now = 0
+    opened_trade_id: str | None = None
     try:
         bundle = latest_bundle(settings)
         market = fetch_and_store(
@@ -106,6 +118,21 @@ def main() -> int:
             days=180,
             provider=bundle.provider,
         )
+        candles = database.load_candles(
+            provider=bundle.provider,
+            symbol=bundle.symbol,
+        )
+        resolved_trades_now = resolve_open_trades(
+            trades,
+            candles,
+            settings,
+        )
+        trade_engine = AdaptiveTradeEngine(
+            settings,
+            bundle.model_id,
+        )
+        trade_summary = trade_engine.synchronize(trades)
+
         result = RuntimeEngine(
             settings,
             database,
@@ -123,6 +150,44 @@ def main() -> int:
             else "FAIL_SAFE"
         )
         if status == "OK" and result.get("candle_time"):
+            result["run_finished_at"] = pd.Timestamp.now(tz="UTC").isoformat()
+            raw_plan = result.get("trade_plan")
+            raw_plan = raw_plan if isinstance(raw_plan, dict) else {}
+            enriched_plan = trade_engine.enrich_trade_plan(result, raw_plan)
+            result["trade_plan"] = enriched_plan
+
+            current_trade = active_trade(trades)
+            if current_trade is not None:
+                if result.get("action") in {"LONG", "SHORT"}:
+                    result["blockers"] = list(
+                        dict.fromkeys(
+                            list(result.get("blockers", []))
+                            + ["ACTIVE_TRADE_IN_PROGRESS"]
+                        )
+                    )
+                result["action"] = (
+                    "HOLD_LONG"
+                    if current_trade.get("direction") == "LONG"
+                    else "HOLD_SHORT"
+                )
+                result["trade_plan"]["status"] = "MANAGING_OPEN_TRADE"
+            elif result.get("action") in {"LONG", "SHORT"}:
+                candidate = open_trade_from_record(result)
+                if candidate is not None and not any(
+                    item.get("trade_id") == candidate.get("trade_id")
+                    for item in trades
+                ):
+                    trades.append(candidate)
+                    opened_trade_id = str(candidate["trade_id"])
+                current_trade = active_trade(trades)
+
+            trade_summary = trade_engine.summary(trades)
+            result["active_trade"] = current_trade
+            result["trade_lifecycle_summary"] = trade_summary
+            result["trade_resolved_now"] = resolved_trades_now
+            result["trade_opened_now"] = opened_trade_id
+            result["trade_contract"] = "TARGET_STOP_TIME_EXIT"
+
             price_prediction = build_price_prediction(
                 settings,
                 database,
@@ -142,11 +207,7 @@ def main() -> int:
                     0.80,
                 )
             )
-            recent_candles = database.load_candles(
-                provider=bundle.provider,
-                symbol=bundle.symbol,
-                limit=168,
-            )
+            recent_candles = candles.tail(168)
             contract = build_next_candle_forecast(
                 result,
                 load_contract_metrics(settings, bundle.metrics),
@@ -156,11 +217,14 @@ def main() -> int:
             )
             result = attach_forecast_contract(result, contract)
     except Exception as exc:
-        LOGGER.exception("Hourly forecast failed")
+        LOGGER.exception("Hourly trade lifecycle failed")
         market = None
         result = {
             "status": "FAIL_SAFE",
             "error": f"{type(exc).__name__}: {exc}",
+            "active_trade": active_trade(trades),
+            "trade_lifecycle_summary": trade_summary,
+            "trade_resolved_now": resolved_trades_now,
         }
         status = "FAIL_SAFE"
 
@@ -181,6 +245,7 @@ def main() -> int:
                 None if memory is None else memory.model_id
             ),
             "negative_memory_error": memory_error,
+            "paper_trade_mode": "AGGRESSIVE_ADAPTIVE_5R",
         }
     )
     fresh_adaptive_summary = fresh_record.get(
@@ -196,10 +261,13 @@ def main() -> int:
         previous_history,
         record,
     )[-MAX_HISTORY:]
+    trades = trades[-MAX_TRADES:]
     write_json(state_dir / "latest.json", record)
     write_json(history_path, history)
+    write_json(trades_path, trades)
     write_json(site_dir / "latest.json", record)
     write_json(site_dir / "history.json", history)
+    write_json(site_dir / "trades.json", trades)
     write_json(
         adaptive_state_dir / "summary.json",
         fresh_adaptive_summary,
@@ -208,13 +276,17 @@ def main() -> int:
         adaptive_state_dir / "price_summary.json",
         price_summary,
     )
+    write_json(
+        adaptive_state_dir / "trade_summary.json",
+        trade_summary,
+    )
     (site_dir / ".nojekyll").write_text("", encoding="utf-8")
 
     print(json.dumps(record, ensure_ascii=False, indent=2))
     if status != "OK":
         print(
-            "::warning::Forecast completed in FAIL_SAFE mode; "
-            "diagnostics were persisted."
+            "::warning::Trade cycle completed in FAIL_SAFE mode; "
+            "the persistent trade ledger was preserved."
         )
     return 0
 
@@ -279,41 +351,28 @@ def attach_forecast_contract(
     result: dict[str, Any],
     contract: dict[str, Any],
 ) -> dict[str, Any]:
+    """Attach one-candle research output without replacing the trade contract."""
     output = dict(result)
-    output["trade_forecast_direction"] = output.get(
-        "forecast_direction"
-    )
-    output["trade_selected_horizon"] = output.get(
-        "selected_horizon"
-    )
+    output["trade_forecast_direction"] = output.get("forecast_direction")
+    output["trade_selected_horizon"] = output.get("selected_horizon")
     output["trade_confidence"] = output.get("confidence")
     output["next_candle_forecast"] = contract
-    output["forecast_contract_version"] = contract[
-        "contract_version"
-    ]
-    output["forecast_direction"] = contract["direction"]
-    output["selected_horizon"] = 1
-    output["confidence"] = contract["direction_confidence"]
-    output["expected_return"] = contract["median_return"]
+    output["forecast_contract_version"] = contract["contract_version"]
+    output["next_candle_direction"] = contract["direction"]
+    output["next_candle_confidence"] = contract["direction_confidence"]
+    output["next_candle_expected_return"] = contract["median_return"]
     output["target_candle_time"] = contract["target_open_time"]
-    output["target_candle_open_time"] = contract[
-        "target_open_time"
-    ]
-    output["target_candle_close_time"] = contract[
-        "target_close_time"
-    ]
+    output["target_candle_open_time"] = contract["target_open_time"]
+    output["target_candle_close_time"] = contract["target_close_time"]
     output["predicted_close_median"] = contract["median_close"]
-    output["predicted_close_low"] = contract[
-        "likely_close_low"
-    ]
-    output["predicted_close_high"] = contract[
-        "likely_close_high"
-    ]
+    output["predicted_close_low"] = contract["likely_close_low"]
+    output["predicted_close_high"] = contract["likely_close_high"]
     output["prediction_result"] = "PENDING"
     output["direction_result"] = "PENDING"
     output["interval_result"] = "PENDING"
     output["resolved_at"] = None
     output["forecast_frozen"] = True
+    output["primary_objective"] = "OPEN_TRADE_TO_TARGET_STOP_OR_TIME_EXIT"
     return output
 
 
@@ -329,17 +388,29 @@ def preserve_existing_forecast(
             item
             for item in reversed(history)
             if item.get("candle_time") == key
-            and isinstance(
-                item.get("next_candle_forecast"),
-                dict,
-            )
+            and isinstance(item.get("next_candle_forecast"), dict)
             and item.get("run_status") == "OK"
         ),
         None,
     )
     if existing is None:
         return record
-    return dict(existing)
+    merged = dict(existing)
+    for field in (
+        "action",
+        "blockers",
+        "trade_plan",
+        "active_trade",
+        "trade_lifecycle_summary",
+        "trade_resolved_now",
+        "trade_opened_now",
+        "run_finished_at",
+        "run_duration_seconds",
+        "paper_trade_mode",
+    ):
+        if field in record:
+            merged[field] = record[field]
+    return merged
 
 
 def load_history(path: Path) -> list[dict[str, Any]]:
@@ -356,17 +427,11 @@ def append_unique(
     history: list[dict[str, Any]],
     record: dict[str, Any],
 ) -> list[dict[str, Any]]:
-    key = record.get("candle_time") or record.get(
-        "run_finished_at"
-    )
+    key = record.get("candle_time") or record.get("run_finished_at")
     filtered = [
         item
         for item in history
-        if (
-            item.get("candle_time")
-            or item.get("run_finished_at")
-        )
-        != key
+        if (item.get("candle_time") or item.get("run_finished_at")) != key
     ]
     filtered.append(record)
     return sorted(
