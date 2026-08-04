@@ -27,6 +27,10 @@ market:
   retry_backoff_seconds: 1.5
   minimum_history_rows: 80000
   maximum_gap_hours: 3
+  training_maximum_gap_hours: 24
+  training_maximum_gap_count: 12
+  training_maximum_missing_hours: 72
+  training_minimum_segment_rows: 1000
   quote_stale_seconds: 90
   coinbase_base_url: https://api.exchange.coinbase.com
   coinbase_product: BTC-USD
