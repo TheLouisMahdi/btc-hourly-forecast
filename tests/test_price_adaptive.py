@@ -5,10 +5,7 @@ import unittest
 import numpy as np
 import pandas as pd
 
-from btc_ema_trader.price_adaptive import (
-    PriceAdaptiveEngine,
-    price_vector,
-)
+from btc_ema_trader.price_adaptive import PriceAdaptiveEngine, price_vector
 
 
 class PriceAdaptiveTests(unittest.TestCase):
@@ -44,8 +41,8 @@ class PriceAdaptiveTests(unittest.TestCase):
         engine = object.__new__(PriceAdaptiveEngine)
         engine.config = {
             "online_minimum_samples": 72,
-            "online_maximum_direction_weight": 0.45,
-            "online_maximum_return_weight": 0.45,
+            "online_maximum_direction_weight": 0.35,
+            "online_maximum_return_weight": 0.35,
         }
         direction_weight, return_weight = engine._blend_weights(
             {
@@ -61,15 +58,15 @@ class PriceAdaptiveTests(unittest.TestCase):
         self.assertEqual(direction_weight, 0.0)
         self.assertEqual(return_weight, 0.0)
 
-    def test_online_model_receives_weight_when_it_is_better(self) -> None:
+    def test_online_model_receives_weight_only_when_better(self) -> None:
         engine = object.__new__(PriceAdaptiveEngine)
         engine.config = {
             "online_minimum_samples": 72,
-            "online_maximum_direction_weight": 0.45,
-            "online_maximum_return_weight": 0.45,
-            "online_brier_tolerance": 0.005,
-            "online_accuracy_tolerance": 0.01,
-            "online_return_mae_tolerance": 0.0001,
+            "online_maximum_direction_weight": 0.35,
+            "online_maximum_return_weight": 0.35,
+            "online_minimum_brier_improvement": 0.0015,
+            "online_minimum_accuracy_improvement": 0.002,
+            "online_minimum_return_mae_improvement": 0.00002,
         }
         direction_weight, return_weight = engine._blend_weights(
             {
@@ -84,8 +81,32 @@ class PriceAdaptiveTests(unittest.TestCase):
         )
         self.assertGreater(direction_weight, 0.0)
         self.assertGreater(return_weight, 0.0)
-        self.assertLessEqual(direction_weight, 0.45)
-        self.assertLessEqual(return_weight, 0.45)
+        self.assertLessEqual(direction_weight, 0.35)
+        self.assertLessEqual(return_weight, 0.35)
+
+    def test_worse_online_model_gets_zero_weight(self) -> None:
+        engine = object.__new__(PriceAdaptiveEngine)
+        engine.config = {
+            "online_minimum_samples": 72,
+            "online_maximum_direction_weight": 0.35,
+            "online_maximum_return_weight": 0.35,
+            "online_minimum_brier_improvement": 0.0015,
+            "online_minimum_accuracy_improvement": 0.002,
+            "online_minimum_return_mae_improvement": 0.00002,
+        }
+        direction_weight, return_weight = engine._blend_weights(
+            {
+                "samples": 504,
+                "base_direction_brier": 0.249,
+                "online_direction_brier": 0.431,
+                "base_direction_accuracy": 0.514,
+                "online_direction_accuracy": 0.516,
+                "base_return_mae": 0.002193,
+                "online_return_mae": 0.002206,
+            }
+        )
+        self.assertEqual(direction_weight, 0.0)
+        self.assertEqual(return_weight, 0.0)
 
 
 if __name__ == "__main__":

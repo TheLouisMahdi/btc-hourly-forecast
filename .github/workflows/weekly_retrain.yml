@@ -10,11 +10,14 @@ on:
       - "src/btc_ema_trader/contract_features.py"
       - "src/btc_ema_trader/contract_training.py"
       - "src/btc_ema_trader/directional_events.py"
+      - "src/btc_ema_trader/economic_validation.py"
       - "src/btc_ema_trader/features.py"
       - "src/btc_ema_trader/market.py"
       - "src/btc_ema_trader/market_structure.py"
       - "src/btc_ema_trader/market_structure_fast.py"
       - "src/btc_ema_trader/model.py"
+      - "src/btc_ema_trader/price_adaptive.py"
+      - "src/btc_ema_trader/strategy.py"
       - "src/btc_ema_trader/structure_training.py"
       - "src/btc_ema_trader/forecast_contract.py"
       - "tests/**"
@@ -57,46 +60,68 @@ jobs:
       - name: Run quality tests
         run: python -m unittest discover -s tests -v
 
-      - name: Fetch real history and retrain directional model
+      - name: Restore incumbent champion
+        shell: bash
+        run: |
+          mkdir -p incumbent-model-state
+          if git ls-remote --exit-code --heads origin model-state >/dev/null 2>&1; then
+            git fetch origin model-state --depth=1
+            for file in latest.joblib latest_training_report.json latest_metrics.csv economic_validation.json model_metadata.json; do
+              git show "origin/model-state:$file" > "incumbent-model-state/$file" 2>/dev/null || true
+            done
+          fi
+
+      - name: Train and economically validate challenger
         id: retraining
         shell: bash
         run: |
           set +e
           mkdir -p training-diagnostics-output
-          python scripts/github_weekly_retrain.py > training-diagnostics-output/training.log 2>&1
+          python scripts/github_weekly_retrain.py \
+            --incumbent-dir incumbent-model-state \
+            > training-diagnostics-output/training.log 2>&1
           retrain_exit=$?
           status=PASS
           if [ "$retrain_exit" -ne 0 ]; then
             status=FAIL
           fi
-          RETRAIN_EXIT="$retrain_exit" STATUS="$status" python - <<'PY'
+          promotion=KEEP_INCUMBENT
+          if [ -f model-state-output/promotion.json ]; then
+            promotion=$(python - <<'PY'
+          import json
+          from pathlib import Path
+          path = Path("model-state-output/promotion.json")
+          try:
+              print(json.loads(path.read_text(encoding="utf-8")).get("decision", "KEEP_INCUMBENT"))
+          except Exception:
+              print("KEEP_INCUMBENT")
+          PY
+          )
+          fi
+          cp model-state-output/promotion.json training-diagnostics-output/ 2>/dev/null || true
+          cp model-state-output/economic_validation.json training-diagnostics-output/ 2>/dev/null || true
+          cp model-state-output/model_metadata.json training-diagnostics-output/ 2>/dev/null || true
+          RETRAIN_EXIT="$retrain_exit" STATUS="$status" PROMOTION="$promotion" python - <<'PY'
           import json
           import os
           from datetime import datetime, timezone
           from pathlib import Path
 
-          metadata_path = Path("model-state-output/model_metadata.json")
-          metadata = None
-          if metadata_path.exists():
-              try:
-                  metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
-              except Exception:
-                  metadata = None
           payload = {
               "status": os.environ["STATUS"],
+              "promotion": os.environ["PROMOTION"],
               "commit_sha": os.environ.get("GITHUB_SHA"),
               "workflow_run_id": os.environ.get("GITHUB_RUN_ID"),
               "workflow_run_attempt": os.environ.get("GITHUB_RUN_ATTEMPT"),
               "checked_at": datetime.now(timezone.utc).isoformat(),
               "retrain_exit_code": int(os.environ["RETRAIN_EXIT"]),
-              "model_metadata": metadata,
           }
           Path("training-diagnostics-output/status.json").write_text(
-              json.dumps(payload, indent=2),
-              encoding="utf-8",
+              json.dumps(payload, indent=2), encoding="utf-8"
           )
           PY
           echo "status=$status" >> "$GITHUB_OUTPUT"
+          echo "promotion=$promotion" >> "$GITHUB_OUTPUT"
           exit 0
 
       - name: Publish retraining diagnostics
@@ -111,8 +136,18 @@ jobs:
           cat training-diagnostics-output/training.log
           exit 1
 
-      - name: Publish latest batch model
-        if: steps.retraining.outputs.status == 'PASS'
+      - name: Publish promoted champion
+        if: >-
+          steps.retraining.outputs.status == 'PASS' &&
+          steps.retraining.outputs.promotion == 'PROMOTE'
         env:
           GITHUB_TOKEN: ${{ github.token }}
         run: bash scripts/push_snapshot_branch.sh model-state model-state-output
+
+      - name: Keep incumbent champion
+        if: >-
+          steps.retraining.outputs.status == 'PASS' &&
+          steps.retraining.outputs.promotion != 'PROMOTE'
+        run: |
+          echo "Challenger trained successfully but did not pass the locked economic promotion gate."
+          cat model-state-output/promotion.json

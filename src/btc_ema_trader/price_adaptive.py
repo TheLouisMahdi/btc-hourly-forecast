@@ -12,7 +12,7 @@ from sklearn.linear_model import SGDClassifier, SGDRegressor
 from .config import Settings
 from .model import HourlyModelBundle
 
-PRICE_ADAPTIVE_SCHEMA_VERSION = 1
+PRICE_ADAPTIVE_SCHEMA_VERSION = 2
 PRICE_VECTOR_LIMIT = 8.0
 
 
@@ -58,20 +58,21 @@ class PriceAdaptiveState:
 
 
 class PriceAdaptiveEngine:
-    def __init__(
-        self,
-        settings: Settings,
-        bundle: HourlyModelBundle,
-    ) -> None:
+    """Shadow online learner with strict evidence-based blend gates.
+
+    The online model is allowed to influence a forecast only when it is
+    measurably better than the current batch champion over the locked rolling
+    evaluation window. Being merely "not much worse" is no longer sufficient.
+    """
+
+    def __init__(self, settings: Settings, bundle: HourlyModelBundle) -> None:
         self.settings = settings
         self.bundle = bundle
         self.config = settings.section("forecast")
         self.path = settings.path("price_adaptive_state")
         self.state = self._load_or_create()
         if self.state.champion_model_id != bundle.model_id:
-            self.state = self._new_state(
-                rebase_count=self.state.rebase_count + 1,
-            )
+            self.state = self._new_state(self.state.rebase_count + 1)
             self.save()
 
     def _load_or_create(self) -> PriceAdaptiveState:
@@ -85,7 +86,7 @@ class PriceAdaptiveEngine:
                     return state
             except Exception:
                 pass
-        return self._new_state(rebase_count=0)
+        return self._new_state(0)
 
     def _new_state(self, rebase_count: int) -> PriceAdaptiveState:
         now = pd.Timestamp.now(tz="UTC").isoformat()
@@ -103,9 +104,9 @@ class PriceAdaptiveEngine:
     def synchronize(self, labeled_frame: pd.DataFrame) -> dict[str, Any]:
         frame = labeled_frame.copy().sort_values("open_time").reset_index(drop=True)
         frame["open_time"] = pd.to_datetime(frame["open_time"], utc=True)
-        target_column = "target_up_h1"
-        return_column = "future_return_h1"
-        eligible = frame.dropna(subset=[target_column, return_column]).copy()
+        eligible = frame.dropna(
+            subset=["target_up_h1", "future_return_h1"]
+        ).copy()
         if self.state.last_trained_open_time:
             eligible = eligible[
                 eligible["open_time"]
@@ -114,7 +115,7 @@ class PriceAdaptiveEngine:
         else:
             bootstrap_rows = max(
                 200,
-                int(self.config.get("online_bootstrap_rows", 1440)),
+                int(self.config.get("online_bootstrap_rows", 2160)),
             )
             eligible = eligible.tail(bootstrap_rows)
         if eligible.empty:
@@ -125,42 +126,40 @@ class PriceAdaptiveEngine:
         )
         observation_limit = max(
             100,
-            int(self.config.get("online_observation_limit", 1000)),
+            int(self.config.get("online_observation_limit", 1500)),
         )
-
         for position, (_, row) in enumerate(eligible.iterrows()):
             base_probability = float(base["p_up"][position])
             base_return = float(base["general_return"][position])
             vector = price_vector(row, base_probability, base_return)
-            target_up = int(row[target_column])
-            target_return = float(row[return_column])
+            target_up = int(row["target_up_h1"])
+            target_return = float(row["future_return_h1"])
 
+            # The observation is recorded before fitting this row. This keeps
+            # the online comparison prequential rather than in-sample.
             if self.state.initialized:
-                online_probability = self._predict_probability(
-                    vector,
-                    base_probability,
-                )
-                online_return = self._predict_return(vector, base_return)
                 self.state.observations.append(
                     {
                         "open_time": pd.Timestamp(row["open_time"]).isoformat(),
                         "target_up": target_up,
                         "actual_return": target_return,
                         "base_probability_up": base_probability,
-                        "online_probability_up": online_probability,
+                        "online_probability_up": self._predict_probability(
+                            vector, base_probability
+                        ),
                         "base_return": base_return,
-                        "online_return": online_return,
+                        "online_return": self._predict_return(vector, base_return),
                     }
                 )
 
             matrix = vector.reshape(1, -1)
-            direction_kwargs: dict[str, Any] = {}
+            kwargs: dict[str, Any] = {}
             if not self.state.initialized:
-                direction_kwargs["classes"] = np.asarray([0, 1], dtype=int)
+                kwargs["classes"] = np.asarray([0, 1], dtype=int)
             self.state.direction_estimator.partial_fit(
                 matrix,
                 np.asarray([target_up], dtype=int),
-                **direction_kwargs,
+                **kwargs,
             )
             self.state.return_estimator.partial_fit(
                 matrix,
@@ -183,14 +182,11 @@ class PriceAdaptiveEngine:
         base_probability_up: float,
         base_return: float,
     ) -> dict[str, Any]:
-        base_probability_up = float(
-            np.clip(base_probability_up, 0.05, 0.95)
-        )
+        base_probability_up = float(np.clip(base_probability_up, 0.05, 0.95))
         base_return = float(np.clip(base_return, -0.05, 0.05))
         vector = price_vector(row, base_probability_up, base_return)
         online_probability_up = self._predict_probability(
-            vector,
-            base_probability_up,
+            vector, base_probability_up
         )
         online_return = self._predict_return(vector, base_return)
         metrics = self.metrics()
@@ -211,13 +207,12 @@ class PriceAdaptiveEngine:
                 0.05,
             )
         )
-        source = (
-            "BATCH_AND_ONLINE"
-            if direction_weight > 0 or return_weight > 0
-            else "BATCH_CHAMPION"
-        )
         return {
-            "source": source,
+            "source": (
+                "BATCH_AND_ONLINE"
+                if direction_weight > 0 or return_weight > 0
+                else "BATCH_CHAMPION"
+            ),
             "batch_probability_up": base_probability_up,
             "online_probability_up": online_probability_up,
             "fused_probability_up": fused_probability_up,
@@ -232,99 +227,85 @@ class PriceAdaptiveEngine:
             "champion_model_id": self.state.champion_model_id,
         }
 
-    def _predict_probability(
-        self,
-        vector: np.ndarray,
-        fallback: float,
-    ) -> float:
+    def _predict_probability(self, vector: np.ndarray, fallback: float) -> float:
         if not self.state.initialized:
             return float(np.clip(fallback, 0.05, 0.95))
-        probability = self.state.direction_estimator.predict_proba(
+        value = self.state.direction_estimator.predict_proba(
             vector.reshape(1, -1)
         )[0, 1]
-        return float(np.clip(probability, 0.05, 0.95))
+        return float(np.clip(value, 0.05, 0.95))
 
-    def _predict_return(
-        self,
-        vector: np.ndarray,
-        fallback: float,
-    ) -> float:
+    def _predict_return(self, vector: np.ndarray, fallback: float) -> float:
         if not self.state.initialized:
             return float(np.clip(fallback, -0.05, 0.05))
-        prediction = self.state.return_estimator.predict(
-            vector.reshape(1, -1)
-        )[0]
-        return float(np.clip(prediction, -0.05, 0.05))
+        value = self.state.return_estimator.predict(vector.reshape(1, -1))[0]
+        return float(np.clip(value, -0.05, 0.05))
 
-    def _blend_weights(
-        self,
-        metrics: dict[str, Any],
-    ) -> tuple[float, float]:
+    def _blend_weights(self, metrics: dict[str, Any]) -> tuple[float, float]:
         samples = int(metrics.get("samples", 0))
         minimum_samples = max(
-            1,
-            int(self.config.get("online_minimum_samples", 72)),
+            1, int(self.config.get("online_minimum_samples", 168))
         )
-        maturity = min(1.0, samples / minimum_samples)
         if samples < minimum_samples:
             return 0.0, 0.0
+        maturity = min(1.0, samples / max(minimum_samples * 2, 1))
 
-        maximum_direction_weight = float(
-            self.config.get("online_maximum_direction_weight", 0.45)
+        max_direction = float(
+            self.config.get("online_maximum_direction_weight", 0.35)
         )
-        maximum_return_weight = float(
-            self.config.get("online_maximum_return_weight", 0.45)
+        max_return = float(
+            self.config.get("online_maximum_return_weight", 0.35)
         )
-        brier_tolerance = float(
-            self.config.get("online_brier_tolerance", 0.005)
+        minimum_brier_gain = float(
+            self.config.get("online_minimum_brier_improvement", 0.0015)
         )
-        accuracy_tolerance = float(
-            self.config.get("online_accuracy_tolerance", 0.01)
+        minimum_accuracy_gain = float(
+            self.config.get("online_minimum_accuracy_improvement", 0.002)
         )
-        return_tolerance = float(
-            self.config.get("online_return_mae_tolerance", 0.0001)
+        minimum_mae_gain = float(
+            self.config.get("online_minimum_return_mae_improvement", 0.00002)
         )
 
         base_brier = _number(metrics.get("base_direction_brier"), 1.0)
         online_brier = _number(metrics.get("online_direction_brier"), 1.0)
         base_accuracy = _number(metrics.get("base_direction_accuracy"), 0.0)
         online_accuracy = _number(metrics.get("online_direction_accuracy"), 0.0)
+        brier_gain = base_brier - online_brier
+        accuracy_gain = online_accuracy - base_accuracy
         direction_safe = (
-            online_brier <= base_brier + brier_tolerance
-            and online_accuracy >= base_accuracy - accuracy_tolerance
+            brier_gain >= minimum_brier_gain
+            and accuracy_gain >= minimum_accuracy_gain
         )
-        direction_gain = max(0.0, base_brier - online_brier)
         direction_quality = min(
             1.0,
-            0.25 + direction_gain / max(brier_tolerance * 4.0, 1e-6),
+            brier_gain / max(minimum_brier_gain * 4.0, 1e-9),
         )
         direction_weight = (
-            maximum_direction_weight * maturity * direction_quality
+            max_direction * maturity * direction_quality
             if direction_safe
             else 0.0
         )
 
         base_mae = _number(metrics.get("base_return_mae"), 1.0)
         online_mae = _number(metrics.get("online_return_mae"), 1.0)
-        return_safe = online_mae <= base_mae + return_tolerance
-        return_gain = max(0.0, base_mae - online_mae)
+        mae_gain = base_mae - online_mae
+        return_safe = mae_gain >= minimum_mae_gain
         return_quality = min(
             1.0,
-            0.25 + return_gain / max(base_mae * 0.25, return_tolerance),
+            mae_gain / max(minimum_mae_gain * 5.0, 1e-9),
         )
         return_weight = (
-            maximum_return_weight * maturity * return_quality
+            max_return * maturity * return_quality
             if return_safe
             else 0.0
         )
         return float(direction_weight), float(return_weight)
 
     def metrics(self) -> dict[str, Any]:
-        evaluation_window = max(
-            50,
-            int(self.config.get("online_evaluation_window", 336)),
+        window = max(
+            50, int(self.config.get("online_evaluation_window", 504))
         )
-        observations = self.state.observations[-evaluation_window:]
+        observations = self.state.observations[-window:]
         if not observations:
             return {
                 "samples": 0,
@@ -335,44 +316,31 @@ class PriceAdaptiveEngine:
                 "base_return_mae": None,
                 "online_return_mae": None,
             }
-
-        target = np.asarray(
-            [item["target_up"] for item in observations],
-            dtype=float,
+        target = np.asarray([item["target_up"] for item in observations])
+        base_p = np.asarray(
+            [item["base_probability_up"] for item in observations], dtype=float
         )
-        base_probability = np.asarray(
-            [item["base_probability_up"] for item in observations],
-            dtype=float,
-        )
-        online_probability = np.asarray(
-            [item["online_probability_up"] for item in observations],
-            dtype=float,
+        online_p = np.asarray(
+            [item["online_probability_up"] for item in observations], dtype=float
         )
         actual_return = np.asarray(
-            [item["actual_return"] for item in observations],
-            dtype=float,
+            [item["actual_return"] for item in observations], dtype=float
         )
         base_return = np.asarray(
-            [item["base_return"] for item in observations],
-            dtype=float,
+            [item["base_return"] for item in observations], dtype=float
         )
         online_return = np.asarray(
-            [item["online_return"] for item in observations],
-            dtype=float,
+            [item["online_return"] for item in observations], dtype=float
         )
         return {
             "samples": int(len(observations)),
-            "base_direction_brier": float(
-                np.mean((base_probability - target) ** 2)
-            ),
-            "online_direction_brier": float(
-                np.mean((online_probability - target) ** 2)
-            ),
+            "base_direction_brier": float(np.mean((base_p - target) ** 2)),
+            "online_direction_brier": float(np.mean((online_p - target) ** 2)),
             "base_direction_accuracy": float(
-                np.mean((base_probability >= 0.5) == target)
+                np.mean((base_p >= 0.5) == target)
             ),
             "online_direction_accuracy": float(
-                np.mean((online_probability >= 0.5) == target)
+                np.mean((online_p >= 0.5) == target)
             ),
             "base_return_mae": float(
                 np.mean(np.abs(base_return - actual_return))
@@ -390,7 +358,7 @@ class PriceAdaptiveEngine:
             "status": (
                 "ACTIVE"
                 if direction_weight > 0 or return_weight > 0
-                else "LEARNING"
+                else "SHADOW_LEARNING"
             ),
             "champion_model_id": self.state.champion_model_id,
             "samples_seen": self.state.samples_seen,
