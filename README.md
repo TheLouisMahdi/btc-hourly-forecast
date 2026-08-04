@@ -8,18 +8,23 @@
   <img src="https://img.shields.io/badge/OPEN_LIVE_DASHBOARD-GITHUB_PAGES-6f9b91?style=for-the-badge&logo=githubpages&logoColor=ffffff" alt="Open live dashboard" />
 </a>
 
+<br />
+<br />
+
 <a href="https://github.com/TheLouisMahdi/btc-hourly-forecast/actions/workflows/hourly_forecast.yml">
-  <img src="https://img.shields.io/github/actions/workflow/status/TheLouisMahdi/btc-hourly-forecast/hourly_forecast.yml?branch=main&style=for-the-badge&label=Hourly%20Pipeline&labelColor=47746b" alt="Hourly pipeline status" />
+  <img src="https://github.com/TheLouisMahdi/btc-hourly-forecast/actions/workflows/hourly_forecast.yml/badge.svg?branch=main" alt="Hourly BTC forecast status" />
 </a>
-
 <a href="https://github.com/TheLouisMahdi/btc-hourly-forecast/actions/workflows/weekly_retrain.yml">
-  <img src="https://img.shields.io/github/actions/workflow/status/TheLouisMahdi/btc-hourly-forecast/weekly_retrain.yml?branch=main&style=for-the-badge&label=Directional%20Retraining&labelColor=47746b" alt="Directional retraining status" />
+  <img src="https://github.com/TheLouisMahdi/btc-hourly-forecast/actions/workflows/weekly_retrain.yml/badge.svg?branch=main" alt="Weekly BTC model retraining status" />
+</a>
+<a href="https://github.com/TheLouisMahdi/btc-hourly-forecast/actions/workflows/pages_dashboard.yml">
+  <img src="https://github.com/TheLouisMahdi/btc-hourly-forecast/actions/workflows/pages_dashboard.yml/badge.svg?branch=main" alt="Dashboard deployment status" />
 </a>
 
 <br />
 <br />
 
-<img src="https://img.shields.io/badge/version-5.0.0-8f8ab8?style=flat-square" alt="Version 5.0.0" />
+<img src="https://img.shields.io/badge/version-5.3.0-8f8ab8?style=flat-square" alt="Version 5.3.0" />
 <img src="https://img.shields.io/badge/Python-3.11%2B-3776ab?style=flat-square&logo=python&logoColor=white" alt="Python 3.11 or newer" />
 <img src="https://img.shields.io/badge/training-no_random_sampling-6f9b91?style=flat-square" alt="No random sampling" />
 <img src="https://img.shields.io/badge/mode-paper_trading_only-c99078?style=flat-square" alt="Paper trading only" />
@@ -28,7 +33,7 @@
 
 # BTC Deterministic Directional Breakout Forecast
 
-Version 5.0 separates two different trading problems that must not share one generic event model:
+Version 5.3 separates two different trading problems that must not share one generic event model:
 
 - `RESISTANCE_BREAKOUT_LONG`: a real close crossing above confirmed resistance;
 - `SUPPORT_BREAKDOWN_SHORT`: a real close crossing below confirmed support.
@@ -302,7 +307,7 @@ tests/
 
 ## Status
 
-Version 5.0 defines the required training contract and architecture. It does not claim profitability. A model is usable only after the GitHub retraining workflow confirms the real event inventory, completes schema-v5 Walk-Forward evaluation and publishes direction-specific qualification results.
+Version 5.3 defines the required training contract and architecture. It does not claim profitability. A model is usable only after the GitHub retraining workflow confirms the real event inventory, completes schema-v5 Walk-Forward evaluation and publishes direction-specific qualification results.
 
 This repository is research software and is not financial advice.
 
