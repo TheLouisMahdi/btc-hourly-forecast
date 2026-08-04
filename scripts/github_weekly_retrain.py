@@ -52,20 +52,28 @@ def main() -> int:
     configure_logging(settings, verbose=True)
     database = Database(settings)
     database.initialize()
-    history_days = float(
-        settings.section("market").get("history_days", 3650)
+    market_cfg = settings.section("market")
+    history_days = float(market_cfg.get("history_days", 3650))
+    strict_gap_hours = float(market_cfg.get("maximum_gap_hours", 3))
+    training_gap_hours = float(
+        market_cfg.get("training_maximum_gap_hours", 24)
     )
     news_days = float(
         settings.section("news").get("historical_days", 365)
     )
 
     started = pd.Timestamp.now(tz="UTC")
-    market = fetch_and_store(
-        settings,
-        database,
-        days=history_days,
-        provider=None,
-    )
+    market_cfg["maximum_gap_hours"] = training_gap_hours
+    try:
+        market = fetch_and_store(
+            settings,
+            database,
+            days=history_days,
+            provider=None,
+        )
+    finally:
+        market_cfg["maximum_gap_hours"] = strict_gap_hours
+
     historical_news = optional(
         lambda: collect_and_store(
             settings,
@@ -108,6 +116,13 @@ def main() -> int:
                 finished - started
             ).total_seconds(),
             "market": market,
+            "market_validation": {
+                "runtime_maximum_gap_hours": strict_gap_hours,
+                "weekly_fetch_maximum_gap_hours": training_gap_hours,
+                "training_gap_policy": (
+                    "CONTIGUOUS_SEGMENTS_WITHOUT_FILL"
+                ),
+            },
             "historical_news": historical_news,
             "recent_news": recent_news,
             "training": training,
@@ -118,6 +133,7 @@ def main() -> int:
             "general_label": "CLOSE_TO_CLOSE_RETURN",
             "sampling_strategy": "NONE",
             "synthetic_events": 0,
+            "synthetic_candles": 0,
         }
     )
     write_json(output_dir / "model_metadata.json", metadata)
