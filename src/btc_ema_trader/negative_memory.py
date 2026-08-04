@@ -9,24 +9,40 @@ import pandas as pd
 
 from .config import Settings
 from .negative_memory_core import (
-    SUPPORT, RESISTANCE, BloomFilter, boundary_context, fingerprint, _num, _outside,
+    SUPPORT,
+    RESISTANCE,
+    BloomFilter,
+    boundary_context,
+    fingerprint,
+    _num,
+    _outside,
 )
 from .negative_memory_dataset import mine_boundary_encounters
 from .negative_memory_model import BoundaryHead, SandwichedBoundaryMemory
 from .negative_memory_training import train_sandwiched_boundary_memory
 
 __all__ = [
-    "SUPPORT", "RESISTANCE", "BloomFilter", "BoundaryHead",
-    "SandwichedBoundaryMemory", "train_sandwiched_boundary_memory",
-    "mine_boundary_encounters", "save_boundary_memory", "load_boundary_memory",
-    "install_runtime_guard", "boundary_context", "fingerprint",
+    "SUPPORT",
+    "RESISTANCE",
+    "BloomFilter",
+    "BoundaryHead",
+    "SandwichedBoundaryMemory",
+    "train_sandwiched_boundary_memory",
+    "mine_boundary_encounters",
+    "save_boundary_memory",
+    "load_boundary_memory",
+    "install_runtime_guard",
+    "boundary_context",
+    "fingerprint",
 ]
+
 
 def save_boundary_memory(memory: SandwichedBoundaryMemory, path: Path) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     temporary = path.with_suffix(path.suffix + ".tmp")
     joblib.dump(memory, temporary)
     temporary.replace(path)
+
 
 def load_boundary_memory(path: Path) -> SandwichedBoundaryMemory:
     value = joblib.load(path)
@@ -36,11 +52,13 @@ def load_boundary_memory(path: Path) -> SandwichedBoundaryMemory:
         raise RuntimeError("Unsupported sandwiched negative-memory schema")
     return value
 
+
 def install_runtime_guard(
     memory: SandwichedBoundaryMemory | None,
     *,
     require_for_trade: bool = True,
 ) -> None:
+    """Install memory as veto in gated mode and risk penalty in wild paper mode."""
     from . import runtime as runtime_module
     from .model import HourlyModelBundle
 
@@ -80,41 +98,58 @@ def install_runtime_guard(
             latest_row, prediction, bundle, settings, **kwargs
         )
         boundary = prediction.get("boundary_memory")
-        boundary = boundary if isinstance(boundary, dict) else _outside("UNAVAILABLE")
+        boundary = (
+            boundary
+            if isinstance(boundary, dict)
+            else _outside("UNAVAILABLE")
+        )
         direction = int(_num(latest_row.get("event_direction"), 0.0) or 0)
-        blockers = list(decision.blockers)
+        flags: list[str] = []
         if direction:
             expected = RESISTANCE if direction > 0 else SUPPORT
             if boundary.get("status") != "READY":
                 if require_for_trade:
-                    blockers.append("BOUNDARY_NEGATIVE_MEMORY_UNAVAILABLE")
+                    flags.append("BOUNDARY_NEGATIVE_MEMORY_UNAVAILABLE")
             elif boundary.get("boundary_side") != expected:
-                blockers.append("BOUNDARY_CONTEXT_MISMATCH")
+                flags.append("BOUNDARY_CONTEXT_MISMATCH")
             else:
                 item = boundary.get("horizons", {}).get(
                     str(decision.selected_horizon)
                 )
                 if not isinstance(item, dict):
-                    blockers.append("BOUNDARY_HORIZON_UNAVAILABLE")
+                    flags.append("BOUNDARY_HORIZON_UNAVAILABLE")
                 else:
                     policy = item.get("policy", {})
                     if not item.get("qualified", False):
-                        blockers.append("BOUNDARY_HEAD_NOT_QUALIFIED")
+                        flags.append("BOUNDARY_HEAD_NOT_QUALIFIED")
                     if item.get("front_memory_hit", False):
-                        blockers.append("KNOWN_BAD_PATTERN_FRONT_BLOOM")
+                        flags.append("KNOWN_BAD_PATTERN_FRONT_BLOOM")
                     if item.get("backup_memory_hit", False):
-                        blockers.append("HARD_NEGATIVE_BACKUP_BLOOM")
+                        flags.append("HARD_NEGATIVE_BACKUP_BLOOM")
                     if float(item.get("p_break", 0.0)) < float(
                         policy.get("minimum_break_probability", 0.60)
                     ):
-                        blockers.append("LOW_LEVEL_BREAK_PROBABILITY")
+                        flags.append("LOW_LEVEL_BREAK_PROBABILITY")
                     if float(item.get("p_unprofitable", 1.0)) > float(
                         policy.get("maximum_bad_probability", 0.45)
                     ):
-                        blockers.append("HIGH_UNPROFITABLE_PATTERN_RISK")
-        blockers = list(dict.fromkeys(blockers))
+                        flags.append("HIGH_UNPROFITABLE_PATTERN_RISK")
+
+        aggressive = bool(
+            settings.section("strategy").get("paper_only", True)
+            and settings.section("strategy").get(
+                "aggressive_paper_mode", False
+            )
+        )
         plan = dict(decision.trade_plan)
         plan["boundary_memory"] = boundary
+        plan["boundary_memory_flags"] = list(dict.fromkeys(flags))
+        if aggressive:
+            plan["negative_memory_mode"] = "ADAPTIVE_PENALTY_ONLY"
+            return replace(decision, trade_plan=plan)
+
+        blockers = list(dict.fromkeys(list(decision.blockers) + flags))
+        plan["negative_memory_mode"] = "HARD_VETO"
         return replace(
             decision,
             action="WAIT" if blockers else decision.action,
