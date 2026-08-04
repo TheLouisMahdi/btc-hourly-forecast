@@ -53,53 +53,50 @@ def build_github_settings(
                     / "price_adaptive_state.joblib"
                 ).resolve()
             ),
+            "trade_adaptive_state": str(
+                (
+                    adaptive_state_dir
+                    / "trade_adaptive_state.joblib"
+                ).resolve()
+            ),
             "log_dir": str((runtime_root / "logs").resolve()),
             "model_dir": str(model_dir),
             "report_dir": str(report_dir),
         }
     )
-    values.setdefault("project", {}).update(
-        {
-            "name": "BTC Sandwiched Boundary Break Forecast",
-            "version": "5.2.0",
-        }
-    )
     values.setdefault("model", {})["auto_retrain_days"] = 10
-    values.setdefault("negative_memory", {}).update(
-        {
-            "enabled": True,
-            "require_for_trade": True,
-            "maximum_boundary_distance_atr": 0.85,
-            "minimum_boundary_distance_atr": -0.25,
-            "break_buffer_atr": 0.08,
-            "encounter_cooldown_hours": 3,
-            "support_max_approach_return_6": 0.0,
-            "resistance_min_approach_return_6": 0.0,
-            "minimum_samples_per_head": 500,
-            "hard_negative_weight": 3.0,
-            "front_memory_minimum_count": 2,
-            "front_memory_bad_rate": 0.80,
-            "bloom_false_positive_rate": 0.005,
-            "minimum_calibration_selected": 30,
-            "minimum_holdout_selected": 12,
-            "minimum_holdout_mean_net_return": 0.0,
-            "minimum_holdout_profitable_rate": 0.52,
-            "maximum_holdout_bad_acceptance": 0.48,
-            "fallback_minimum_break_probability": 0.62,
-            "fallback_maximum_bad_probability": 0.42,
-            "learning_rate": 0.035,
-            "max_iter": 220,
-            "max_leaf_nodes": 11,
-            "min_samples_leaf": 35,
-            "l2_regularization": 4.0,
-            "random_state": 20260804,
-        }
-    )
     values.setdefault("live", {}).update(
         {
             "auto_retrain": False,
             "collect_recent_news_each_cycle": True,
             "start_on_next_closed_candle": False,
+        }
+    )
+    # GitHub is a paper-trading research environment. Here the public model
+    # deliberately explores more setups while preserving hard data checks.
+    values.setdefault("strategy", {}).update(
+        {
+            "paper_only": True,
+            "aggressive_paper_mode": True,
+            "allow_short": True,
+            "entry_order_style": "market",
+            "risk_per_trade_fraction": 0.01,
+            "maximum_leverage": 5.0,
+            "target_r_multiple": 5.0,
+            "minimum_event_score": 0.10,
+            "minimum_net_edge_bps": 0.0,
+            "maximum_daily_signals": 12,
+            "cooldown_hours_after_signal": 0,
+            "block_during_news_shock": False,
+        }
+    )
+    values.setdefault("adaptive", {})["enabled"] = True
+    values.setdefault("negative_memory", {})["require_for_trade"] = False
+    values.setdefault("trade_lifecycle", {}).update(
+        {
+            "enabled": True,
+            "mode": "AGGRESSIVE_PAPER",
+            "base_reward_r": 5.0,
         }
     )
 
@@ -125,7 +122,6 @@ def copy_latest_model_from_state(
         "latest_training_report.json",
         "latest_metrics.csv",
         "model_metadata.json",
-        "negative_memory_report.json",
     ):
         candidate = model_state_dir / filename
         if candidate.exists():
