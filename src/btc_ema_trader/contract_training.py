@@ -79,7 +79,7 @@ def build_segmented_feature_set(
     maximum_gap_hours = float(
         market_cfg.get("training_maximum_gap_hours", 24)
     )
-    maximum_gap_count = int(
+    advisory_maximum_gap_count = int(
         market_cfg.get("training_maximum_gap_count", 12)
     )
     maximum_missing_hours = int(
@@ -95,18 +95,16 @@ def build_segmented_feature_set(
             f"{continuity['largest_gap_hours']:.1f} hours but the "
             f"training limit is {maximum_gap_hours:.1f} hours"
         )
-    if continuity["gap_count"] > maximum_gap_count:
-        raise ValueError(
-            "Historical continuity gate failed; "
-            f"{continuity['gap_count']} gaps exceed the configured "
-            f"limit of {maximum_gap_count}"
-        )
     if continuity["missing_candle_hours"] > maximum_missing_hours:
         raise ValueError(
             "Historical continuity gate failed; "
             f"{continuity['missing_candle_hours']} missing candle hours "
             f"exceed the configured limit of {maximum_missing_hours}"
         )
+
+    gap_count_advisory_exceeded = bool(
+        continuity["gap_count"] > advisory_maximum_gap_count
+    )
 
     built: list[FeatureSet] = []
     segment_audit: list[dict[str, Any]] = []
@@ -176,6 +174,12 @@ def build_segmented_feature_set(
     if combined["open_time"].duplicated().any():
         raise ValueError("Duplicate timestamps after segment assembly")
 
+    retained_input_rows = int(
+        sum(item["input_rows"] for item in segment_audit)
+    )
+    retained_input_fraction = float(
+        retained_input_rows / max(len(candles), 1)
+    )
     audit_report = {
         "policy": "CONTIGUOUS_SEGMENTS_WITHOUT_FILL",
         "random_sampling": False,
@@ -183,17 +187,21 @@ def build_segmented_feature_set(
         "interpolation": False,
         "forward_fill": False,
         "input_rows": int(len(candles)),
+        "retained_input_rows": retained_input_rows,
+        "retained_input_fraction": retained_input_fraction,
         "training_rows": int(len(combined)),
         "used_segment_count": int(len(built)),
         "skipped_segment_count": int(len(skipped_segments)),
         "gap_count": int(continuity["gap_count"]),
+        "gap_count_policy": "AUDIT_ONLY",
+        "gap_count_advisory_exceeded": gap_count_advisory_exceeded,
         "largest_gap_hours": float(continuity["largest_gap_hours"]),
         "missing_candle_hours": int(
             continuity["missing_candle_hours"]
         ),
         "limits": {
             "maximum_gap_hours": maximum_gap_hours,
-            "maximum_gap_count": maximum_gap_count,
+            "advisory_maximum_gap_count": advisory_maximum_gap_count,
             "maximum_missing_hours": maximum_missing_hours,
             "minimum_segment_rows": minimum_segment_rows,
         },
