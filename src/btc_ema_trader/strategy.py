@@ -119,7 +119,7 @@ def make_decision(
 
     blockers: list[str] = []
     if not bool(qualification.get("passed", False)):
-        blockers.append("MODEL_NOT_ECONOMICALLY_QUALIFIED")
+        blockers.append("MODEL_NOT_QUALIFIED")
     if is_event and selected_horizon not in qualified_horizons:
         blockers.append("SELECTED_DIRECTION_NOT_QUALIFIED")
     if is_event and not policy:
@@ -327,25 +327,42 @@ def build_trade_plan(
             price * float(cfg.get("minimum_stop_percent", 0.0035)),
         )
     )
-    invalidation = _finite(row.get("breakout_invalidation_level"))
-    generic_stop_pct = float(cfg.get("stop_atr_multiplier", 1.10)) * atr / price
-    if direction == "UP" and invalidation is not None and invalidation < price:
-        structural_stop_pct = (price - invalidation) / price
-    elif direction == "DOWN" and invalidation is not None and invalidation > price:
-        structural_stop_pct = (invalidation - price) / price
-    else:
-        structural_stop_pct = generic_stop_pct
-    stop_pct = float(
-        np.clip(
-            max(structural_stop_pct, generic_stop_pct * 0.65),
-            float(cfg.get("minimum_stop_percent", 0.0035)),
-            float(cfg.get("maximum_stop_percent", 0.018)),
-        )
-    )
     selected_horizon = int(
         selected_horizon
         if selected_horizon is not None
         else prediction["selected_horizon"]
+    )
+    direction_cfg = settings.section(
+        "long_breakout" if direction == "UP" else "short_breakdown"
+    )
+    target_atr = _per_horizon(
+        direction_cfg.get("target_atr_by_horizon", {}),
+        selected_horizon,
+        1.0,
+    )
+    target_distance = max(target_atr * atr, 0.0)
+    target_pct = target_distance / max(price, 1e-9)
+
+    invalidation = _finite(row.get("breakout_invalidation_level"))
+    fallback_stop_pct = (
+        float(cfg.get("stop_atr_multiplier", 1.10))
+        * atr
+        / max(price, 1e-9)
+    )
+    if direction == "UP" and invalidation is not None and invalidation < price:
+        stop_price = invalidation
+        stop_pct = (price - invalidation) / price
+    elif direction == "DOWN" and invalidation is not None and invalidation > price:
+        stop_price = invalidation
+        stop_pct = (invalidation - price) / price
+    else:
+        stop_pct = fallback_stop_pct
+        stop_price = price * (1 - stop_pct if direction == "UP" else 1 + stop_pct)
+
+    target_price = (
+        price + target_distance
+        if direction == "UP"
+        else price - target_distance
     )
     predicted_move = abs(
         float(
@@ -354,17 +371,6 @@ def build_trade_plan(
             else prediction.get("expected_event_aligned_return", 0.0)
         )
     )
-    target_pct = max(
-        float(cfg.get("target_r_multiple", 1.80)) * stop_pct,
-        predicted_move,
-    )
-    if direction == "UP":
-        stop_price = price * (1 - stop_pct)
-        target_price = price * (1 + target_pct)
-    else:
-        stop_price = price * (1 + stop_pct)
-        target_price = price * (1 - target_pct)
-
     account = float(cfg.get("account_equity_usd", 1000.0))
     risk_budget = account * float(cfg.get("risk_per_trade_fraction", 0.0020))
     costs = execution_cost_breakdown(cfg)
@@ -397,14 +403,17 @@ def build_trade_plan(
         "regime": row.get("regime", "UNKNOWN"),
         "trade_direction_source": "ECONOMIC_DIRECTIONAL_BREAKOUT",
         "entry_reference": price,
+        "entry_reference_kind": "CURRENT_CLOSE_PROXY_FOR_NEXT_OPEN",
         "entry_definition": "OPEN_OF_NEXT_1H_CANDLE",
         "entry_style": str(cfg.get("entry_order_style", "maker")).upper(),
         "exit_style": str(cfg.get("exit_order_style", "taker")).upper(),
         "stop_price": float(stop_price),
         "target_price": float(target_price),
-        "stop_percent": stop_pct,
-        "target_percent": target_pct,
-        "risk_reward": float(target_pct / stop_pct),
+        "stop_percent": float(stop_pct),
+        "target_percent": float(target_pct),
+        "target_atr": float(target_atr),
+        "risk_reward": float(target_pct / max(stop_pct, 1e-9)),
+        "label_execution_aligned": bool(invalidation is not None),
         "risk_budget_usd": risk_budget,
         "quantity_btc": float(quantity_btc),
         "notional_usd": float(notional),

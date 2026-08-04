@@ -78,6 +78,7 @@ def evaluate_oof_economics(
 ) -> dict[str, Any]:
     strategy = _strategy(report)
     costs = execution_cost_breakdown(strategy)
+    base_bps = float(costs["base_cost_bps"])
     stress_bps = float(costs["stress_cost_bps"]) + max(
         4.0, float(strategy.get("economic_execution_uncertainty_bps", 4.0))
     )
@@ -103,7 +104,9 @@ def evaluate_oof_economics(
                 (events["direction_name"] == direction)
                 & (pd.to_numeric(events["horizon"], errors="coerce") == horizon)
             ].sort_values("open_time")
-            item = _evaluate_pair(subset.reset_index(drop=True), horizon, stress_bps)
+            item = _evaluate_pair(
+                subset.reset_index(drop=True), horizon, base_bps, stress_bps
+            )
             details[direction][str(horizon)] = item
             if item["passed"]:
                 qualified[direction].append(horizon)
@@ -184,7 +187,10 @@ def compare_with_incumbent(
 
 
 def _evaluate_pair(
-    rows: pd.DataFrame, horizon: int, stress_bps: float
+    rows: pd.DataFrame,
+    horizon: int,
+    base_bps: float,
+    stress_bps: float,
 ) -> dict[str, Any]:
     if len(rows) < 200:
         return _failed(len(rows), f"only {len(rows)} OOF events; 200 required")
@@ -192,8 +198,10 @@ def _evaluate_pair(
     dev, holdout = rows.iloc[:split].copy(), rows.iloc[split:].copy()
     success_cal = _fit_calibration(dev["p_continuation"], dev["actual_continuation"])
     trade_cal = _fit_calibration(dev["p_tradeable"], dev["actual_tradeable"])
-    dev = _prepare(dev, success_cal, trade_cal, stress_bps)
-    holdout = _prepare(holdout, success_cal, trade_cal, stress_bps)
+    dev = _prepare(dev, success_cal, trade_cal, base_bps, stress_bps)
+    holdout = _prepare(
+        holdout, success_cal, trade_cal, base_bps, stress_bps
+    )
     policy, dev_stats = _choose_policy(dev, horizon, success_cal, trade_cal)
     if policy is None:
         return _failed(
@@ -202,7 +210,7 @@ def _evaluate_pair(
         )
     selected = _select(holdout, policy, horizon)
     hold_stats = _statistics(
-        selected.get("actual_event_net_return", pd.Series(dtype=float)),
+        selected.get("actual_stress_net_return", pd.Series(dtype=float)),
         selected.get("actual_continuation", pd.Series(dtype=float)),
         SEED + horizon,
     )
@@ -244,7 +252,7 @@ def _choose_policy(
                     if len(selected) < MIN_DEV_TRADES:
                         continue
                     stats = _statistics(
-                        selected["actual_event_net_return"],
+                        selected["actual_stress_net_return"],
                         selected["actual_continuation"],
                         SEED + len(selected),
                         bootstrap=False,
@@ -258,7 +266,7 @@ def _choose_policy(
         return None, None
     selected = _select(dev, best[1], horizon)
     return best[1], _statistics(
-        selected["actual_event_net_return"],
+        selected["actual_stress_net_return"],
         selected["actual_continuation"],
         SEED + len(selected),
     )
@@ -268,6 +276,7 @@ def _prepare(
     rows: pd.DataFrame,
     success_cal: CalibrationMap,
     trade_cal: CalibrationMap,
+    base_bps: float,
     stress_bps: float,
 ) -> pd.DataFrame:
     output = rows.copy()
@@ -277,6 +286,12 @@ def _prepare(
         pd.to_numeric(output["predicted_event_gross_return"], errors="coerce")
         * 10_000
         - stress_bps
+    )
+    output["actual_stress_net_return"] = (
+        pd.to_numeric(
+            output["actual_event_net_return"], errors="coerce"
+        )
+        - max(stress_bps - base_bps, 0.0) / 10_000.0
     )
     output["event_score"] = pd.to_numeric(
         output["event_score"], errors="coerce"
