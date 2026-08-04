@@ -1,6 +1,6 @@
 project:
-  name: BTC Economic Directional Breakout Forecast
-  version: 5.1.0
+  name: BTC Adaptive Target-Stop Trader
+  version: 5.3.0
   timezone: UTC
 
 paths:
@@ -11,6 +11,7 @@ paths:
   runtime_state: data/runtime_state.json
   adaptive_state: data/adaptive_state.joblib
   price_adaptive_state: data/price_adaptive_state.joblib
+  trade_adaptive_state: data/trade_adaptive_state.joblib
 
 market:
   symbol: BTCUSDT
@@ -225,7 +226,8 @@ short_model:
   tree_weight: 0.62
 
 forecast:
-  target: NEXT_CLOSED_1H_CANDLE
+  target: SECONDARY_NEXT_CLOSED_1H_CANDLE
+  primary_target: OPEN_TRADE_TO_TARGET_STOP_OR_TIME_EXIT
   interval_probability: 0.80
   settlement_delay_seconds: 90
   minimum_residual_samples: 30
@@ -241,8 +243,7 @@ forecast:
   online_minimum_return_mae_improvement: 0.00002
 
 adaptive:
-  enabled: false
-  disabled_reason: DIRECTIONAL_V5_REQUIRES_SEPARATE_ONLINE_HEADS
+  enabled: true
   bootstrap_rows: 2160
   observation_limit: 1500
   evaluation_window: 504
@@ -255,6 +256,43 @@ adaptive:
   maximum_blend_weight: 0.30
   event_weight: 2.0
   new_sample_weight: 1.0
+
+negative_memory:
+  require_for_trade: false
+  runtime_mode: ADAPTIVE_PENALTY_ONLY
+  minimum_boundary_distance_atr: -0.25
+  maximum_boundary_distance_atr: 0.85
+  minimum_samples_per_head: 500
+  minimum_holdout_selected: 12
+  minimum_holdout_profitable_rate: 0.52
+  maximum_holdout_bad_acceptance: 0.48
+  hard_negative_weight: 3.0
+  front_memory_minimum_count: 2
+  front_memory_bad_rate: 0.80
+  bloom_false_positive_rate: 0.005
+
+trade_lifecycle:
+  enabled: true
+  mode: AGGRESSIVE_PAPER
+  base_reward_r: 5.0
+  minimum_reward_r: 3.0
+  maximum_reward_r: 8.0
+  base_stop_atr_multiplier: 0.75
+  fallback_atr_percent: 0.008
+  minimum_stop_percent: 0.0025
+  maximum_stop_percent: 0.025
+  base_maximum_holding_hours: 72
+  minimum_holding_hours: 12
+  maximum_holding_hours: 168
+  breakeven_trigger_r: 2.0
+  trailing_trigger_r: 3.0
+  trailing_atr_multiplier: 1.0
+  same_bar_policy: NEAREST_TO_OPEN
+  minimum_online_samples: 20
+  maximum_online_weight: 0.65
+  stop_learning_weight: 1.75
+  reward_probability_gain: 0.80
+  reward_r_gain: 0.08
 
 qualification:
   minimum_oof_events_per_direction: 1000
@@ -272,8 +310,9 @@ qualification:
 
 strategy:
   paper_only: true
-  allow_short: false
-  entry_order_style: maker
+  aggressive_paper_mode: true
+  allow_short: true
+  entry_order_style: market
   exit_order_style: taker
   maker_fee_bps: 2.0
   taker_fee_bps: 5.0
@@ -284,32 +323,32 @@ strategy:
   stress_cost_multiplier: 1.50
   economic_execution_uncertainty_bps: 4.0
   minimum_profit_buffer_bps: 8.0
-  minimum_net_edge_bps: 8.0
-  minimum_event_score: 0.30
+  minimum_net_edge_bps: 0.0
+  minimum_event_score: 0.10
   minimum_confidence:
-    3: 0.58
-    6: 0.60
-    12: 0.62
+    3: 0.50
+    6: 0.50
+    12: 0.50
   minimum_tradeability_probability:
-    3: 0.56
-    6: 0.58
-    12: 0.60
-  minimum_horizon_agreement: 0.6667
-  maximum_atr_percent: 4.0
-  block_during_news_shock: true
+    3: 0.50
+    6: 0.50
+    12: 0.50
+  minimum_horizon_agreement: 0.50
+  maximum_atr_percent: 6.0
+  block_during_news_shock: false
   require_fresh_news: false
-  risk_per_trade_fraction: 0.0020
+  risk_per_trade_fraction: 0.01
   account_equity_usd: 1000.0
-  maximum_leverage: 3.0
-  stop_atr_multiplier: 1.10
-  minimum_stop_percent: 0.0035
-  maximum_stop_percent: 0.018
-  target_r_multiple: 1.80
-  label_target_atr_multiplier: 1.50
+  maximum_leverage: 5.0
+  stop_atr_multiplier: 0.75
+  minimum_stop_percent: 0.0025
+  maximum_stop_percent: 0.025
+  target_r_multiple: 5.0
+  label_target_atr_multiplier: 5.0
   label_stop_atr_multiplier: 1.0
   gap_risk_buffer_bps: 6.0
-  maximum_daily_signals: 3
-  cooldown_hours_after_signal: 3
+  maximum_daily_signals: 12
+  cooldown_hours_after_signal: 0
 
 live:
   poll_seconds: 15
