@@ -122,6 +122,19 @@ def main() -> int:
             provider=bundle.provider,
             symbol=bundle.symbol,
         )
+        # Rebuild the path-dependent stop state from the immutable initial
+        # stop before replaying closed candles. This keeps hourly reruns
+        # deterministic and prevents a later trailing stop from being applied
+        # retroactively to an earlier candle.
+        for trade in trades:
+            if trade.get("status") == "OPEN":
+                trade["current_stop_price"] = trade.get(
+                    "initial_stop_price", trade.get("current_stop_price")
+                )
+                trade["max_favorable_r"] = 0.0
+                trade["max_adverse_r"] = 0.0
+                trade["breakeven_armed"] = False
+                trade["trailing_armed"] = False
         resolved_trades_now = resolve_open_trades(
             trades,
             candles,
