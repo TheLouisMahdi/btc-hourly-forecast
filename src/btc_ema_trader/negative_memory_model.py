@@ -54,6 +54,7 @@ class SandwichedBoundaryMemory:
     model_id: str
     heads: dict[str, dict[int, BoundaryHead]]
     report: dict[str, Any]
+    minimum_distance_atr: float = -0.25
     maximum_distance_atr: float = 0.85
     schema_version: int = 1
 
@@ -65,6 +66,8 @@ class SandwichedBoundaryMemory:
         context = boundary_context(latest, event_direction)
         if (
             context is None
+            or float(context["boundary_distance_atr"])
+            < self.minimum_distance_atr
             or float(context["boundary_distance_atr"])
             > self.maximum_distance_atr
         ):

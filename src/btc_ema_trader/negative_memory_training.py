@@ -57,6 +57,9 @@ def train_sandwiched_boundary_memory(
         model_id=model_id,
         heads=heads,
         report=report,
+        minimum_distance_atr=float(
+            cfg.get("minimum_boundary_distance_atr", -0.25)
+        ),
         maximum_distance_atr=float(
             cfg.get("maximum_boundary_distance_atr", 0.85)
         ),
