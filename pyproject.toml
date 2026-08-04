@@ -4,8 +4,8 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "btc-hourly-regime-trader"
-version = "5.2.0"
-description = "Cost-aware BTC boundary-break research with sandwiched learned Bloom negative memory, hard-negative mining, and locked economic promotion"
+version = "5.3.0"
+description = "Aggressive adaptive BTC paper-trading research with persistent target, stop-loss, time-exit and online trade-outcome learning"
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
