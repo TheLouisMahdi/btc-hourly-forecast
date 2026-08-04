@@ -54,14 +54,19 @@ jobs:
       - name: Run quality tests
         run: python -m unittest discover -s tests -v
 
-      - name: Restore forecast history
+      - name: Restore forecast and trade ledger
         shell: bash
         run: |
           mkdir -p .github_state
           if git ls-remote --exit-code --heads origin forecast-state >/dev/null 2>&1; then
             git fetch origin forecast-state --depth=1
-            git show origin/forecast-state:history.json > .github_state/history.json 2>/dev/null || true
-            git show origin/forecast-state:latest.json > .github_state/latest.json 2>/dev/null || true
+            git show origin/forecast-state:history.json > .github_state/history.json 2>/dev/null || printf '[]\n' > .github_state/history.json
+            git show origin/forecast-state:latest.json > .github_state/latest.json 2>/dev/null || printf '{}\n' > .github_state/latest.json
+            git show origin/forecast-state:trades.json > .github_state/trades.json 2>/dev/null || printf '[]\n' > .github_state/trades.json
+          else
+            printf '[]\n' > .github_state/history.json
+            printf '{}\n' > .github_state/latest.json
+            printf '[]\n' > .github_state/trades.json
           fi
 
       - name: Restore weekly batch model and negative memory
@@ -81,18 +86,18 @@ jobs:
           mkdir -p .adaptive_state
           if git ls-remote --exit-code --heads origin adaptive-state >/dev/null 2>&1; then
             git fetch origin adaptive-state --depth=1
-            for file in adaptive_state.joblib price_adaptive_state.joblib summary.json price_summary.json; do
+            for file in adaptive_state.joblib price_adaptive_state.joblib trade_adaptive_state.joblib summary.json price_summary.json trade_summary.json; do
               git show "origin/adaptive-state:${file}" > ".adaptive_state/${file}" 2>/dev/null || rm -f ".adaptive_state/${file}"
             done
           fi
 
-      - name: Run structural adaptive forecast
+      - name: Run adaptive target-stop trade cycle
         run: python scripts/github_structural_forecast.py
 
-      - name: Resolve outcomes
+      - name: Resolve secondary next-candle outcomes
         run: python scripts/github_dashboard.py
 
-      - name: Persist forecast history
+      - name: Persist forecast and trade ledger
         env:
           GITHUB_TOKEN: ${{ github.token }}
         run: bash scripts/push_snapshot_branch.sh forecast-state .github_state
