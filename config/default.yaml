@@ -1,6 +1,6 @@
 project:
-  name: BTC Deterministic Directional Breakout Forecast
-  version: 5.0.0
+  name: BTC Economic Directional Breakout Forecast
+  version: 5.1.0
   timezone: UTC
 
 paths:
@@ -236,9 +236,9 @@ forecast:
   online_minimum_samples: 168
   online_maximum_direction_weight: 0.35
   online_maximum_return_weight: 0.35
-  online_brier_tolerance: 0.003
-  online_accuracy_tolerance: 0.005
-  online_return_mae_tolerance: 0.00008
+  online_minimum_brier_improvement: 0.0015
+  online_minimum_accuracy_improvement: 0.002
+  online_minimum_return_mae_improvement: 0.00002
 
 adaptive:
   enabled: false
@@ -272,6 +272,7 @@ qualification:
 
 strategy:
   paper_only: true
+  allow_short: false
   entry_order_style: maker
   exit_order_style: taker
   maker_fee_bps: 2.0
@@ -281,6 +282,7 @@ strategy:
   funding_buffer_bps: 0.0
   fallback_round_trip_cost_bps: 11.0
   stress_cost_multiplier: 1.50
+  economic_execution_uncertainty_bps: 4.0
   minimum_profit_buffer_bps: 8.0
   minimum_net_edge_bps: 8.0
   minimum_event_score: 0.30
