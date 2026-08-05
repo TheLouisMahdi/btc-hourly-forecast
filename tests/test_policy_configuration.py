@@ -42,6 +42,10 @@ class PolicyConfigurationTests(unittest.TestCase):
         )
         self.assertFalse(config["adaptive"]["enabled"])
         self.assertTrue(config["trade_lifecycle"]["enabled"])
+        self.assertEqual(
+            config["negative_memory"]["runtime_mode"],
+            "ADAPTIVE_PENALTY_ONLY",
+        )
         self.assertGreater(
             config["forecast"]["online_maximum_direction_weight"],
             0,
@@ -61,6 +65,14 @@ class PolicyConfigurationTests(unittest.TestCase):
         )
         self.assertNotIn('values.setdefault("strategy"', source)
         self.assertNotIn('values.setdefault("trade_lifecycle"', source)
+
+    def test_negative_memory_uses_its_runtime_mode_not_removed_toggle(self) -> None:
+        source = (
+            self.root / "src" / "btc_ema_trader" / "negative_memory.py"
+        ).read_text(encoding="utf-8")
+        self.assertIn('memory_cfg.get("runtime_mode", "HARD_VETO")', source)
+        self.assertIn("_apply_boundary_risk_penalty", source)
+        self.assertNotIn("aggressive_paper_mode", source)
 
     def test_release_versions_are_aligned(self) -> None:
         config = yaml.safe_load(
