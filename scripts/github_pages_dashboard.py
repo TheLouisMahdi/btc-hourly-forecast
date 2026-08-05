@@ -6,13 +6,17 @@ import re
 from pathlib import Path
 from typing import Any
 
+import github_boundary_dashboard
 import github_dashboard
+import github_timing_dashboard
+import github_trade_dashboard
 
 
 def main() -> int:
     status = github_dashboard.main()
     if status != 0:
         return status
+
     root = Path(__file__).resolve().parents[1]
     site_dir = root / "site"
     latest = _load_json(site_dir / "latest.json", {})
@@ -21,15 +25,15 @@ def main() -> int:
     document = index_path.read_text(encoding="utf-8")
     document = document.replace(
         "BTC Next-Candle Forecast",
-        "BTC Economic Breakout Forecast",
+        "BTC Adaptive Directional Breakout Trader",
     )
     document = document.replace(
         "Direction-first forecasting with adaptive price learning",
-        "Cost-aware structural signals with locked economic validation",
+        "Persistent paper positions with causal structure and immutable outcomes",
     )
     document = document.replace(
         "Adaptive next-candle BTC direction and price forecast",
-        "Causal BTC structure, cost-aware execution and economic validation",
+        "Adaptive BTC paper positions and an exact secondary next-close forecast",
     )
     document = document.replace(
         "</style>",
@@ -47,6 +51,12 @@ def main() -> int:
     if marker in document:
         document = document.replace(marker, panels + "\n" + marker, 1)
     index_path.write_text(document, encoding="utf-8")
+
+    # Component renderers are intentionally orchestrated here so deployment has
+    # one canonical dashboard command and one deterministic mutation order.
+    github_boundary_dashboard.main()
+    github_trade_dashboard.main()
+    github_timing_dashboard.main()
     return 0
 
 
@@ -55,16 +65,21 @@ def _health_badges(latest: dict[str, Any]) -> str:
     health = latest.get("data_health")
     health = health if isinstance(health, dict) else {}
     data_ok = bool(health.get("candles_ok", False) and health.get("quote_ok", False))
-    economic_ok = bool(latest.get("qualification_passed", False))
+    qualification_ok = bool(latest.get("qualification_passed", False))
+    paper_only = bool(
+        str(latest.get("paper_trade_mode") or "").upper()
+        or _plan(latest).get("paper_only", True)
+    )
     return (
         '<div class="health-stack">'
         + _badge("Pipeline", "HEALTHY" if pipeline_ok else "FAIL-SAFE", pipeline_ok)
-        + _badge("Data", "FRESH" if data_ok else "WARNING", data_ok)
+        + _badge("Market data", "FRESH" if data_ok else "WARNING", data_ok)
         + _badge(
-            "Economic model",
-            "QUALIFIED" if economic_ok else "BLOCKED",
-            economic_ok,
+            "Economic qualification",
+            "QUALIFIED" if qualification_ok else "UNQUALIFIED",
+            qualification_ok,
         )
+        + _badge("Execution", "PAPER ONLY" if paper_only else "UNKNOWN", paper_only)
         + "</div>"
     )
 
@@ -78,96 +93,126 @@ def _badge(label: str, value: str, ok: bool) -> str:
 
 
 def _economic_panel(latest: dict[str, Any], history: list[Any]) -> str:
-    trade_plan = latest.get("trade_plan")
-    trade_plan = trade_plan if isinstance(trade_plan, dict) else {}
-    contract = latest.get("next_candle_forecast")
-    contract = contract if isinstance(contract, dict) else {}
-    expected_gross = _number(trade_plan.get("predicted_gross_move_bps"))
-    if expected_gross is None:
-        expected_gross = abs(_number(latest.get("expected_return")) or 0.0) * 10_000.0
-    stress_cost = _number(trade_plan.get("stress_execution_cost_bps"))
+    active = latest.get("active_trade")
+    active = active if isinstance(active, dict) else None
+    current_plan = _plan(latest)
+    candidate = latest.get("candidate_trade_plan") if active else current_plan
+    candidate = candidate if isinstance(candidate, dict) else current_plan
+
+    expected_gross = _number(candidate.get("predicted_gross_move_bps"))
+    stress_cost = _number(candidate.get("stress_execution_cost_bps"))
     if stress_cost is None:
         stress_cost = _number(latest.get("actual_cost_bps"))
     net_edge = _number(
-        trade_plan.get(
+        candidate.get(
             "predicted_stress_net_edge_bps",
             latest.get("expected_net_edge_bps"),
         )
     )
-    required_edge = _number(trade_plan.get("minimum_required_net_edge_bps"))
-    direction_weight = _number(contract.get("direction_blend_weight")) or 0.0
-    return_weight = _number(contract.get("return_blend_weight")) or 0.0
-    resolved = sum(
+    expected_value = _number(candidate.get("expected_value_usd"))
+    ignored = candidate.get("ignored_soft_blockers")
+    ignored = ignored if isinstance(ignored, list) else []
+    hard = latest.get("candidate_blockers") if active else latest.get("blockers")
+    hard = hard if isinstance(hard, list) else []
+    mode = str(
+        candidate.get("decision_mode")
+        or latest.get("paper_trade_mode")
+        or "PAPER"
+    )
+    candidate_action = str(
+        latest.get("candidate_action")
+        if active
+        else latest.get("action")
+        or "WAIT"
+    )
+    resolved_positions = _number(
+        (latest.get("trade_lifecycle_summary") or {}).get("resolved_trades")
+        if isinstance(latest.get("trade_lifecycle_summary"), dict)
+        else None
+    )
+    resolved_forecasts = sum(
         1
         for item in history
         if isinstance(item, dict)
         and item.get("direction_result")
         in {"DIRECTION_CORRECT", "DIRECTION_WRONG"}
     )
-    evidence = (
-        "INSUFFICIENT LIVE EVIDENCE"
-        if resolved < 100
-        else "EARLY LIVE EVIDENCE"
-        if resolved < 500
-        else "ESTABLISHED LIVE SAMPLE"
+    qualification = bool(latest.get("qualification_passed", False))
+    explanation = (
+        "The active position is managed from its frozen entry contract. "
+        "This panel describes the newest candidate decision separately."
+        if active
+        else "The candidate is evaluated after stress execution costs. "
+        "Aggressive paper mode may explore selected soft-gate failures, but "
+        "hard timing, data, structure and duplication checks remain enforced."
     )
-    action = str(latest.get("action") or "WAIT")
     return f'''
 <section class="panel economic-panel">
   <div class="economic-heading">
     <div>
-      <div class="structure-eyebrow">Net edge after execution costs</div>
+      <div class="structure-eyebrow">Candidate economics · separate from active position</div>
       <h2>Economic decision</h2>
-      <p class="sub">The direction forecast is never treated as a trade unless the locked direction/horizon policy clears calibrated probability, structure and stress-cost gates.</p>
+      <p class="sub">{_escape(explanation)}</p>
     </div>
-    <span class="economic-action">{_escape(action)}</span>
+    <span class="economic-action">{_escape(candidate_action)}</span>
   </div>
   <div class="economic-grid">
-    {_tile("Predicted gross move", _bps(expected_gross), "Model-aligned move before costs")}
+    {_tile("Decision mode", _label(mode), "Economic-gated or aggressive paper exploration")}
+    {_tile("Predicted gross move", _bps(expected_gross), "Candidate move before execution costs")}
     {_tile("Stress execution cost", _bps(stress_cost), "Fees, slippage and uncertainty buffer")}
-    {_tile("Predicted net edge", _bps(net_edge), "Gross move minus stress execution cost")}
-    {_tile("Required net edge", _bps(required_edge), "Locked policy threshold from development data")}
-    {_tile("Direction online weight", _percent(direction_weight), "Zero unless online Brier and accuracy improve")}
-    {_tile("Return online weight", _percent(return_weight), "Zero unless online return MAE improves")}
-    {_tile("Resolved live forecasts", str(resolved), evidence)}
-    {_tile("Qualification", "PASSED" if latest.get("qualification_passed") else "BLOCKED", "Locked chronological holdout verdict")}
+    {_tile("Predicted net edge", _bps(net_edge), "Candidate gross move minus stress cost")}
+    {_tile("Expected value", _money(expected_value), "Probability-weighted paper value")}
+    {_tile("Ignored soft gates", str(len(ignored)), _list_text(ignored, "None"))}
+    {_tile("Hard blockers", str(len(hard)), _list_text(hard, "None"))}
+    {_tile("Qualification", "QUALIFIED" if qualification else "UNQUALIFIED", f"{int(resolved_positions or 0)} resolved positions · {resolved_forecasts} resolved secondary forecasts")}
   </div>
 </section>'''
 
 
 def _structure_panel(latest: dict[str, Any]) -> str:
-    trade_plan = latest.get("trade_plan")
-    trade_plan = trade_plan if isinstance(trade_plan, dict) else {}
-    event_type = str(
-        trade_plan.get("event_type") or latest.get("event_type") or "NONE"
-    )
-    event_score = _number(
-        trade_plan.get("event_score", latest.get("trigger_score"))
-    )
+    active = latest.get("active_trade")
+    active = active if isinstance(active, dict) else None
+    trade_plan = _plan(latest)
+    source = trade_plan if active else latest.get("candidate_trade_plan", trade_plan)
+    source = source if isinstance(source, dict) else trade_plan
+
+    event_type = str(source.get("event_type") or latest.get("event_type") or "NONE")
+    event_score = _number(source.get("event_score"))
     breakout_source = str(
-        trade_plan.get("breakout_source")
+        source.get("breakout_source")
         or latest.get("breakout_source")
         or "NONE"
     )
     breakout_level = _number(
-        trade_plan.get("breakout_level", latest.get("breakout_level"))
+        source.get("breakout_level", latest.get("breakout_level"))
     )
-    invalidation_level = _number(trade_plan.get("invalidation_level"))
+    invalidation_level = _number(
+        source.get(
+            "invalidation_level",
+            latest.get("breakout_invalidation_level"),
+        )
+    )
     triangle_type = str(
-        trade_plan.get("triangle_type")
+        source.get("triangle_type")
         or latest.get("triangle_type")
         or "NONE"
     )
     selected_horizon = (
-        latest.get("trade_selected_horizon")
-        or trade_plan.get("maximum_holding_hours")
+        source.get("selected_horizon")
+        or latest.get("trade_selected_horizon")
         or latest.get("selected_horizon")
     )
     action = str(latest.get("action") or "WAIT")
+    context_complete = bool(
+        source.get(
+            "candle_context_complete",
+            latest.get("candle_context_complete", False),
+        )
+    )
     state = (
-        "Confirmed structural event"
-        if event_type != "NONE"
-        else "Waiting for a fresh structural crossing"
+        "Managing the frozen structure that opened the active position"
+        if active
+        else "Waiting for or evaluating a fresh close-to-close structural crossing"
     )
     return f'''
 <section class="panel structure-panel">
@@ -175,21 +220,27 @@ def _structure_panel(latest: dict[str, Any]) -> str:
     <div>
       <div class="structure-eyebrow">Causal market structure</div>
       <h2>Breakout context</h2>
-      <p class="sub">{_escape(state)}. A setup requires a real close-to-close crossing and a qualified 3h, 6h or 12h economic policy.</p>
+      <p class="sub">{_escape(state)}. New positions require a real crossing; an existing position may remain open without a new hourly event.</p>
     </div>
     <span class="structure-action">{_escape(action)}</span>
   </div>
   <div class="structure-grid">
-    {_tile("Event", _label(event_type), "Primary setup classification")}
-    {_tile("Source", _label(breakout_source), "Dynamic level or triangle boundary")}
+    {_tile("Event", _label(event_type), "Structural setup classification")}
+    {_tile("Source", _label(breakout_source), "Static, dynamic or triangle boundary")}
     {_tile("Breakout level", _price(breakout_level), "Confirmed crossed structure")}
-    {_tile("Invalidation", _price(invalidation_level), "Preferred structural stop reference")}
+    {_tile("Invalidation", _price(invalidation_level), "Structural risk reference")}
     {_tile("Triangle", _label(triangle_type), "Causal converging-boundary pattern")}
     {_tile("Event score", _percent(event_score), "Body, volume, close and structure quality")}
-    {_tile("Trade horizon", f"{_escape(selected_horizon)}h" if selected_horizon else "—", "Selected only from qualified 3h, 6h and 12h policies")}
-    {_tile("Regime", _label(latest.get("regime")), "Long-term structural environment")}
+    {_tile("Signal horizon", f"{_escape(selected_horizon)}h" if selected_horizon else "—", "Direction-specific event horizon")}
+    {_tile("Candle context", "COMPLETE" if context_complete else "UNAVAILABLE", "Event candle plus two previous closed candles")}
+    {_tile("Regime", _label(source.get("regime", latest.get("regime"))), "Long-term structural environment")}
   </div>
 </section>'''
+
+
+def _plan(latest: dict[str, Any]) -> dict[str, Any]:
+    value = latest.get("trade_plan")
+    return value if isinstance(value, dict) else {}
 
 
 def _tile(title: str, value: str, note: str) -> str:
@@ -206,7 +257,7 @@ def _extra_styles() -> str:
 .health-stack{display:flex;flex-wrap:wrap;justify-content:flex-end;gap:7px}
 .health-badge{display:grid;grid-template-columns:8px auto;column-gap:7px;align-items:center;padding:8px 10px;border:1px solid var(--line);border-radius:14px;background:rgba(255,255,255,.72)}
 .health-badge i{grid-row:1/3;width:8px;height:8px;border-radius:50%;background:var(--ok)}
-.health-badge.warn i{background:var(--bad)}
+.health-badge.warn i{background:var(--wait)}
 .health-badge small{font-size:8px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em}
 .health-badge strong{font-size:10px}
 .structure-panel,.economic-panel{margin-top:18px;background:linear-gradient(135deg,rgba(255,255,255,.84),rgba(222,236,231,.54))}
@@ -237,11 +288,15 @@ def _number(value: Any) -> float | None:
         number = float(value)
     except (TypeError, ValueError):
         return None
-    return number if number == number else None
+    return number if number == number and abs(number) != float("inf") else None
 
 
 def _price(value: float | None) -> str:
     return "—" if value is None else f"${value:,.2f}"
+
+
+def _money(value: float | None) -> str:
+    return "—" if value is None else f"${value:+,.2f}"
 
 
 def _percent(value: float | None) -> str:
@@ -254,6 +309,12 @@ def _bps(value: float | None) -> str:
 
 def _label(value: Any) -> str:
     return _escape(str(value or "NONE").replace("_", " ").title())
+
+
+def _list_text(items: list[Any], empty: str) -> str:
+    if not items:
+        return empty
+    return ", ".join(str(item).replace("_", " ").title() for item in items[:3])
 
 
 def _escape(value: Any) -> str:
