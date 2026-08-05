@@ -10,26 +10,28 @@ from typing import Any
 import pandas as pd
 
 from btc_ema_trader.contract_features import build_feature_set
-from btc_ema_trader.forecast_contract import (
-    attach_close_based_general_labels,
-    build_next_candle_forecast,
+from btc_ema_trader.execution_path import resolve_open_trades_after_entry
+from btc_ema_trader.forecast_contract import attach_close_based_general_labels
+from btc_ema_trader.github_runtime import (
+    CanonicalAdaptiveTradeEngine,
+    CanonicalRuntimeEngine,
+    attach_optional_forecast,
+    build_optional_secondary_forecast,
+    open_trade_with_context,
+    optional_price_prediction,
+    preserve_canonical_forecast,
+    retain_directional_history,
 )
 from btc_ema_trader.logging_setup import configure_logging
-from btc_ema_trader.market import fetch_and_store
 from btc_ema_trader.model import latest_bundle
 from btc_ema_trader.negative_memory import (
     install_runtime_guard,
     load_boundary_memory,
 )
 from btc_ema_trader.price_adaptive import PriceAdaptiveEngine
-from btc_ema_trader.runtime import RuntimeEngine
+from btc_ema_trader.runtime_history import fetch_latest_contiguous_and_store
 from btc_ema_trader.storage import Database
-from btc_ema_trader.trade_lifecycle import (
-    AdaptiveTradeEngine,
-    active_trade,
-    open_trade_from_record,
-    resolve_open_trades,
-)
+from btc_ema_trader.trade_lifecycle import active_trade
 
 from github_common import (
     build_github_settings,
@@ -46,8 +48,8 @@ MAX_TRADES = 1000
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description=(
-            "Run one aggressive adaptive paper-trade cycle with persistent "
-            "target, stop, time-exit and online outcome learning"
+            "Run one canonical aggressive paper-trade cycle with causal "
+            "context, live-quote entry, adaptive exits and immutable outcomes"
         )
     )
     parser.add_argument("--state-dir", default=".github_state")
@@ -75,9 +77,17 @@ def main() -> int:
     site_dir.mkdir(parents=True, exist_ok=True)
 
     history_path = state_dir / "history.json"
+    latest_path = state_dir / "latest.json"
     trades_path = state_dir / "trades.json"
-    previous_history = load_history(history_path)
+    raw_history = load_history(history_path)
+    previous_history = retain_directional_history(raw_history)
+    if previous_history != raw_history:
+        write_json(history_path, previous_history)
+    previous_latest = load_record(latest_path)
+    if previous_latest and not retain_directional_history([previous_latest]):
+        write_json(latest_path, {})
     trades = load_history(trades_path)
+
     used_weekly_model = copy_latest_model_from_state(
         root,
         model_state_dir,
@@ -112,7 +122,7 @@ def main() -> int:
     opened_trade_id: str | None = None
     try:
         bundle = latest_bundle(settings)
-        market = fetch_and_store(
+        market = fetch_latest_contiguous_and_store(
             settings,
             database,
             days=180,
@@ -122,31 +132,32 @@ def main() -> int:
             provider=bundle.provider,
             symbol=bundle.symbol,
         )
-        # Rebuild the path-dependent stop state from the immutable initial
-        # stop before replaying closed candles. This keeps hourly reruns
-        # deterministic and prevents a later trailing stop from being applied
-        # retroactively to an earlier candle.
+
+        # Rebuild path-dependent stop state from its immutable entry values
+        # before deterministic post-entry replay.
         for trade in trades:
             if trade.get("status") == "OPEN":
                 trade["current_stop_price"] = trade.get(
-                    "initial_stop_price", trade.get("current_stop_price")
+                    "initial_stop_price",
+                    trade.get("current_stop_price"),
                 )
                 trade["max_favorable_r"] = 0.0
                 trade["max_adverse_r"] = 0.0
                 trade["breakeven_armed"] = False
                 trade["trailing_armed"] = False
-        resolved_trades_now = resolve_open_trades(
+        resolved_trades_now = resolve_open_trades_after_entry(
             trades,
             candles,
             settings,
         )
-        trade_engine = AdaptiveTradeEngine(
+
+        trade_engine = CanonicalAdaptiveTradeEngine(
             settings,
             bundle.model_id,
         )
         trade_summary = trade_engine.synchronize(trades)
 
-        result = RuntimeEngine(
+        result = CanonicalRuntimeEngine(
             settings,
             database,
         ).run_once(force=True)
@@ -162,12 +173,15 @@ def main() -> int:
             if result.get("status") != "FAIL_SAFE"
             else "FAIL_SAFE"
         )
+
         if status == "OK" and result.get("candle_time"):
             result["run_finished_at"] = pd.Timestamp.now(tz="UTC").isoformat()
             raw_plan = result.get("trade_plan")
             raw_plan = raw_plan if isinstance(raw_plan, dict) else {}
-            enriched_plan = trade_engine.enrich_trade_plan(result, raw_plan)
-            result["trade_plan"] = enriched_plan
+            result["trade_plan"] = trade_engine.enrich_trade_plan(
+                result,
+                raw_plan,
+            )
 
             current_trade = active_trade(trades)
             if current_trade is not None:
@@ -185,7 +199,7 @@ def main() -> int:
                 )
                 result["trade_plan"]["status"] = "MANAGING_OPEN_TRADE"
             elif result.get("action") in {"LONG", "SHORT"}:
-                candidate = open_trade_from_record(result)
+                candidate = open_trade_with_context(result)
                 if candidate is not None and not any(
                     item.get("trade_id") == candidate.get("trade_id")
                     for item in trades
@@ -201,7 +215,8 @@ def main() -> int:
             result["trade_opened_now"] = opened_trade_id
             result["trade_contract"] = "TARGET_STOP_TIME_EXIT"
 
-            price_prediction = build_price_prediction(
+            price_prediction = optional_price_prediction(
+                build_price_prediction,
                 settings,
                 database,
                 bundle,
@@ -220,15 +235,14 @@ def main() -> int:
                     0.80,
                 )
             )
-            recent_candles = candles.tail(168)
-            contract = build_next_candle_forecast(
+            contract = build_optional_secondary_forecast(
                 result,
                 load_contract_metrics(settings, bundle.metrics),
-                recent_candles,
+                candles.tail(168),
                 previous_history,
                 interval_probability=interval_probability,
             )
-            result = attach_forecast_contract(result, contract)
+            result = attach_optional_forecast(result, contract)
     except Exception as exc:
         LOGGER.exception("Hourly trade lifecycle failed")
         market = None
@@ -258,24 +272,22 @@ def main() -> int:
                 None if memory is None else memory.model_id
             ),
             "negative_memory_error": memory_error,
-            "paper_trade_mode": "AGGRESSIVE_ADAPTIVE_5R",
+            "paper_trade_mode": "AGGRESSIVE_STRUCTURAL_RISK_SCALED",
+            "runtime_contract": "CANONICAL_GITHUB_RUNTIME_V2",
         }
     )
     fresh_adaptive_summary = fresh_record.get(
         "adaptive",
         {"status": "UNAVAILABLE"},
     )
-    record = preserve_existing_forecast(
+    record = preserve_canonical_forecast(
         previous_history,
         fresh_record,
     )
 
-    history = append_unique(
-        previous_history,
-        record,
-    )[-MAX_HISTORY:]
+    history = append_unique(previous_history, record)[-MAX_HISTORY:]
     trades = trades[-MAX_TRADES:]
-    write_json(state_dir / "latest.json", record)
+    write_json(latest_path, record)
     write_json(history_path, history)
     write_json(trades_path, trades)
     write_json(site_dir / "latest.json", record)
@@ -360,72 +372,6 @@ def load_contract_metrics(
         return fallback
 
 
-def attach_forecast_contract(
-    result: dict[str, Any],
-    contract: dict[str, Any],
-) -> dict[str, Any]:
-    """Attach one-candle research output without replacing the trade contract."""
-    output = dict(result)
-    output["trade_forecast_direction"] = output.get("forecast_direction")
-    output["trade_selected_horizon"] = output.get("selected_horizon")
-    output["trade_confidence"] = output.get("confidence")
-    output["next_candle_forecast"] = contract
-    output["forecast_contract_version"] = contract["contract_version"]
-    output["next_candle_direction"] = contract["direction"]
-    output["next_candle_confidence"] = contract["direction_confidence"]
-    output["next_candle_expected_return"] = contract["median_return"]
-    output["target_candle_time"] = contract["target_open_time"]
-    output["target_candle_open_time"] = contract["target_open_time"]
-    output["target_candle_close_time"] = contract["target_close_time"]
-    output["predicted_close_median"] = contract["median_close"]
-    output["predicted_close_low"] = contract["likely_close_low"]
-    output["predicted_close_high"] = contract["likely_close_high"]
-    output["prediction_result"] = "PENDING"
-    output["direction_result"] = "PENDING"
-    output["interval_result"] = "PENDING"
-    output["resolved_at"] = None
-    output["forecast_frozen"] = True
-    output["primary_objective"] = "OPEN_TRADE_TO_TARGET_STOP_OR_TIME_EXIT"
-    return output
-
-
-def preserve_existing_forecast(
-    history: list[dict[str, Any]],
-    record: dict[str, Any],
-) -> dict[str, Any]:
-    key = record.get("candle_time")
-    if not key:
-        return record
-    existing = next(
-        (
-            item
-            for item in reversed(history)
-            if item.get("candle_time") == key
-            and isinstance(item.get("next_candle_forecast"), dict)
-            and item.get("run_status") == "OK"
-        ),
-        None,
-    )
-    if existing is None:
-        return record
-    merged = dict(existing)
-    for field in (
-        "action",
-        "blockers",
-        "trade_plan",
-        "active_trade",
-        "trade_lifecycle_summary",
-        "trade_resolved_now",
-        "trade_opened_now",
-        "run_finished_at",
-        "run_duration_seconds",
-        "paper_trade_mode",
-    ):
-        if field in record:
-            merged[field] = record[field]
-    return merged
-
-
 def load_history(path: Path) -> list[dict[str, Any]]:
     if not path.exists():
         return []
@@ -434,6 +380,16 @@ def load_history(path: Path) -> list[dict[str, Any]]:
         return payload if isinstance(payload, list) else []
     except Exception:
         return []
+
+
+def load_record(path: Path) -> dict[str, Any]:
+    if not path.exists():
+        return {}
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+        return payload if isinstance(payload, dict) else {}
+    except Exception:
+        return {}
 
 
 def append_unique(
