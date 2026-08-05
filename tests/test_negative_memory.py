@@ -8,9 +8,22 @@ from btc_ema_trader.negative_memory import (
     BloomFilter,
     RESISTANCE,
     SUPPORT,
+    _apply_boundary_risk_penalty,
     boundary_context,
     fingerprint,
 )
+
+
+class _Settings:
+    def section(self, name: str):
+        if name != "strategy":
+            raise KeyError(name)
+        return {
+            "account_equity_usd": 1000.0,
+            "risk_per_trade_fraction": 0.0125,
+            "minimum_risk_per_trade_fraction": 0.005,
+            "maximum_risk_per_trade_fraction": 0.03,
+        }
 
 
 class NegativeMemoryTests(unittest.TestCase):
@@ -69,6 +82,43 @@ class NegativeMemoryTests(unittest.TestCase):
             boundary_context(resistance_row)["boundary_side"],
             RESISTANCE,
         )
+
+    def test_bloom_and_bad_pattern_evidence_reduce_but_do_not_zero_risk(self) -> None:
+        plan = {
+            "risk_fraction": 0.02,
+            "risk_budget_usd": 20.0,
+            "risk_assessment": {},
+            "soft_risk_flags": [],
+        }
+        flags = [
+            "KNOWN_BAD_PATTERN_FRONT_BLOOM",
+            "HIGH_UNPROFITABLE_PATTERN_RISK",
+        ]
+        result = _apply_boundary_risk_penalty(plan, flags, _Settings())
+        self.assertLess(result["risk_fraction"], 0.02)
+        self.assertGreaterEqual(result["risk_fraction"], 0.005)
+        self.assertEqual(
+            result["risk_budget_usd"],
+            1000.0 * result["risk_fraction"],
+        )
+        self.assertEqual(result["negative_memory_risk_multiplier"], 0.60)
+        self.assertIn(
+            "KNOWN_BAD_PATTERN_FRONT_BLOOM",
+            result["soft_risk_flags"],
+        )
+        self.assertEqual(
+            result["risk_assessment"]["pre_memory_risk_fraction"],
+            0.02,
+        )
+
+    def test_no_memory_flags_leave_risk_unchanged(self) -> None:
+        result = _apply_boundary_risk_penalty(
+            {"risk_fraction": 0.0125, "risk_assessment": {}},
+            [],
+            _Settings(),
+        )
+        self.assertEqual(result["risk_fraction"], 0.0125)
+        self.assertEqual(result["negative_memory_risk_multiplier"], 1.0)
 
 
 if __name__ == "__main__":
