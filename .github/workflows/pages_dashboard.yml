@@ -9,6 +9,7 @@ on:
       - "scripts/github_pages_dashboard.py"
       - "scripts/github_boundary_dashboard.py"
       - "scripts/github_trade_dashboard.py"
+      - "scripts/github_timing_dashboard.py"
       - "scripts/github_common.py"
       - "pyproject.toml"
       - "requirements-github.txt"
@@ -72,6 +73,7 @@ jobs:
           python scripts/github_pages_dashboard.py --runtime-dir .dashboard_runtime
           python scripts/github_boundary_dashboard.py
           python scripts/github_trade_dashboard.py
+          python scripts/github_timing_dashboard.py
 
       - name: Configure GitHub Pages
         uses: actions/configure-pages@v6
