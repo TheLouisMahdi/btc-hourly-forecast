@@ -1,5 +1,18 @@
 # Changelog
 
+## 5.5.0 — Aggressive structural entries with risk-scaled sizing
+
+- Replaced the fixed-risk aggressive toggle with one canonical `AGGRESSIVE_STRUCTURAL_RISK_SCALED` entry policy.
+- Kept valid structural Long and Short events position-seeking even when model qualification or predicted stress edge is weak.
+- Converted qualification, economic edge, confidence, tradeability, regime alignment and operational warnings into a bounded risk score.
+- Added dynamic paper-account risk sizing between 0.5% and 3.0% instead of a fixed 1% allocation.
+- Preserved hard fail-safe blockers for missing structure, invalid market data, stale execution quotes, direction mismatch and duplicate or active positions.
+- Disabled the generic multi-horizon adaptive blend while retaining the gated price learner and resolved-trade target/stop learner.
+- Recalculated final Adaptive Target/Stop economics with the decision risk fraction so later lifecycle processing cannot restore fixed sizing.
+- Added `policy_version`, `risk_contract_version`, `entry_contract`, `risk_score`, `risk_fraction` and soft-risk evidence to new positions.
+- Kept legacy positions in the same ledger while making their older policy contract distinguishable.
+- Added dashboard diagnostics and regression tests for risk scaling, hard blockers, policy persistence and version consistency.
+
 ## 5.4.0 — Canonical position contract and repository cleanup
 
 - Made the persistent LONG/SHORT target-stop lifecycle the primary product contract.
