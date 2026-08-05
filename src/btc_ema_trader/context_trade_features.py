@@ -26,6 +26,10 @@ CONTEXT_TRADE_FEATURES = (
     "three_bar_wick_pressure",
 )
 EXTENDED_TRADE_FEATURES = BASE_TRADE_FEATURES + CONTEXT_TRADE_FEATURES
+NEUTRAL_CONTEXT_VECTOR = np.asarray(
+    [0.0, 0.0, 0.0, 0.0, 0.5, 0.0, 0.5, 0.0, 0.5, 0.0, 0.0, 0.0],
+    dtype=float,
+)
 
 
 def context_trade_feature_vector(
@@ -132,11 +136,37 @@ def context_trade_feature_vector(
     return np.concatenate([np.asarray(base, dtype=float), extra])
 
 
+def migrate_trade_feature_vectors(trades: list[dict[str, Any]]) -> int:
+    """Pad schema-v1 positions with neutral context so their outcomes remain usable."""
+    migrated = 0
+    for trade in trades:
+        vector = np.asarray(trade.get("entry_feature_vector", []), dtype=float)
+        if vector.shape != (len(BASE_TRADE_FEATURES),):
+            continue
+        trade["entry_feature_vector"] = np.concatenate(
+            [vector, NEUTRAL_CONTEXT_VECTOR]
+        ).tolist()
+        trade["entry_feature_names"] = list(EXTENDED_TRADE_FEATURES)
+        trade["candle_context_migration"] = "LEGACY_NEUTRAL_CONTEXT"
+        migrated += 1
+    return migrated
+
+
 def install_context_trade_features(module: Any) -> None:
     """Install schema-v2 features into the existing adaptive lifecycle module."""
     module.TRADE_STATE_SCHEMA_VERSION = CONTEXT_TRADE_SCHEMA_VERSION
     module.TRADE_FEATURES = EXTENDED_TRADE_FEATURES
     module.trade_feature_vector = context_trade_feature_vector
+    if getattr(module.AdaptiveTradeEngine, "_context_sync_installed", False):
+        return
+    base_synchronize = module.AdaptiveTradeEngine.synchronize
+
+    def synchronize_with_context(self, trades):
+        migrate_trade_feature_vectors(trades)
+        return base_synchronize(self, trades)
+
+    module.AdaptiveTradeEngine.synchronize = synchronize_with_context
+    module.AdaptiveTradeEngine._context_sync_installed = True
 
 
 def _scaled_percent(value: Any, scale: float) -> float:
