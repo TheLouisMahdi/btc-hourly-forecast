@@ -20,6 +20,10 @@ from btc_ema_trader.context_trade_features import (
     install_context_trade_features,
 )
 from btc_ema_trader.execution_entry import apply_execution_quote
+from btc_ema_trader.execution_path import (
+    install_execution_path_contract,
+    resolve_open_trades_after_entry,
+)
 from btc_ema_trader.runtime_history import (
     fetch_latest_contiguous_and_store,
 )
@@ -169,10 +173,21 @@ def open_trade_with_context(
         "source_candle_close",
         record.get("price"),
     )
+    trade["selected_horizon"] = record.get(
+        "trade_selected_horizon",
+        record.get("selected_horizon"),
+    )
+    trade["breakout_source"] = record.get("breakout_source")
+    trade["breakout_level"] = record.get("breakout_level")
+    trade["invalidation_level"] = record.get(
+        "breakout_invalidation_level"
+    )
+    trade["regime"] = record.get("regime")
+    trade["event_score"] = record.get("trigger_score")
     execution_quote = record.get("execution_quote")
     if isinstance(execution_quote, dict):
         trade["execution_quote"] = execution_quote
-    return trade
+    return install_execution_path_contract(trade)
 
 
 def main() -> int:
@@ -207,6 +222,9 @@ def main() -> int:
     github_hourly_forecast.RuntimeEngine = ContextRuntimeEngine
     github_hourly_forecast.AdaptiveTradeEngine = CanonicalAdaptiveTradeEngine
     github_hourly_forecast.open_trade_from_record = open_trade_with_context
+    github_hourly_forecast.resolve_open_trades = (
+        resolve_open_trades_after_entry
+    )
     github_hourly_forecast.build_next_candle_forecast = (
         build_strict_next_candle_forecast
     )
