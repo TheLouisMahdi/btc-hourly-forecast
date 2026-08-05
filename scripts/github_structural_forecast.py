@@ -5,9 +5,13 @@ from pathlib import Path
 from typing import Any
 
 import github_hourly_forecast
+import btc_ema_trader.trade_lifecycle as trade_lifecycle_module
 from btc_ema_trader.candle_context import (
     CONTEXT_CONTRACT,
     extract_candle_context,
+)
+from btc_ema_trader.context_trade_features import (
+    install_context_trade_features,
 )
 from btc_ema_trader.runtime_history import (
     fetch_latest_contiguous_and_store,
@@ -98,10 +102,14 @@ def main() -> int:
         if latest and not _is_directional_record(latest):
             latest_path.write_text("{}\n", encoding="utf-8")
 
+    install_context_trade_features(trade_lifecycle_module)
     github_hourly_forecast.fetch_and_store = (
         fetch_latest_contiguous_and_store
     )
     github_hourly_forecast.RuntimeEngine = ContextRuntimeEngine
+    github_hourly_forecast.AdaptiveTradeEngine = (
+        trade_lifecycle_module.AdaptiveTradeEngine
+    )
     github_hourly_forecast.open_trade_from_record = open_trade_with_context
     github_hourly_forecast.build_next_candle_forecast = (
         build_strict_next_candle_forecast
