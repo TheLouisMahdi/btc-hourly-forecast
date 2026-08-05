@@ -35,6 +35,8 @@ MODEL_PREFIX = "directional-breakout-hourly-"
 _BASE_RUNTIME_ENGINE = github_hourly_forecast.RuntimeEngine
 _BASE_OPEN_TRADE = github_hourly_forecast.open_trade_from_record
 _BASE_ADAPTIVE_TRADE_ENGINE = trade_lifecycle_module.AdaptiveTradeEngine
+_BASE_PRICE_PREDICTION = github_hourly_forecast.build_price_prediction
+_BASE_ATTACH_FORECAST = github_hourly_forecast.attach_forecast_contract
 
 FORECAST_IMMUTABLE_FIELDS = {
     "next_candle_forecast",
@@ -63,6 +65,9 @@ FORECAST_IMMUTABLE_FIELDS = {
     "evaluation_available_at",
     "seconds_until_evaluation",
     "forecast_frozen",
+    "secondary_forecast_status",
+    "secondary_forecast_error",
+    "secondary_forecast_timing_status",
 }
 
 
@@ -229,6 +234,85 @@ def open_trade_with_context(
     return install_execution_path_contract(trade)
 
 
+def optional_price_prediction(*args, **kwargs) -> dict[str, Any]:
+    """Keep secondary price-model failure outside the primary trade cycle."""
+    try:
+        return _BASE_PRICE_PREDICTION(*args, **kwargs)
+    except Exception as exc:
+        return {
+            "status": "UNAVAILABLE",
+            "source": "SECONDARY_PRICE_MODEL_UNAVAILABLE",
+            "error": f"{type(exc).__name__}: {exc}",
+            "batch_probability_up": 0.5,
+            "online_probability_up": 0.5,
+            "fused_probability_up": 0.5,
+            "direction_blend_weight": 0.0,
+            "batch_return": 0.0,
+            "online_return": 0.0,
+            "fused_return": 0.0,
+            "return_blend_weight": 0.0,
+            "metrics": {},
+            "samples_seen": 0,
+        }
+
+
+def build_optional_secondary_forecast(
+    record: dict[str, Any],
+    model_metrics: dict[str, Any] | None,
+    recent_candles: pd.DataFrame,
+    history: list[dict[str, Any]],
+    interval_probability: float = 0.80,
+) -> dict[str, Any]:
+    price_model = record.get("price_forecast_model")
+    price_model = price_model if isinstance(price_model, dict) else {}
+    if price_model.get("status") == "UNAVAILABLE":
+        return _not_created_contract(
+            str(price_model.get("error") or "Secondary price model unavailable"),
+            "PRICE_MODEL_UNAVAILABLE",
+        )
+    try:
+        return build_strict_next_candle_forecast(
+            record,
+            model_metrics,
+            recent_candles,
+            history,
+            interval_probability=interval_probability,
+        )
+    except Exception as exc:
+        return _not_created_contract(
+            f"{type(exc).__name__}: {exc}",
+            "MISSED_OR_INVALID_TARGET_WINDOW",
+        )
+
+
+def attach_optional_forecast(
+    result: dict[str, Any],
+    contract: dict[str, Any],
+) -> dict[str, Any]:
+    if contract.get("status") == "NOT_CREATED":
+        output = dict(result)
+        output["secondary_forecast_status"] = "NOT_CREATED"
+        output["secondary_forecast_error"] = contract.get("error")
+        output["secondary_forecast_timing_status"] = contract.get(
+            "timing_status"
+        )
+        output["prediction_result"] = "NOT_SCORED"
+        output["direction_result"] = "NOT_SCORED"
+        output["interval_result"] = "NOT_SCORED"
+        output["resolved_at"] = None
+        output["primary_objective"] = (
+            "OPEN_TRADE_TO_TARGET_STOP_OR_TIME_EXIT"
+        )
+        return output
+    output = _BASE_ATTACH_FORECAST(result, contract)
+    output["secondary_forecast_status"] = "CREATED"
+    output["secondary_forecast_error"] = None
+    output["secondary_forecast_timing_status"] = contract.get(
+        "timing_status"
+    )
+    return output
+
+
 def preserve_canonical_forecast(
     history: list[dict[str, Any]],
     record: dict[str, Any],
@@ -254,6 +338,17 @@ def preserve_canonical_forecast(
         if field not in FORECAST_IMMUTABLE_FIELDS:
             merged[field] = value
     return merged
+
+
+def _not_created_contract(error: str, timing_status: str) -> dict[str, Any]:
+    return {
+        "contract_version": 0,
+        "status": "NOT_CREATED",
+        "target": "NEXT_CLOSED_1H_CANDLE",
+        "timing_status": timing_status,
+        "retroactive_forecast": False,
+        "error": error,
+    }
 
 
 def main() -> int:
@@ -291,8 +386,12 @@ def main() -> int:
     github_hourly_forecast.resolve_open_trades = (
         resolve_open_trades_after_entry
     )
+    github_hourly_forecast.build_price_prediction = optional_price_prediction
     github_hourly_forecast.build_next_candle_forecast = (
-        build_strict_next_candle_forecast
+        build_optional_secondary_forecast
+    )
+    github_hourly_forecast.attach_forecast_contract = (
+        attach_optional_forecast
     )
     github_hourly_forecast.preserve_existing_forecast = (
         preserve_canonical_forecast
