@@ -22,8 +22,6 @@ on:
       - "src/btc_ema_trader/strategy.py"
       - "src/btc_ema_trader/structure_training.py"
       - "src/btc_ema_trader/forecast_contract.py"
-      - "src/btc_ema_trader/strict_forecast_contract.py"
-      - "tests/**"
       - "requirements-github.txt"
       - "pyproject.toml"
   schedule:
