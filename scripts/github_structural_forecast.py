@@ -4,7 +4,6 @@ import json
 from pathlib import Path
 from typing import Any
 
-import numpy as np
 import pandas as pd
 
 import btc_ema_trader.trade_lifecycle as trade_lifecycle_module
@@ -24,6 +23,9 @@ from btc_ema_trader.execution_entry import apply_execution_quote
 from btc_ema_trader.execution_path import (
     install_execution_path_contract,
     resolve_open_trades_after_entry,
+)
+from btc_ema_trader.risk_economics import (
+    apply_risk_scaled_economics as _apply_risk_scaled_economics,
 )
 from btc_ema_trader.runtime_history import (
     fetch_latest_contiguous_and_store,
@@ -73,7 +75,7 @@ FORECAST_IMMUTABLE_FIELDS = {
 
 
 class ContextRuntimeEngine:
-    """Install causal candle context and a fresh paper-entry quote."""
+    """Install causal candle context and a fresh execution-time quote."""
 
     def __init__(self, settings, database) -> None:
         self.settings = settings
@@ -84,6 +86,7 @@ class ContextRuntimeEngine:
         result = self.delegate.run_once(force=force)
         if not isinstance(result, dict) or not result.get("candle_time"):
             return result
+
         provider = str(result.get("provider") or "") or None
         symbol = str(
             self.settings.section("market").get("symbol", "BTCUSDT")
@@ -99,7 +102,9 @@ class ContextRuntimeEngine:
         )
         result["event_candle_context"] = context
         result["candle_context_contract"] = CONTEXT_CONTRACT
-        result["candle_context_complete"] = bool(context.get("complete", False))
+        result["candle_context_complete"] = bool(
+            context.get("complete", False)
+        )
 
         observed_at = pd.Timestamp.now(tz="UTC")
         try:
@@ -150,7 +155,7 @@ class ContextRuntimeEngine:
 
 
 class CanonicalAdaptiveTradeEngine(_BASE_ADAPTIVE_TRADE_ENGINE):
-    """Keep the active position contract separate from a new candidate plan."""
+    """Keep the active position separate from the newest hourly candidate."""
 
     def __init__(self, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
@@ -167,7 +172,10 @@ class CanonicalAdaptiveTradeEngine(_BASE_ADAPTIVE_TRADE_ENGINE):
         plan: dict[str, Any],
     ) -> dict[str, Any]:
         candidate = super().enrich_trade_plan(record, plan)
-        candidate = _apply_risk_scaled_economics(candidate, self.settings)
+        candidate = _apply_risk_scaled_economics(
+            candidate,
+            self.settings,
+        )
         active = self._active_position
         if active is None:
             return candidate
@@ -182,91 +190,13 @@ class CanonicalAdaptiveTradeEngine(_BASE_ADAPTIVE_TRADE_ENGINE):
         return build_active_position_plan(active)
 
 
-def _apply_risk_scaled_economics(
-    plan: dict[str, Any],
-    settings: Any,
-) -> dict[str, Any]:
-    """Recalculate final target-stop economics with the decision risk fraction."""
-    output = dict(plan)
-    try:
-        entry = float(output["entry_reference"])
-        stop_pct = abs(float(output["stop_percent"]))
-        target_pct = abs(float(output["target_percent"]))
-    except (KeyError, TypeError, ValueError):
-        return output
-    if entry <= 0 or stop_pct <= 0 or target_pct <= 0:
-        return output
-
-    strategy = settings.section("strategy")
-    account = float(strategy.get("account_equity_usd", 1000.0))
-    risk_fraction = float(
-        output.get(
-            "risk_fraction",
-            strategy.get("risk_per_trade_fraction", 0.0125),
-        )
-    )
-    minimum_fraction = float(
-        strategy.get("minimum_risk_per_trade_fraction", 0.005)
-    )
-    maximum_fraction = float(
-        strategy.get("maximum_risk_per_trade_fraction", 0.03)
-    )
-    risk_fraction = float(
-        np.clip(risk_fraction, minimum_fraction, maximum_fraction)
-    )
-    risk_budget = account * risk_fraction
-    maximum_leverage = float(strategy.get("maximum_leverage", 5.0))
-    stress_bps = float(output.get("stress_execution_cost_bps", 0.0))
-    cost_fraction = stress_bps / 10_000.0
-    unit_risk = entry * (stop_pct + cost_fraction)
-    quantity = risk_budget / max(unit_risk, 1e-9)
-    notional = min(quantity * entry, account * maximum_leverage)
-    quantity = notional / entry
-    leverage = float(
-        np.clip(notional / max(account, 1e-9), 1.0, maximum_leverage)
-    )
-    margin = notional / leverage
-    execution_cost = notional * cost_fraction
-    target_gross = notional * target_pct
-    stop_gross = notional * stop_pct
-    target_net = target_gross - execution_cost
-    stop_net = -(stop_gross + execution_cost)
-    predicted_r = float(output.get("adaptive_predicted_r", 0.0))
-    p_target = float(output.get("adaptive_target_probability", 0.5))
-    p_stop = float(output.get("adaptive_stop_probability", 0.4))
-    p_expiry = max(0.0, 1.0 - p_target - p_stop)
-    expiry_net = notional * predicted_r * stop_pct - execution_cost
-    expected_value = (
-        p_target * target_net + p_stop * stop_net + p_expiry * expiry_net
-    )
-    output.update(
-        {
-            "risk_fraction": risk_fraction,
-            "risk_budget_usd": float(risk_budget),
-            "quantity_btc": float(quantity),
-            "notional_usd": float(notional),
-            "suggested_leverage": leverage,
-            "margin_required_usd": float(margin),
-            "round_trip_stress_cost_usd": float(execution_cost),
-            "target_gross_profit_usd": float(target_gross),
-            "target_net_profit_usd": float(target_net),
-            "stop_gross_loss_usd": float(-stop_gross),
-            "stop_net_loss_usd": float(stop_net),
-            "profit_margin_usd": float(target_net),
-            "target_margin_roi": float(target_net / max(margin, 1e-9)),
-            "stop_margin_roi": float(stop_net / max(margin, 1e-9)),
-            "expected_value_usd": float(expected_value),
-        }
-    )
-    return output
-
-
 def open_trade_with_context(
     record: dict[str, Any],
 ) -> dict[str, Any] | None:
     trade = _BASE_OPEN_TRADE(record)
     if trade is None:
         return None
+
     context = record.get("event_candle_context")
     if isinstance(context, dict):
         trade["event_candle_context"] = context
@@ -274,21 +204,57 @@ def open_trade_with_context(
             record.get("candle_context_contract") or CONTEXT_CONTRACT
         )
         trade["candle_context_complete"] = bool(
-            record.get("candle_context_complete", context.get("complete", False))
+            record.get(
+                "candle_context_complete",
+                context.get("complete", False),
+            )
         )
+
     plan = record.get("trade_plan")
     plan = plan if isinstance(plan, dict) else {}
-    trade["entry_definition"] = str(
-        plan.get("entry_definition", "PAPER_MARKET_ORDER_AT_SIGNAL_RUN")
+    _copy_plan_fields(
+        trade,
+        plan,
+        (
+            "entry_definition",
+            "entry_reference_kind",
+            "entry_quote_provider",
+            "entry_quote_time",
+            "entry_quote_observed_at",
+            "source_candle_close",
+            "policy_name",
+            "policy_version",
+            "risk_contract_version",
+            "entry_contract",
+            "risk_score",
+            "risk_fraction",
+            "risk_assessment",
+            "soft_risk_flags",
+            "qualification_passed",
+            "direction_qualified",
+            "modeled_risk_fraction",
+            "modeled_total_risk_usd",
+            "risk_budget_utilization",
+            "gap_risk_buffer_bps",
+            "label_execution_aligned",
+            "label_entry_definition",
+            "runtime_entry_definition",
+            "execution_alignment_status",
+        ),
     )
-    trade["entry_reference_kind"] = plan.get("entry_reference_kind")
-    trade["entry_quote_provider"] = plan.get("entry_quote_provider")
-    trade["entry_quote_time"] = plan.get("entry_quote_time")
-    trade["entry_quote_observed_at"] = plan.get("entry_quote_observed_at")
-    trade["source_candle_close"] = plan.get(
-        "source_candle_close",
-        record.get("price"),
+    trade.setdefault("entry_definition", "PAPER_MARKET_ORDER_AT_SIGNAL_RUN")
+    trade.setdefault("policy_name", "LEGACY_AGGRESSIVE_PAPER")
+    trade.setdefault("policy_version", 1)
+    trade.setdefault("risk_contract_version", 1)
+    trade.setdefault("entry_contract", "LEGACY_FIXED_RISK")
+    trade["soft_risk_flags"] = list(trade.get("soft_risk_flags") or [])
+    trade["qualification_passed"] = bool(
+        trade.get("qualification_passed", False)
     )
+    trade["direction_qualified"] = bool(
+        trade.get("direction_qualified", False)
+    )
+
     trade["selected_horizon"] = record.get(
         "trade_selected_horizon",
         record.get("selected_horizon"),
@@ -300,25 +266,7 @@ def open_trade_with_context(
     )
     trade["regime"] = record.get("regime")
     trade["event_score"] = record.get("trigger_score")
-    trade["policy_name"] = str(
-        plan.get("policy_name") or "LEGACY_AGGRESSIVE_PAPER"
-    )
-    trade["policy_version"] = int(plan.get("policy_version", 1))
-    trade["risk_contract_version"] = int(
-        plan.get("risk_contract_version", 1)
-    )
-    trade["entry_contract"] = str(
-        plan.get("entry_contract") or "LEGACY_FIXED_RISK"
-    )
-    trade["risk_score"] = float(plan.get("risk_score", 0.0))
-    trade["risk_fraction"] = float(plan.get("risk_fraction", 0.0))
-    trade["soft_risk_flags"] = list(plan.get("soft_risk_flags", []))
-    trade["qualification_passed"] = bool(
-        plan.get("qualification_passed", False)
-    )
-    trade["direction_qualified"] = bool(
-        plan.get("direction_qualified", False)
-    )
+
     execution_quote = record.get("execution_quote")
     if isinstance(execution_quote, dict):
         trade["execution_quote"] = execution_quote
@@ -367,7 +315,10 @@ def build_optional_secondary_forecast(
     price_model = price_model if isinstance(price_model, dict) else {}
     if price_model.get("status") == "UNAVAILABLE":
         return _not_created_contract(
-            str(price_model.get("error") or "Secondary price model unavailable"),
+            str(
+                price_model.get("error")
+                or "Secondary price model unavailable"
+            ),
             "PRICE_MODEL_UNAVAILABLE",
         )
     try:
@@ -404,6 +355,7 @@ def attach_optional_forecast(
             "OPEN_TRADE_TO_TARGET_STOP_OR_TIME_EXIT"
         )
         return output
+
     output = _BASE_ATTACH_FORECAST(result, contract)
     output["secondary_forecast_status"] = "CREATED"
     output["secondary_forecast_error"] = None
@@ -417,7 +369,7 @@ def preserve_canonical_forecast(
     history: list[dict[str, Any]],
     record: dict[str, Any],
 ) -> dict[str, Any]:
-    """Keep the frozen forecast while refreshing all runtime metadata."""
+    """Keep frozen forecast outcomes while refreshing runtime metadata."""
     key = record.get("candle_time")
     if not key:
         return record
@@ -433,6 +385,7 @@ def preserve_canonical_forecast(
     )
     if existing is None:
         return record
+
     merged = dict(existing)
     for field, value in record.items():
         if field not in FORECAST_IMMUTABLE_FIELDS:
@@ -458,9 +411,7 @@ def main() -> int:
     latest_path = state_dir / "latest.json"
     history = _load_list(history_path)
     directional_history = [
-        item
-        for item in history
-        if _is_directional_record(item)
+        item for item in history if _is_directional_record(item)
     ]
     if directional_history != history:
         state_dir.mkdir(parents=True, exist_ok=True)
@@ -497,6 +448,16 @@ def main() -> int:
         preserve_canonical_forecast
     )
     return github_hourly_forecast.main()
+
+
+def _copy_plan_fields(
+    target: dict[str, Any],
+    source: dict[str, Any],
+    fields: tuple[str, ...],
+) -> None:
+    for field in fields:
+        if field in source:
+            target[field] = source[field]
 
 
 def _is_directional_record(item: dict[str, Any]) -> bool:
