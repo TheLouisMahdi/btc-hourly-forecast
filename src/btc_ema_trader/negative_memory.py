@@ -5,6 +5,7 @@ from pathlib import Path
 from typing import Any
 
 import joblib
+import numpy as np
 import pandas as pd
 
 from .config import Settings
@@ -58,7 +59,7 @@ def install_runtime_guard(
     *,
     require_for_trade: bool = True,
 ) -> None:
-    """Install memory as veto in gated mode and risk penalty in wild paper mode."""
+    """Install memory as a configured hard veto or paper-risk penalty."""
     from . import runtime as runtime_module
     from .model import HourlyModelBundle
 
@@ -95,7 +96,11 @@ def install_runtime_guard(
         **kwargs: Any,
     ) -> Any:
         decision = original_decision(
-            latest_row, prediction, bundle, settings, **kwargs
+            latest_row,
+            prediction,
+            bundle,
+            settings,
+            **kwargs,
         )
         boundary = prediction.get("boundary_memory")
         boundary = (
@@ -135,17 +140,22 @@ def install_runtime_guard(
                     ):
                         flags.append("HIGH_UNPROFITABLE_PATTERN_RISK")
 
-        aggressive = bool(
-            settings.section("strategy").get("paper_only", True)
-            and settings.section("strategy").get(
-                "aggressive_paper_mode", False
-            )
-        )
+        flags = list(dict.fromkeys(flags))
         plan = dict(decision.trade_plan)
         plan["boundary_memory"] = boundary
-        plan["boundary_memory_flags"] = list(dict.fromkeys(flags))
-        if aggressive:
-            plan["negative_memory_mode"] = "ADAPTIVE_PENALTY_ONLY"
+        plan["boundary_memory_flags"] = flags
+
+        memory_cfg = settings.section("negative_memory")
+        mode = str(
+            memory_cfg.get("runtime_mode", "HARD_VETO")
+        ).upper()
+        if mode == "ADAPTIVE_PENALTY_ONLY":
+            plan = _apply_boundary_risk_penalty(
+                plan,
+                flags,
+                settings,
+            )
+            plan["negative_memory_mode"] = mode
             return replace(decision, trade_plan=plan)
 
         blockers = list(dict.fromkeys(list(decision.blockers) + flags))
@@ -159,3 +169,67 @@ def install_runtime_guard(
 
     guarded_decision._negative_memory_guard = True
     runtime_module.make_decision = guarded_decision
+
+
+def _apply_boundary_risk_penalty(
+    plan: dict[str, Any],
+    flags: list[str],
+    settings: Settings,
+) -> dict[str, Any]:
+    """Convert negative-memory evidence into a bounded paper-risk reduction."""
+    output = dict(plan)
+    factors = {
+        "BOUNDARY_NEGATIVE_MEMORY_UNAVAILABLE": 0.90,
+        "BOUNDARY_CONTEXT_MISMATCH": 0.80,
+        "BOUNDARY_HORIZON_UNAVAILABLE": 0.88,
+        "BOUNDARY_HEAD_NOT_QUALIFIED": 0.90,
+        "KNOWN_BAD_PATTERN_FRONT_BLOOM": 0.75,
+        "HARD_NEGATIVE_BACKUP_BLOOM": 0.65,
+        "LOW_LEVEL_BREAK_PROBABILITY": 0.85,
+        "HIGH_UNPROFITABLE_PATTERN_RISK": 0.80,
+    }
+    multiplier = 1.0
+    applied: dict[str, float] = {}
+    for flag in flags:
+        factor = factors.get(flag)
+        if factor is None:
+            continue
+        multiplier *= factor
+        applied[flag] = factor
+
+    strategy = settings.section("strategy")
+    minimum = float(
+        strategy.get("minimum_risk_per_trade_fraction", 0.005)
+    )
+    maximum = float(
+        strategy.get("maximum_risk_per_trade_fraction", 0.03)
+    )
+    if maximum < minimum:
+        minimum, maximum = maximum, minimum
+    original_fraction = float(
+        output.get(
+            "risk_fraction",
+            strategy.get("risk_per_trade_fraction", 0.0125),
+        )
+    )
+    adjusted_fraction = float(
+        np.clip(original_fraction * multiplier, minimum, maximum)
+    )
+    account = float(strategy.get("account_equity_usd", 1000.0))
+
+    assessment = output.get("risk_assessment")
+    assessment = dict(assessment) if isinstance(assessment, dict) else {}
+    assessment["negative_memory_multiplier"] = float(multiplier)
+    assessment["negative_memory_penalties"] = applied
+    assessment["pre_memory_risk_fraction"] = original_fraction
+    assessment["risk_fraction"] = adjusted_fraction
+
+    soft_flags = list(output.get("soft_risk_flags", []))
+    output["soft_risk_flags"] = list(dict.fromkeys(soft_flags + flags))
+    output["ignored_soft_blockers"] = list(output["soft_risk_flags"])
+    output["risk_assessment"] = assessment
+    output["risk_fraction"] = adjusted_fraction
+    output["risk_budget_usd"] = account * adjusted_fraction
+    output["negative_memory_risk_multiplier"] = float(multiplier)
+    output["negative_memory_penalties"] = applied
+    return output
