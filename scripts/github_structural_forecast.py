@@ -4,6 +4,8 @@ import json
 from pathlib import Path
 from typing import Any
 
+import pandas as pd
+
 import btc_ema_trader.trade_lifecycle as trade_lifecycle_module
 import github_hourly_forecast
 from btc_ema_trader.active_position_contract import (
@@ -17,6 +19,7 @@ from btc_ema_trader.candle_context import (
 from btc_ema_trader.context_trade_features import (
     install_context_trade_features,
 )
+from btc_ema_trader.execution_entry import apply_execution_quote
 from btc_ema_trader.runtime_history import (
     fetch_latest_contiguous_and_store,
 )
@@ -31,7 +34,7 @@ _BASE_ADAPTIVE_TRADE_ENGINE = trade_lifecycle_module.AdaptiveTradeEngine
 
 
 class ContextRuntimeEngine:
-    """Decorate the runtime result with an auditable causal candle window."""
+    """Install causal candle context and a fresh paper-entry quote."""
 
     def __init__(self, settings, database) -> None:
         self.settings = settings
@@ -58,6 +61,49 @@ class ContextRuntimeEngine:
         result["event_candle_context"] = context
         result["candle_context_contract"] = CONTEXT_CONTRACT
         result["candle_context_complete"] = bool(context.get("complete", False))
+
+        observed_at = pd.Timestamp.now(tz="UTC")
+        try:
+            quote = self.delegate.market.live_quote(provider_hint=provider)
+            result = apply_execution_quote(
+                result,
+                provider=quote.provider,
+                price=quote.price,
+                quote_time=quote.timestamp,
+                observed_at=observed_at,
+                maximum_age_seconds=float(
+                    self.settings.section("market").get(
+                        "quote_stale_seconds",
+                        90,
+                    )
+                ),
+            )
+        except Exception as exc:
+            result["execution_quote"] = {
+                "contract": "LIVE_QUOTE_AT_SIGNAL_RUN",
+                "fresh": False,
+                "error": f"{type(exc).__name__}: {exc}",
+                "observed_at": observed_at.isoformat(),
+            }
+            result["blockers"] = list(
+                dict.fromkeys(
+                    list(result.get("blockers", []))
+                    + ["EXECUTION_QUOTE_UNAVAILABLE"]
+                )
+            )
+            if result.get("action") in {"LONG", "SHORT"}:
+                result["candidate_action_before_quote_block"] = result.get(
+                    "action"
+                )
+                result["action"] = "WAIT"
+                plan = result.get("trade_plan")
+                if isinstance(plan, dict):
+                    plan = dict(plan)
+                    plan["status"] = "BLOCKED"
+                    plan["entry_reference_kind"] = (
+                        "EXECUTION_QUOTE_UNAVAILABLE"
+                    )
+                    result["trade_plan"] = plan
         return result
 
     def __getattr__(self, name: str) -> Any:
@@ -111,12 +157,21 @@ def open_trade_with_context(
         trade["candle_context_complete"] = bool(
             record.get("candle_context_complete", context.get("complete", False))
         )
+    plan = record.get("trade_plan")
+    plan = plan if isinstance(plan, dict) else {}
     trade["entry_definition"] = str(
-        record.get("trade_plan", {}).get(
-            "entry_definition",
-            "PAPER_MARKET_ORDER_AT_SIGNAL_RUN",
-        )
+        plan.get("entry_definition", "PAPER_MARKET_ORDER_AT_SIGNAL_RUN")
     )
+    trade["entry_reference_kind"] = plan.get("entry_reference_kind")
+    trade["entry_quote_provider"] = plan.get("entry_quote_provider")
+    trade["entry_quote_time"] = plan.get("entry_quote_time")
+    trade["source_candle_close"] = plan.get(
+        "source_candle_close",
+        record.get("price"),
+    )
+    execution_quote = record.get("execution_quote")
+    if isinstance(execution_quote, dict):
+        trade["execution_quote"] = execution_quote
     return trade
 
 
