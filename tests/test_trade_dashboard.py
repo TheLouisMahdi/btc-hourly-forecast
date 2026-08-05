@@ -9,7 +9,7 @@ sys.path.insert(
     str(Path(__file__).resolve().parents[1] / "scripts"),
 )
 
-from github_trade_dashboard import _position_ledger
+from github_trade_dashboard import _panel, _position_ledger
 
 
 class TradeDashboardTests(unittest.TestCase):
@@ -66,6 +66,39 @@ class TradeDashboardTests(unittest.TestCase):
         self.assertIn("+3.80R", document)
         self.assertIn("TIME EXIT WIN", document)
         self.assertNotIn("$999.00", document)
+
+    def test_panel_displays_risk_policy_and_soft_evidence(self) -> None:
+        latest = {
+            "action": "LONG",
+            "trade_plan": {
+                "status": "ACTIONABLE",
+                "entry_reference": 100.0,
+                "target_price": 105.0,
+                "stop_price": 99.0,
+                "risk_budget_usd": 20.0,
+                "risk_fraction": 0.02,
+                "risk_score": 0.60,
+                "policy_name": "AGGRESSIVE_STRUCTURAL_RISK_SCALED",
+                "policy_version": 2,
+                "qualification_passed": False,
+                "direction_qualified": False,
+                "soft_risk_flags": [
+                    "MODEL_NOT_QUALIFIED",
+                    "INSUFFICIENT_STRESS_NET_EDGE",
+                ],
+            },
+            "trade_lifecycle_summary": {},
+        }
+
+        document = _panel(latest, [])
+
+        self.assertIn("Risk allocation", document)
+        self.assertIn("$+20.00 · 2.00%", document)
+        self.assertIn("Risk score", document)
+        self.assertIn("60.00%", document)
+        self.assertIn("v2", document)
+        self.assertIn("RISK-SCALED", document)
+        self.assertIn("MODEL NOT QUALIFIED", document)
 
 
 if __name__ == "__main__":

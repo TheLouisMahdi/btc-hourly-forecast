@@ -4,8 +4,8 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "btc-hourly-regime-trader"
-version = "5.4.0"
-description = "Adaptive BTC paper-trading research with causal breakout features, persistent target-stop positions and immutable outcome tracking"
+version = "5.5.0"
+description = "Aggressive risk-scaled BTC paper-trading research with causal breakout features, persistent target-stop positions and immutable outcome tracking"
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [

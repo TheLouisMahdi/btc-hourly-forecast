@@ -1,6 +1,6 @@
 project:
   name: BTC Adaptive Target-Stop Trader
-  version: 5.4.0
+  version: 5.5.0
   timezone: UTC
 
 paths:
@@ -244,7 +244,7 @@ forecast:
   online_minimum_return_mae_improvement: 0.00002
 
 adaptive:
-  enabled: true
+  enabled: false
   bootstrap_rows: 2160
   observation_limit: 1500
   evaluation_window: 504
@@ -274,7 +274,7 @@ negative_memory:
 
 trade_lifecycle:
   enabled: true
-  mode: AGGRESSIVE_PAPER
+  mode: AGGRESSIVE_STRUCTURAL_RISK_SCALED
   base_reward_r: 5.0
   minimum_reward_r: 3.0
   maximum_reward_r: 8.0
@@ -311,7 +311,8 @@ qualification:
 
 strategy:
   paper_only: true
-  aggressive_paper_mode: true
+  position_policy: AGGRESSIVE_STRUCTURAL_RISK_SCALED
+  policy_version: 2
   allow_short: true
   entry_order_style: market
   exit_order_style: taker
@@ -338,7 +339,11 @@ strategy:
   maximum_atr_percent: 6.0
   block_during_news_shock: false
   require_fresh_news: false
-  risk_per_trade_fraction: 0.01
+  risk_per_trade_fraction: 0.0125
+  minimum_risk_per_trade_fraction: 0.005
+  maximum_risk_per_trade_fraction: 0.03
+  risk_edge_lower_bps: -20.0
+  risk_edge_upper_bps: 20.0
   account_equity_usd: 1000.0
   maximum_leverage: 5.0
   stop_atr_multiplier: 0.75

@@ -11,6 +11,10 @@ from .costs import execution_cost_breakdown
 from .economic_validation import apply_calibration
 from .model import HourlyModelBundle
 
+POLICY_NAME = "AGGRESSIVE_STRUCTURAL_RISK_SCALED"
+POLICY_VERSION = 2
+RISK_CONTRACT_VERSION = 2
+
 STRUCTURAL_EVENTS = {
     "RESISTANCE_BREAKOUT_LONG",
     "TRIANGLE_BREAKOUT_LONG",
@@ -18,7 +22,7 @@ STRUCTURAL_EVENTS = {
     "TRIANGLE_BREAKDOWN_SHORT",
 }
 
-AGGRESSIVE_SOFT_BLOCKERS = {
+SOFT_RISK_FLAGS = {
     "MODEL_NOT_QUALIFIED",
     "SELECTED_DIRECTION_NOT_QUALIFIED",
     "ECONOMIC_POLICY_UNAVAILABLE",
@@ -27,11 +31,12 @@ AGGRESSIVE_SOFT_BLOCKERS = {
     "LOW_TRADEABILITY_PROBABILITY",
     "INSUFFICIENT_STRESS_NET_EDGE",
     "VOLATILITY_SHOCK",
-    "NEWS_SHOCK_BLOCK",
+    "NEWS_SHOCK",
     "DAILY_SIGNAL_LIMIT",
     "SIGNAL_COOLDOWN",
     "MODEL_STALE",
     "NEWS_STALE",
+    "REGIME_UNKNOWN",
 }
 
 
@@ -62,10 +67,6 @@ def make_decision(
     event_already_traded: bool = False,
 ) -> Decision:
     cfg = settings.section("strategy")
-    aggressive = bool(
-        cfg.get("paper_only", True)
-        and cfg.get("aggressive_paper_mode", False)
-    )
     qualification = bundle.qualification or {}
     forecast_direction = str(prediction["direction"])
     trade_direction = str(
@@ -127,38 +128,42 @@ def make_decision(
     minimum_edge_bps = float(
         policy.get(
             "minimum_predicted_stress_edge_bps",
-            cfg.get("minimum_net_edge_bps", 0.0 if aggressive else 8.0),
+            cfg.get("minimum_net_edge_bps", 0.0),
         )
     )
     minimum_event_score = float(
         policy.get(
             "minimum_event_score",
-            cfg.get("minimum_event_score", 0.10 if aggressive else 0.30),
+            cfg.get("minimum_event_score", 0.10),
         )
     )
 
-    blockers: list[str] = []
-    if not bool(qualification.get("passed", False)):
-        blockers.append("MODEL_NOT_QUALIFIED")
-    if is_event and selected_horizon not in qualified_horizons:
-        blockers.append("SELECTED_DIRECTION_NOT_QUALIFIED")
+    hard_blockers: list[str] = []
+    soft_risk_flags: list[str] = []
+
+    qualification_passed = bool(qualification.get("passed", False))
+    direction_qualified = selected_horizon in qualified_horizons
+    if not qualification_passed:
+        soft_risk_flags.append("MODEL_NOT_QUALIFIED")
+    if is_event and not direction_qualified:
+        soft_risk_flags.append("SELECTED_DIRECTION_NOT_QUALIFIED")
     if is_event and not policy:
-        blockers.append("ECONOMIC_POLICY_UNAVAILABLE")
+        soft_risk_flags.append("ECONOMIC_POLICY_UNAVAILABLE")
 
     if not is_event or event_direction == 0:
-        blockers.append("NO_NEW_STRUCTURE_BREAKOUT")
+        hard_blockers.append("NO_NEW_STRUCTURE_BREAKOUT")
     elif event_type not in STRUCTURAL_EVENTS:
-        blockers.append("UNSUPPORTED_STRUCTURE_EVENT")
+        hard_blockers.append("UNSUPPORTED_STRUCTURE_EVENT")
     if is_event and event_score < minimum_event_score:
-        blockers.append("WEAK_BREAKOUT_STRUCTURE")
+        soft_risk_flags.append("WEAK_BREAKOUT_STRUCTURE")
     if is_event and breakout_level is None:
-        blockers.append("BREAKOUT_LEVEL_UNAVAILABLE")
+        hard_blockers.append("BREAKOUT_LEVEL_UNAVAILABLE")
     if is_event and invalidation_level is None:
-        blockers.append("INVALIDATION_LEVEL_UNAVAILABLE")
+        hard_blockers.append("INVALIDATION_LEVEL_UNAVAILABLE")
     if event_already_traded:
-        blockers.append("EVENT_ALREADY_TRADED")
+        hard_blockers.append("EVENT_ALREADY_TRADED")
     if str(latest_row.get("regime", "UNKNOWN")) == "UNKNOWN":
-        blockers.append("REGIME_UNKNOWN")
+        soft_risk_flags.append("REGIME_UNKNOWN")
 
     expected_trade_direction = (
         "UP"
@@ -168,9 +173,9 @@ def make_decision(
         else trade_direction
     )
     if is_event and trade_direction != expected_trade_direction:
-        blockers.append("EVENT_DIRECTION_MISMATCH")
+        hard_blockers.append("EVENT_DIRECTION_MISMATCH")
     if event_direction < 0 and not bool(cfg.get("allow_short", False)):
-        blockers.append("SHORT_EXECUTION_VENUE_NOT_ENABLED")
+        hard_blockers.append("SHORT_EXECUTION_VENUE_NOT_ENABLED")
 
     minimum_confidence = float(
         policy.get(
@@ -178,68 +183,76 @@ def make_decision(
             _per_horizon(
                 cfg.get("minimum_confidence", {}),
                 selected_horizon,
-                0.50 if aggressive else 0.60,
+                0.50,
             ),
         )
     )
     if confidence < minimum_confidence:
-        blockers.append("LOW_BREAKOUT_SUCCESS_PROBABILITY")
+        soft_risk_flags.append("LOW_BREAKOUT_SUCCESS_PROBABILITY")
     minimum_tradeability = float(
         policy.get(
             "tradeability_probability",
             _per_horizon(
                 cfg.get("minimum_tradeability_probability", {}),
                 selected_horizon,
-                0.50 if aggressive else 0.58,
+                0.50,
             ),
         )
     )
     if tradeability_probability < minimum_tradeability:
-        blockers.append("LOW_TRADEABILITY_PROBABILITY")
+        soft_risk_flags.append("LOW_TRADEABILITY_PROBABILITY")
     if net_edge_bps < minimum_edge_bps:
-        blockers.append("INSUFFICIENT_STRESS_NET_EDGE")
+        soft_risk_flags.append("INSUFFICIENT_STRESS_NET_EDGE")
 
     atr_pct = float(latest_row.get("atr_pct", np.nan))
     if not np.isfinite(atr_pct) or atr_pct <= 0:
-        blockers.append("ATR_UNAVAILABLE")
-    elif atr_pct * 100 > float(cfg.get("maximum_atr_percent", 6.0 if aggressive else 4.0)):
-        blockers.append("VOLATILITY_SHOCK")
-    if int(latest_row.get("news_shock", 0)) == 1 and bool(
-        cfg.get("block_during_news_shock", not aggressive)
-    ):
-        blockers.append("NEWS_SHOCK_BLOCK")
-    if recent_signal_count >= int(cfg.get("maximum_daily_signals", 12 if aggressive else 3)):
-        blockers.append("DAILY_SIGNAL_LIMIT")
-    cooldown = float(cfg.get("cooldown_hours_after_signal", 0 if aggressive else 3))
+        hard_blockers.append("ATR_UNAVAILABLE")
+    elif atr_pct * 100 > float(cfg.get("maximum_atr_percent", 6.0)):
+        soft_risk_flags.append("VOLATILITY_SHOCK")
+    if int(latest_row.get("news_shock", 0)) == 1:
+        soft_risk_flags.append("NEWS_SHOCK")
+    if recent_signal_count >= int(cfg.get("maximum_daily_signals", 12)):
+        soft_risk_flags.append("DAILY_SIGNAL_LIMIT")
+    cooldown = float(cfg.get("cooldown_hours_after_signal", 0))
     if (
         hours_since_last_signal is not None
         and hours_since_last_signal < cooldown
     ):
-        blockers.append("SIGNAL_COOLDOWN")
+        soft_risk_flags.append("SIGNAL_COOLDOWN")
 
     if data_health:
         if not data_health.get("candles_ok", True):
-            blockers.append("CANDLE_DATA_UNHEALTHY")
+            hard_blockers.append("CANDLE_DATA_UNHEALTHY")
         if not data_health.get("quote_ok", True):
-            blockers.append("QUOTE_STALE")
+            hard_blockers.append("QUOTE_STALE")
         if data_health.get("provider_mismatch", False):
-            blockers.append("PROVIDER_MISMATCH")
+            hard_blockers.append("PROVIDER_MISMATCH")
         if data_health.get("model_stale", False):
-            blockers.append("MODEL_STALE")
-        if data_health.get("news_stale", False) and bool(
-            cfg.get("require_fresh_news", False)
-        ):
-            blockers.append("NEWS_STALE")
+            soft_risk_flags.append("MODEL_STALE")
+        if data_health.get("news_stale", False):
+            soft_risk_flags.append("NEWS_STALE")
 
-    ignored_blockers: list[str] = []
-    if aggressive:
-        ignored_blockers = [
-            blocker for blocker in blockers if blocker in AGGRESSIVE_SOFT_BLOCKERS
-        ]
-        blockers = [
-            blocker for blocker in blockers if blocker not in AGGRESSIVE_SOFT_BLOCKERS
-        ]
-    blockers = list(dict.fromkeys(blockers))
+    hard_blockers = list(dict.fromkeys(hard_blockers))
+    soft_risk_flags = [
+        item
+        for item in dict.fromkeys(soft_risk_flags)
+        if item in SOFT_RISK_FLAGS
+    ]
+
+    risk_assessment = _risk_assessment(
+        cfg=cfg,
+        event_score=event_score,
+        confidence=confidence,
+        tradeability_probability=tradeability_probability,
+        net_edge_bps=net_edge_bps,
+        minimum_edge_bps=minimum_edge_bps,
+        qualification_passed=qualification_passed,
+        direction_qualified=direction_qualified,
+        economic_policy_available=bool(policy),
+        regime=str(latest_row.get("regime", "UNKNOWN")),
+        event_direction=event_direction,
+        soft_risk_flags=soft_risk_flags,
+    )
 
     action = (
         "LONG"
@@ -248,7 +261,7 @@ def make_decision(
         if event_direction < 0
         else "WAIT"
     )
-    if blockers:
+    if hard_blockers:
         action = "WAIT"
     trade_plan = build_trade_plan(
         latest_row,
@@ -262,11 +275,23 @@ def make_decision(
         minimum_edge_bps=minimum_edge_bps,
         calibrated_success=confidence,
         calibrated_tradeability=tradeability_probability,
+        risk_assessment=risk_assessment,
     )
-    trade_plan["decision_mode"] = (
-        "AGGRESSIVE_PAPER" if aggressive else "ECONOMIC_GATED"
+    trade_plan.update(
+        {
+            "decision_mode": POLICY_NAME,
+            "policy_name": POLICY_NAME,
+            "policy_version": POLICY_VERSION,
+            "risk_contract_version": RISK_CONTRACT_VERSION,
+            "entry_contract": "STRUCTURAL_EVENT_RISK_SCALED",
+            "soft_risk_flags": soft_risk_flags,
+            "ignored_soft_blockers": soft_risk_flags,
+            "hard_blockers": hard_blockers,
+            "qualification_passed": qualification_passed,
+            "direction_qualified": direction_qualified,
+            "economic_policy_available": bool(policy),
+        }
     )
-    trade_plan["ignored_soft_blockers"] = ignored_blockers
     return Decision(
         forecast_direction=forecast_direction,
         action=action,
@@ -290,7 +315,7 @@ def make_decision(
                 prediction.get("returns", {}),
             ).items()
         },
-        blockers=blockers,
+        blockers=hard_blockers,
         trade_plan=trade_plan,
     )
 
@@ -302,7 +327,22 @@ def _select_economic_horizon(
     event_score: float,
 ) -> tuple[int, float, float, dict[str, Any]]:
     fallback = int(prediction.get("selected_horizon", 1))
-    candidates = sorted(qualified_horizons) or [fallback]
+    available: set[int] = set()
+    for key in ("continuation", "tradeability", "event_returns"):
+        value = prediction.get(key, {})
+        if isinstance(value, dict):
+            for horizon in value:
+                try:
+                    available.add(int(horizon))
+                except (TypeError, ValueError):
+                    continue
+    structural_horizons = sorted(h for h in available if h > 1)
+    candidates = (
+        sorted(qualified_horizons)
+        or structural_horizons
+        or sorted(available)
+        or [fallback]
+    )
     best: tuple[float, int, float, float, dict[str, Any]] | None = None
     for horizon in candidates:
         policy = policies.get(str(horizon), policies.get(horizon, {}))
@@ -325,17 +365,159 @@ def _select_economic_horizon(
         edge_floor = float(
             policy.get("minimum_predicted_stress_edge_bps", 0.0)
         )
+        relative_edge_bps = gross_return * 10_000.0 - edge_floor
+        economic_weight = float(
+            np.clip(0.75 + relative_edge_bps / 80.0, 0.25, 1.50)
+        )
         score = (
             success
             * tradeability
-            * max(gross_return * 10_000.0 - edge_floor, 0.0)
             * (0.5 + max(event_score, 0.0))
+            * economic_weight
         )
         candidate = (score, horizon, success, tradeability, policy)
         if best is None or candidate[0] > best[0]:
             best = candidate
     assert best is not None
     return int(best[1]), float(best[2]), float(best[3]), dict(best[4])
+
+
+def _risk_assessment(
+    *,
+    cfg: dict[str, Any],
+    event_score: float,
+    confidence: float,
+    tradeability_probability: float,
+    net_edge_bps: float,
+    minimum_edge_bps: float,
+    qualification_passed: bool,
+    direction_qualified: bool,
+    economic_policy_available: bool,
+    regime: str,
+    event_direction: int,
+    soft_risk_flags: list[str],
+) -> dict[str, Any]:
+    base_fraction = float(cfg.get("risk_per_trade_fraction", 0.0125))
+    minimum_fraction = float(
+        cfg.get(
+            "minimum_risk_per_trade_fraction",
+            max(0.001, base_fraction * 0.40),
+        )
+    )
+    maximum_fraction = float(
+        cfg.get(
+            "maximum_risk_per_trade_fraction",
+            max(minimum_fraction, base_fraction * 2.40),
+        )
+    )
+    if maximum_fraction < minimum_fraction:
+        minimum_fraction, maximum_fraction = (
+            maximum_fraction,
+            minimum_fraction,
+        )
+
+    event_component = float(np.clip(event_score, 0.0, 1.0))
+    confidence_component = float(
+        np.clip((confidence - 0.48) / 0.24, 0.0, 1.0)
+    )
+    tradeability_component = float(
+        np.clip((tradeability_probability - 0.45) / 0.30, 0.0, 1.0)
+    )
+    qualification_component = float(
+        0.35
+        + 0.25 * float(qualification_passed)
+        + 0.25 * float(direction_qualified)
+        + 0.15 * float(economic_policy_available)
+    )
+    edge_lower = float(cfg.get("risk_edge_lower_bps", -20.0))
+    edge_upper = float(cfg.get("risk_edge_upper_bps", 20.0))
+    if edge_upper <= edge_lower:
+        edge_upper = edge_lower + 1.0
+    edge_reference = net_edge_bps - minimum_edge_bps
+    edge_component = float(
+        np.clip(
+            (edge_reference - edge_lower) / (edge_upper - edge_lower),
+            0.0,
+            1.0,
+        )
+    )
+    regime_component = _regime_alignment_score(regime, event_direction)
+
+    components = {
+        "event_quality": event_component,
+        "confidence": confidence_component,
+        "tradeability": tradeability_component,
+        "qualification": qualification_component,
+        "economic_edge": edge_component,
+        "regime_alignment": regime_component,
+    }
+    risk_score = float(
+        0.30 * event_component
+        + 0.18 * confidence_component
+        + 0.16 * tradeability_component
+        + 0.14 * qualification_component
+        + 0.14 * edge_component
+        + 0.08 * regime_component
+    )
+
+    penalties = {
+        "WEAK_BREAKOUT_STRUCTURE": 0.92,
+        "LOW_BREAKOUT_SUCCESS_PROBABILITY": 0.95,
+        "LOW_TRADEABILITY_PROBABILITY": 0.95,
+        "VOLATILITY_SHOCK": 0.88,
+        "NEWS_SHOCK": 0.92,
+        "DAILY_SIGNAL_LIMIT": 0.90,
+        "SIGNAL_COOLDOWN": 0.92,
+        "MODEL_STALE": 0.85,
+        "NEWS_STALE": 0.96,
+        "REGIME_UNKNOWN": 0.92,
+    }
+    penalty_multiplier = 1.0
+    applied_penalties: dict[str, float] = {}
+    for flag in soft_risk_flags:
+        factor = penalties.get(flag)
+        if factor is None:
+            continue
+        penalty_multiplier *= factor
+        applied_penalties[flag] = factor
+    risk_score = float(np.clip(risk_score * penalty_multiplier, 0.0, 1.0))
+    risk_fraction = float(
+        np.clip(
+            minimum_fraction
+            + risk_score * (maximum_fraction - minimum_fraction),
+            minimum_fraction,
+            maximum_fraction,
+        )
+    )
+    return {
+        "risk_score": risk_score,
+        "risk_fraction": risk_fraction,
+        "minimum_risk_fraction": minimum_fraction,
+        "maximum_risk_fraction": maximum_fraction,
+        "components": components,
+        "penalty_multiplier": float(penalty_multiplier),
+        "applied_penalties": applied_penalties,
+        "edge_reference_bps": float(edge_reference),
+    }
+
+
+def _regime_alignment_score(regime: str, event_direction: int) -> float:
+    name = str(regime or "UNKNOWN").upper()
+    if name == "UNKNOWN":
+        return 0.50
+    bullish = any(token in name for token in ("UP", "BULL", "LONG"))
+    bearish = any(token in name for token in ("DOWN", "BEAR", "SHORT"))
+    if event_direction > 0:
+        if bullish:
+            return 1.0
+        if bearish:
+            return 0.25
+    elif event_direction < 0:
+        if bearish:
+            return 1.0
+        if bullish:
+            return 0.25
+    return 0.60
 
 
 def build_trade_plan(
@@ -351,6 +533,7 @@ def build_trade_plan(
     minimum_edge_bps: float | None = None,
     calibrated_success: float | None = None,
     calibrated_tradeability: float | None = None,
+    risk_assessment: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     cfg = settings.section("strategy")
     price = float(row["close"])
@@ -405,9 +588,14 @@ def build_trade_plan(
         )
     )
     account = float(cfg.get("account_equity_usd", 1000.0))
-    risk_budget = account * float(
-        cfg.get("risk_per_trade_fraction", 0.01)
+    assessment = risk_assessment or {}
+    risk_fraction = float(
+        assessment.get(
+            "risk_fraction",
+            cfg.get("risk_per_trade_fraction", 0.0125),
+        )
     )
+    risk_budget = account * risk_fraction
     costs = execution_cost_breakdown(cfg)
     effective_stress_bps = float(
         stress_cost_bps
@@ -459,6 +647,9 @@ def build_trade_plan(
         "target_atr": float(target_pct * price / max(atr, 1e-9)),
         "risk_reward": float(base_reward_r),
         "label_execution_aligned": bool(invalidation is not None),
+        "risk_score": float(assessment.get("risk_score", 0.0)),
+        "risk_fraction": risk_fraction,
+        "risk_assessment": assessment,
         "risk_budget_usd": risk_budget,
         "quantity_btc": float(quantity_btc),
         "notional_usd": float(notional),
