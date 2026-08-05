@@ -21,6 +21,7 @@ def build_github_settings(
     report_dir: Path | None = None,
     adaptive_state_dir: Path | None = None,
 ) -> Settings:
+    """Create GitHub runtime paths without redefining strategy formulas."""
     source = project_root / "config" / "default.yaml"
     values = yaml.safe_load(source.read_text(encoding="utf-8")) or {}
 
@@ -64,39 +65,13 @@ def build_github_settings(
             "report_dir": str(report_dir),
         }
     )
-    values.setdefault("model", {})["auto_retrain_days"] = 10
+
+    # Workflow-specific scheduling belongs here; strategy, model and risk
+    # parameters remain exclusively in config/default.yaml.
     values.setdefault("live", {}).update(
         {
             "auto_retrain": False,
-            "collect_recent_news_each_cycle": True,
             "start_on_next_closed_candle": False,
-        }
-    )
-    # GitHub is a paper-trading research environment. Here the public model
-    # deliberately explores more setups while preserving hard data checks.
-    values.setdefault("strategy", {}).update(
-        {
-            "paper_only": True,
-            "aggressive_paper_mode": True,
-            "allow_short": True,
-            "entry_order_style": "market",
-            "risk_per_trade_fraction": 0.01,
-            "maximum_leverage": 5.0,
-            "target_r_multiple": 5.0,
-            "minimum_event_score": 0.10,
-            "minimum_net_edge_bps": 0.0,
-            "maximum_daily_signals": 12,
-            "cooldown_hours_after_signal": 0,
-            "block_during_news_shock": False,
-        }
-    )
-    values.setdefault("adaptive", {})["enabled"] = True
-    values.setdefault("negative_memory", {})["require_for_trade"] = False
-    values.setdefault("trade_lifecycle", {}).update(
-        {
-            "enabled": True,
-            "mode": "AGGRESSIVE_PAPER",
-            "base_reward_r": 5.0,
         }
     )
 
