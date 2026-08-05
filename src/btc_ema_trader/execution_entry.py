@@ -53,8 +53,10 @@ def apply_execution_quote(
         plan["source_candle_close"] = output.get("price")
         plan["entry_reference"] = quote_price
         plan["entry_reference_kind"] = EXECUTION_ENTRY_CONTRACT
+        plan["entry_definition"] = "PAPER_ENTRY_AT_OBSERVED_LIVE_QUOTE"
         plan["entry_quote_provider"] = str(provider)
         plan["entry_quote_time"] = quote_timestamp.isoformat()
+        plan["entry_quote_observed_at"] = observation_timestamp.isoformat()
         plan["entry_quote_age_seconds"] = max(0.0, age_seconds)
         output["trade_plan"] = plan
     return output
