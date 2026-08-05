@@ -68,12 +68,8 @@ jobs:
             printf '[]\n' > .github_state/trades.json
           fi
 
-      - name: Render adaptive target-stop dashboard
-        run: |
-          python scripts/github_pages_dashboard.py --runtime-dir .dashboard_runtime
-          python scripts/github_boundary_dashboard.py
-          python scripts/github_trade_dashboard.py
-          python scripts/github_timing_dashboard.py
+      - name: Render canonical dashboard
+        run: python scripts/github_pages_dashboard.py --runtime-dir .dashboard_runtime
 
       - name: Configure GitHub Pages
         uses: actions/configure-pages@v6
