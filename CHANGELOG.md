@@ -4,17 +4,27 @@
 
 - Made the persistent LONG/SHORT target-stop lifecycle the primary product contract.
 - Replaced the public forecast ledger with a position-only ledger showing open and realized P/L, return and R-multiple.
+- Separated a managed active position from the newest hourly candidate plan.
+- Bound new paper entries to a fresh execution quote while retaining the source candle close for forecasting.
+- Frozen entry time now uses the quote observation time rather than workflow completion time.
+- Excluded pre-entry price action by starting barrier evaluation with the first fully observable post-entry hourly candle.
 - Added an exact secondary next-close timing contract and rejected retroactive forecasts.
+- Isolated secondary price-model and timing failures from the primary target-stop lifecycle.
 - Added causal three-candle context: the event candle plus the two immediately preceding closed candles.
 - Added full candle-body, range, upper-shadow, lower-shadow, close-location, volume and three-bar pressure features.
 - Extended the adaptive trade learner to consume the frozen causal candle context.
 - Preserved legacy position outcomes by migrating old feature vectors with neutral context values.
-- Made GitHub Pages the only canonical dashboard implementation.
+- Preserved immutable forecast outcomes while refreshing execution, candidate and context metadata on same-candle reruns.
+- Made GitHub Pages the only canonical dashboard implementation and reduced deployment to one render command.
+- Separated pipeline health, market-data health, economic qualification and paper-only execution in the dashboard.
+- Replaced ambiguous negative-memory states with `PASS`, `VETO`, `SHADOW` and `UNAVAILABLE`.
 - Removed the obsolete local Gradio/Plotly dashboard and its unused dependencies.
 - Removed stale schema-v3 model and report artifacts from `main`; promoted artifacts remain isolated on `model-state`.
 - Expanded `.gitignore` for generated runtime, dashboard, model, quality and training state.
+- Made `config/default.yaml` the only source of strategy, model and risk parameters.
+- Limited hourly and weekly workflow triggers to files that actually affect their work.
 - Aligned package documentation with aggressive paper exploration, economic qualification and online outcome learning.
-- Added tests for strict forecast timing, causal context, position-only rendering, migration and signed P/L display.
+- Added tests for strict timing, execution quotes, post-entry paths, causal context, position rendering, state merge, workflow YAML and repository consistency.
 
 ## 5.3.0 — Adaptive target-stop paper positions
 
