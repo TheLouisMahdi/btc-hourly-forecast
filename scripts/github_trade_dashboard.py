@@ -22,7 +22,7 @@ def main() -> int:
     )
     document = document.replace(
         "Cost-aware structural signals with locked economic validation",
-        "Aggressive paper orders with adaptive targets, stop-loss and online learning",
+        "Aggressive structural entries with risk-scaled sizing and adaptive exits",
     )
     document = document.replace(
         "NEXT CLOSED 1-HOUR CANDLE",
@@ -104,6 +104,33 @@ def _panel(latest: dict[str, Any], trades: list[Any]) -> str:
     leverage = _number(
         source.get("suggested_leverage", plan.get("suggested_leverage"))
     )
+    risk_budget = _number(
+        source.get("risk_budget_usd", plan.get("risk_budget_usd"))
+    )
+    risk_fraction = _number(
+        source.get("risk_fraction", plan.get("risk_fraction"))
+    )
+    risk_score = _number(source.get("risk_score", plan.get("risk_score")))
+    policy_name = str(
+        source.get("policy_name")
+        or plan.get("policy_name")
+        or "LEGACY_AGGRESSIVE_PAPER"
+    )
+    policy_version = source.get("policy_version", plan.get("policy_version", 1))
+    soft_flags = source.get("soft_risk_flags", plan.get("soft_risk_flags", []))
+    soft_flags = soft_flags if isinstance(soft_flags, list) else []
+    qualification_passed = bool(
+        source.get(
+            "qualification_passed",
+            plan.get("qualification_passed", False),
+        )
+    )
+    direction_qualified = bool(
+        source.get(
+            "direction_qualified",
+            plan.get("direction_qualified", False),
+        )
+    )
     expiry = source.get("expires_at")
     holding = source.get("maximum_holding_hours", plan.get("maximum_holding_hours"))
     samples = summary.get("samples_seen")
@@ -114,18 +141,29 @@ def _panel(latest: dict[str, Any], trades: list[Any]) -> str:
     mode = str(
         plan.get("decision_mode")
         or latest.get("paper_trade_mode")
-        or "AGGRESSIVE_PAPER"
+        or "AGGRESSIVE_STRUCTURAL_RISK_SCALED"
     )
     state_class = "open" if active else "waiting"
     verdict = "OPEN POSITION" if active else "SCANNING / READY"
+    risk_note = (
+        "No soft risk warnings"
+        if not soft_flags
+        else f"{len(soft_flags)} soft risk warning(s): "
+        + ", ".join(str(item).replace("_", " ") for item in soft_flags[:3])
+    )
+    qualification_note = (
+        "Model and selected direction qualified"
+        if qualification_passed and direction_qualified
+        else "Qualification adjusts size; it does not veto a valid structure"
+    )
 
     return f'''
 <section class="panel trade-lifecycle-panel">
   <div class="trade-lifecycle-heading">
     <div>
-      <div class="structure-eyebrow">Primary contract · target, stop or time exit</div>
+      <div class="structure-eyebrow">Primary contract · aggressive entry, scaled capital risk</div>
       <h2>Adaptive paper-trade lifecycle</h2>
-      <p class="sub">Each recommendation becomes one persistent LONG or SHORT paper position. It remains open across hourly candles until target, stop-loss or time exit, then its realized P&amp;L and R-multiple are learned online.</p>
+      <p class="sub">A valid structural event seeks a LONG or SHORT paper position. Qualification, economic edge and warnings change position size rather than silently vetoing the setup; hard data and structure failures still block entry.</p>
     </div>
     <span class="trade-lifecycle-state {state_class}">{_escape(verdict)}</span>
   </div>
@@ -138,6 +176,10 @@ def _panel(latest: dict[str, Any], trades: list[Any]) -> str:
   </div>
   <div class="trade-lifecycle-grid">
     {_tile("State", f"{direction} · {status}", mode)}
+    {_tile("Risk allocation", f"{_money(risk_budget)} · {_percent(risk_fraction)}", "Dynamic paper-account risk assigned to this setup")}
+    {_tile("Risk score", _percent(risk_score), risk_note)}
+    {_tile("Policy", f"v{_escape(policy_version)}", policy_name.replace("_", " ").title())}
+    {_tile("Qualification", "QUALIFIED" if qualification_passed and direction_qualified else "RISK-SCALED", qualification_note)}
     {_tile("Adaptive reward", _r(reward_r), "Starts at 5R and adapts only from resolved trade outcomes")}
     {_tile("Target probability", _percent(target_probability), "Probability of target before stop")}
     {_tile("Stop probability", _percent(stop_probability), "Probability of stop before target")}
