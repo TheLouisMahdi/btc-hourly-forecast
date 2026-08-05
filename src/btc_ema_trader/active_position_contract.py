@@ -40,14 +40,34 @@ def build_active_position_plan(
         "model_id": trade.get("model_id"),
         "event_id": trade.get("event_id"),
         "event_type": trade.get("event_type", "NONE"),
+        "event_score": trade.get("event_score"),
+        "selected_horizon": trade.get("selected_horizon"),
+        "breakout_source": trade.get("breakout_source"),
+        "breakout_level": trade.get("breakout_level"),
+        "invalidation_level": trade.get("invalidation_level"),
+        "regime": trade.get("regime"),
         "entry_reference": entry,
-        "entry_reference_kind": "FROZEN_POSITION_ENTRY",
+        "entry_reference_kind": trade.get(
+            "entry_reference_kind",
+            "FROZEN_POSITION_ENTRY",
+        ),
         "entry_definition": trade.get(
             "entry_definition",
             "PAPER_MARKET_ORDER_AT_SIGNAL_RUN",
         ),
+        "entry_quote_provider": trade.get("entry_quote_provider"),
+        "entry_quote_time": trade.get("entry_quote_time"),
+        "source_candle_close": trade.get("source_candle_close"),
+        "execution_quote": trade.get("execution_quote"),
         "opened_at": trade.get("opened_at"),
         "signal_candle_time": trade.get("signal_candle_time"),
+        "execution_path_contract": trade.get("execution_path_contract"),
+        "first_evaluable_candle_open": trade.get(
+            "first_evaluable_candle_open"
+        ),
+        "partial_entry_candle_used_for_barriers": bool(
+            trade.get("partial_entry_candle_used_for_barriers", False)
+        ),
         "target_price": target,
         "stop_price": current_stop,
         "current_stop_price": current_stop,
