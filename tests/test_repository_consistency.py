@@ -22,14 +22,15 @@ class RepositoryConsistencyTests(unittest.TestCase):
                 encoding="utf-8"
             )
         )
+        expected = str(project["project"]["version"])
         versions = {
-            project["project"]["version"],
+            expected,
             str(config["project"]["version"]),
             btc_ema_trader.__version__,
         }
-        self.assertEqual(versions, {"5.4.0"})
+        self.assertEqual(versions, {expected})
         self.assertIn(
-            "version-5.4.0",
+            f"version-{expected}",
             (self.root / "README.md").read_text(encoding="utf-8"),
         )
 

@@ -1,3 +1,3 @@
-"""BTC adaptive directional-breakout paper-trading research."""
+"""BTC aggressive risk-scaled directional-breakout paper-trading research."""
 
-__version__ = "5.4.0"
+__version__ = "5.5.0"
