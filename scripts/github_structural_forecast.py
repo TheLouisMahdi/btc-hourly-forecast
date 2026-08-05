@@ -36,6 +36,35 @@ _BASE_RUNTIME_ENGINE = github_hourly_forecast.RuntimeEngine
 _BASE_OPEN_TRADE = github_hourly_forecast.open_trade_from_record
 _BASE_ADAPTIVE_TRADE_ENGINE = trade_lifecycle_module.AdaptiveTradeEngine
 
+FORECAST_IMMUTABLE_FIELDS = {
+    "next_candle_forecast",
+    "forecast_contract_version",
+    "next_candle_direction",
+    "next_candle_confidence",
+    "next_candle_expected_return",
+    "target_candle_time",
+    "target_candle_open_time",
+    "target_candle_close_time",
+    "predicted_close_median",
+    "predicted_close_low",
+    "predicted_close_high",
+    "prediction_result",
+    "direction_result",
+    "interval_result",
+    "actual_close",
+    "actual_price",
+    "actual_close_return",
+    "actual_return",
+    "actual_direction",
+    "actual_candle_open",
+    "actual_candle_high",
+    "actual_candle_low",
+    "resolved_at",
+    "evaluation_available_at",
+    "seconds_until_evaluation",
+    "forecast_frozen",
+}
+
 
 class ContextRuntimeEngine:
     """Install causal candle context and a fresh paper-entry quote."""
@@ -169,6 +198,7 @@ def open_trade_with_context(
     trade["entry_reference_kind"] = plan.get("entry_reference_kind")
     trade["entry_quote_provider"] = plan.get("entry_quote_provider")
     trade["entry_quote_time"] = plan.get("entry_quote_time")
+    trade["entry_quote_observed_at"] = plan.get("entry_quote_observed_at")
     trade["source_candle_close"] = plan.get(
         "source_candle_close",
         record.get("price"),
@@ -187,7 +217,43 @@ def open_trade_with_context(
     execution_quote = record.get("execution_quote")
     if isinstance(execution_quote, dict):
         trade["execution_quote"] = execution_quote
+
+    observed_at = plan.get("entry_quote_observed_at")
+    if observed_at:
+        opened_at = _utc(observed_at)
+        holding_hours = int(trade.get("maximum_holding_hours", 72))
+        trade["opened_at"] = opened_at.isoformat()
+        trade["expires_at"] = (
+            opened_at + pd.Timedelta(hours=holding_hours)
+        ).isoformat()
     return install_execution_path_contract(trade)
+
+
+def preserve_canonical_forecast(
+    history: list[dict[str, Any]],
+    record: dict[str, Any],
+) -> dict[str, Any]:
+    """Keep the frozen forecast while refreshing all runtime metadata."""
+    key = record.get("candle_time")
+    if not key:
+        return record
+    existing = next(
+        (
+            item
+            for item in reversed(history)
+            if item.get("candle_time") == key
+            and isinstance(item.get("next_candle_forecast"), dict)
+            and item.get("run_status") == "OK"
+        ),
+        None,
+    )
+    if existing is None:
+        return record
+    merged = dict(existing)
+    for field, value in record.items():
+        if field not in FORECAST_IMMUTABLE_FIELDS:
+            merged[field] = value
+    return merged
 
 
 def main() -> int:
@@ -228,6 +294,9 @@ def main() -> int:
     github_hourly_forecast.build_next_candle_forecast = (
         build_strict_next_candle_forecast
     )
+    github_hourly_forecast.preserve_existing_forecast = (
+        preserve_canonical_forecast
+    )
     return github_hourly_forecast.main()
 
 
@@ -251,6 +320,15 @@ def _load_dict(path: Path) -> dict[str, Any]:
     except Exception:
         return {}
     return payload if isinstance(payload, dict) else {}
+
+
+def _utc(value: Any) -> pd.Timestamp:
+    timestamp = pd.Timestamp(value)
+    return (
+        timestamp.tz_localize("UTC")
+        if timestamp.tzinfo is None
+        else timestamp.tz_convert("UTC")
+    )
 
 
 if __name__ == "__main__":
