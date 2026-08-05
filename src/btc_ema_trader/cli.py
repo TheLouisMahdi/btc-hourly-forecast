@@ -7,7 +7,6 @@ import sys
 
 from .config import load_settings
 from .contract_training import train_from_database
-from .dashboard import launch_dashboard
 from .logging_setup import configure_logging
 from .market import fetch_and_store
 from .model import latest_bundle
@@ -16,6 +15,7 @@ from .runtime import RuntimeEngine
 from .storage import Database
 
 LOGGER = logging.getLogger(__name__)
+DASHBOARD_URL = "https://thelouismahdi.github.io/btc-hourly-forecast/"
 MARKET_PROVIDERS = (
     "auto",
     "coinbase_spot",
@@ -31,7 +31,7 @@ def parser() -> argparse.ArgumentParser:
         prog="btc-regime",
         description=(
             "BTC deterministic directional breakout forecaster and "
-            "fail-safe paper-trade decision system"
+            "adaptive paper-trade research system"
         ),
     )
     root.add_argument("--config", default=None)
@@ -76,10 +76,10 @@ def parser() -> argparse.ArgumentParser:
     live = sub.add_parser("live")
     live.add_argument("--once", action="store_true")
 
-    dashboard = sub.add_parser("dashboard")
-    dashboard.add_argument("--share", action="store_true")
-    dashboard.add_argument("--display-only", action="store_true")
-
+    sub.add_parser(
+        "dashboard",
+        help="Print the canonical public GitHub Pages dashboard URL",
+    )
     sub.add_parser("status")
     sub.add_parser("reset-session")
     return root
@@ -196,13 +196,10 @@ def dispatch(args, settings, database):
         engine.run_forever()
         return None
     if args.command == "dashboard":
-        launch_dashboard(
-            settings,
-            database,
-            share=args.share,
-            start_engine=not args.display_only,
-        )
-        return None
+        return {
+            "status": "public_dashboard",
+            "url": DASHBOARD_URL,
+        }
     if args.command == "status":
         providers = database.providers(
             settings.section("market").get(
@@ -231,6 +228,7 @@ def dispatch(args, settings, database):
             "signals": database.recent_signals(10).to_dict(
                 orient="records"
             ),
+            "dashboard_url": DASHBOARD_URL,
         }
     if args.command == "reset-session":
         return RuntimeEngine(
