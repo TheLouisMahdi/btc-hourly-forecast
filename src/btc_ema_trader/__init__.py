@@ -1,3 +1,3 @@
-"""BTC deterministic directional breakout forecasting."""
+"""BTC adaptive directional-breakout paper-trading research."""
 
-__version__ = "5.0.0"
+__version__ = "5.4.0"
