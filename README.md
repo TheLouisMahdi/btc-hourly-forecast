@@ -34,12 +34,12 @@
 
 # BTC Adaptive Directional Breakout Trader
 
-This repository is a research-grade, paper-only Bitcoin trading system built around two separate structural events:
+This repository is a research-grade, paper-only Bitcoin trading system built around two independent structural events:
 
 - `RESISTANCE_BREAKOUT_LONG`: a confirmed close crossing above resistance;
 - `SUPPORT_BREAKDOWN_SHORT`: a confirmed close crossing below support.
 
-The primary output is a persistent LONG or SHORT paper position with an entry, adaptive target, stop-loss and maximum holding time. A secondary public contract forecasts the exact `NEXT_CLOSED_1H_CANDLE` and is scored only after that candle closes.
+The primary output is a persistent LONG or SHORT paper position with an execution quote, adaptive target, stop-loss and maximum holding time. A secondary public contract forecasts the exact `NEXT_CLOSED_1H_CANDLE` and is scored only after that candle closes.
 
 The project does not claim profitability and does not place live orders.
 
@@ -59,20 +59,26 @@ TIME_EXIT_LOSS
 Each position stores:
 
 ```text
-entry price
+entry quote and observation time
 target price
 initial and current stop
 risk score and risk fraction
-risk budget and notional
+risk budget, notional and leverage
 policy and risk-contract versions
-stress execution cost
-expected value
+stress execution cost and expected value
 maximum favorable and adverse excursion
-realized net P/L
-realized R-multiple
+realized net P/L and R-multiple
 ```
 
-Only one active position is managed at a time. Closed outcomes are never recomputed from later prices.
+Only one active position is managed at a time. A new hourly candidate is stored separately and cannot replace the active position plan. Closed outcomes are never recomputed from later prices.
+
+### Execution-time contract
+
+A new paper position uses a fresh observed market quote, not the previous candle close. The source candle close remains frozen as the reference for the secondary forecast.
+
+Hourly OHLC data cannot determine whether a target or stop was touched before a mid-hour entry. The partial entry candle is therefore excluded from barrier resolution. Target, stop, breakeven and trailing calculations begin with the first fully observable hourly candle after entry.
+
+This contract is conservative and auditable, but it exposes one known research limitation: batch event labels use the next hourly open while GitHub paper positions use the quote observed when the workflow runs. The resolved-trade learner evaluates the actual paper entry, but batch qualification is not fully execution-aligned until minute-level historical entry labels are added and a compatible challenger is promoted.
 
 ### Secondary: exact next-close forecast
 
@@ -103,11 +109,11 @@ IN_RANGE
 OUT_OF_RANGE
 ```
 
-A wide interval cannot turn a wrong direction into a correct result. Resolved records are immutable.
+A wide interval cannot turn a wrong direction into a correct result. Resolved records are immutable. When the price model is unavailable or the target window is missed, the secondary forecast is `NOT_CREATED`; it cannot invalidate the primary position cycle.
 
 ## Causal candle context
 
-Every event is represented by exactly three closed candles:
+Every new event feature row is represented by exactly three closed candles:
 
 ```text
 PREVIOUS_2
@@ -115,7 +121,9 @@ PREVIOUS_1
 EVENT
 ```
 
-The model receives OHLCV shape, candle body, full upper and lower shadows, close location, range, volume change and three-bar pressure features. Future candles are never predictors; they are used only to create labels and resolve positions.
+The feature pipeline exposes OHLCV shape, candle body, full upper and lower shadows, close location, range, volume change and three-bar pressure. Future candles are never predictors; they are used only to create labels and resolve outcomes.
+
+A champion trained before these fields were introduced can continue to run because inputs are schema-aligned, but it does not use the new context columns until a compatible challenger is retrained, validated and promoted.
 
 ## Deterministic event mining
 
@@ -129,9 +137,9 @@ A candidate requires a real close-to-close crossing. Remaining above an already 
 
 Each event records its unique ID, direction, source, scale, level, structural invalidation, ATR-normalized distance, touch count, age, line quality, market regime and diversity key. Near-duplicates are removed deterministically.
 
-## Separate Long and Short models
+## Separate Long and Short batch heads
 
-Long and Short do not share one event head. Every trade horizon contains independent classifiers and return regressors for each direction.
+Long and Short do not share one batch event head. Every trade horizon contains independent classifiers and return regressors for each direction.
 
 Long logic emphasizes resistance quality, upward candle strength, upper close location, relative volume and upward structural alignment. Short logic separately emphasizes support quality, downward candle strength, lower close location, relative volume and downward structural alignment.
 
@@ -157,15 +165,15 @@ split: chronological expanding window
 
 Training requires at least **2,000 unique Long events** and **2,000 unique Short events**, plus multi-year, multi-quarter, multi-scale, volatility and regime diversity. Real events are never duplicated to satisfy the gate.
 
-The configured history target is ten years of real hourly BTC candles. One provider is selected for each training run; rows from different exchanges are not mixed into one dataset.
+The configured history target is ten years of real hourly BTC candles. One provider is selected for each training run; rows from different exchanges are not mixed into one dataset. Real gaps are segmented and audited rather than filled or interpolated.
 
 ## Validation and champion promotion
 
 General prediction uses chronological time-series validation. Long and Short event heads use independent expanding-window Walk-Forward evaluation with an embargo.
 
-A direction-horizon pair is evaluated using event count, AUC, calibration, selected-trade count, hit rate, stress-adjusted expectancy and positive-fold consistency. A challenger replaces the current champion only when the economic validation and sandwiched negative-memory validation agree.
+A direction-horizon pair is evaluated using event count, AUC, calibration, selected-trade count, hit rate, stress-adjusted expectancy and positive-fold consistency. A challenger replaces the current champion only when economic validation and sandwiched negative-memory validation agree.
 
-Candidate diagnostics are retained even when promotion is rejected. Production-facing artifacts live on `model-state`, not on `main`.
+Candidate diagnostics are retained when promotion is rejected. Production-facing artifacts live on `model-state`, not on `main`.
 
 ## Aggressive risk-scaled position policy
 
@@ -177,16 +185,16 @@ policy_version: 2
 risk_contract_version: 2
 ```
 
-A valid fresh structural breakout seeks a paper position. Qualification, predicted economic edge, confidence, tradeability, regime alignment and soft warnings do not create a second conservative mode and do not automatically veto the event. They are combined into a bounded risk score that selects between **0.5% and 3.0%** of paper-account equity.
+A valid fresh structural breakout seeks a paper position. Qualification, predicted economic edge, confidence, tradeability, regime alignment and soft warnings are combined into a bounded risk score rather than creating a second conservative mode.
 
-Typical behavior is:
+Paper-account risk is selected between **0.5% and 3.0%**:
 
 ```text
 weak or unqualified event with negative edge -> smaller position
 strong qualified event with positive edge   -> larger position
 ```
 
-Soft risk evidence includes incomplete qualification, a missing economic policy, weak confidence, weak tradeability, negative stress edge, volatility or news shock, stale model/news evidence, signal frequency and regime uncertainty.
+Soft risk evidence includes incomplete qualification, missing economic policy, weak confidence, weak tradeability, negative stress edge, volatility or news shock, stale model/news evidence, signal frequency and regime uncertainty.
 
 Hard blockers remain fail-safe and non-negotiable:
 
@@ -204,15 +212,17 @@ provider mismatch
 an already active position
 ```
 
-The dashboard displays the policy version, risk score, allocated risk, qualification state and soft risk evidence. An exploratory paper position is not evidence of a profitable production strategy.
+The dashboard exposes the policy version, risk score, allocated risk, qualification state and soft risk evidence. An exploratory paper position is not evidence of a profitable production strategy.
 
-Legacy positions are not deleted or placed in a separate operating mode. Positions created before this contract remain identifiable by a missing or version-1 policy tag, while all new positions persist `policy_version: 2` and `entry_contract: STRUCTURAL_EVENT_RISK_SCALED`.
+Legacy positions stay in the same ledger and remain identifiable by their missing or version-1 policy metadata. New positions persist `policy_version: 2` and `entry_contract: STRUCTURAL_EVENT_RISK_SCALED`.
 
 ## Adaptive learning and negative memory
 
-The generic multi-horizon adaptive layer is disabled because it can blend shared online estimates into the independent Long and Short event heads. The dedicated price learner remains separate and receives weight only when its prequential Brier score, direction accuracy and return error improve over the batch model.
+The generic shared multi-horizon adaptive blend is disabled because it can blend shared online estimates into otherwise independent Long and Short batch heads.
 
-The trade learner remains enabled. It updates only after a position resolves and learns target probability, stop probability and realized R from the frozen entry feature vector, including the causal three-candle context. Its final target-stop economics preserve the risk fraction selected by the entry policy.
+The dedicated price learner remains performance-gated and receives weight only when its prequential Brier score, direction accuracy and return error improve over the batch model.
+
+The trade learner remains enabled. It updates only after a position resolves and learns target probability, stop probability and realized R from the frozen entry feature vector, including the causal three-candle context. Final target-stop economics preserve the risk fraction selected by the entry policy.
 
 The negative-memory layer uses a sandwiched design:
 
@@ -222,7 +232,7 @@ learned boundary-risk model
 backup Bloom memory
 ```
 
-Bloom hits are treated as learned risk evidence. In the current paper configuration they adjust or report risk rather than silently changing historical outcomes.
+Bloom hits are stored as risk evidence. The current `ADAPTIVE_PENALTY_ONLY` runtime reports or penalizes risk and never rewrites historical outcomes.
 
 ## State isolation
 
@@ -232,7 +242,7 @@ Generated data is intentionally kept outside `main`:
 |---|---|
 | `forecast-state` | latest record, forecast history and position ledger |
 | `model-state` | promoted champion, reports and negative memory |
-| `adaptive-state` | online learner states and summaries |
+| `adaptive-state` | price and resolved-trade learner states and summaries |
 | `quality-state` | test and compile diagnostics |
 | `training-diagnostics` | challenger training diagnostics |
 
@@ -240,29 +250,30 @@ Generated data is intentionally kept outside `main`:
 
 ## Automation
 
+The repository-quality workflow validates source, configuration, documentation, tests and GitHub Actions files and publishes the exact result to `quality-state`.
+
 The hourly workflow:
 
-1. restores the champion and persistent state;
-2. runs the full quality suite;
-3. fetches the latest contiguous closed-candle segment;
-4. resolves existing positions;
-5. creates one new structural decision when eligible;
-6. freezes the secondary next-close contract when its timing window is valid;
+1. restores forecast, position, champion and adaptive state;
+2. fetches the latest contiguous closed-candle segment;
+3. resolves existing positions using only fully observable post-entry candles;
+4. creates one new structural decision when eligible;
+5. freezes the execution quote, risk contract and position plan;
+6. creates the secondary next-close contract only when its target window is valid;
 7. persists forecast, position and adaptive states.
-
-The secondary next-close contract is diagnostic and fail-soft. Missing its creation window does not invalidate an otherwise valid primary position cycle.
 
 The weekly workflow:
 
-1. fetches long historical data;
-2. segments real gaps without filling or interpolation;
-3. mines deterministic Long and Short events;
-4. trains independent direction heads;
-5. performs chronological validation;
-6. trains sandwiched negative memory;
-7. promotes the challenger only when all promotion gates pass.
+1. runs the full validation suite;
+2. fetches long historical data;
+3. segments real gaps without filling or interpolation;
+4. mines deterministic Long and Short events;
+5. trains independent direction heads;
+6. performs chronological validation;
+7. trains sandwiched negative memory;
+8. promotes the challenger only when all promotion gates pass.
 
-GitHub Pages is the only canonical dashboard implementation.
+GitHub Pages is the only canonical dashboard implementation and is rendered through one orchestration command.
 
 ## Local setup
 
@@ -281,7 +292,7 @@ btc-regime news
 btc-regime train
 ```
 
-Run one local cycle:
+Run one local diagnostic cycle:
 
 ```bash
 btc-regime cycle --force
@@ -303,12 +314,16 @@ python -m compileall -q src scripts
 ## Repository layout
 
 ```text
-config/default.yaml                   Canonical strategy and model configuration
-scripts/github_weekly_retrain.py      Challenger training and promotion
-scripts/github_structural_forecast.py Canonical GitHub hourly entry point
-scripts/github_pages_dashboard.py     Public dashboard orchestration
-src/btc_ema_trader/candle_context.py  Causal three-candle context
+config/default.yaml                    Canonical strategy and model configuration
+scripts/github_weekly_retrain.py       Challenger training and promotion
+scripts/github_structural_forecast.py  Canonical GitHub hourly entry point
+scripts/github_pages_dashboard.py      Public dashboard orchestration
+src/btc_ema_trader/active_position_contract.py
+src/btc_ema_trader/candle_context.py   Causal three-candle context
+src/btc_ema_trader/context_trade_features.py
 src/btc_ema_trader/directional_events.py
+src/btc_ema_trader/execution_entry.py
+src/btc_ema_trader/execution_path.py
 src/btc_ema_trader/market_structure_fast.py
 src/btc_ema_trader/model.py
 src/btc_ema_trader/negative_memory.py
