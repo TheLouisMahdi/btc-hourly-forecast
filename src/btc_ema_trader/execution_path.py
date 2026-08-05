@@ -20,6 +20,14 @@ def install_execution_path_contract(trade: dict[str, Any]) -> dict[str, Any]:
     trade["execution_path_contract"] = EXECUTION_PATH_CONTRACT
     trade["first_evaluable_candle_open"] = first_open.isoformat()
     trade["partial_entry_candle_used_for_barriers"] = False
+    trade["label_execution_aligned"] = False
+    trade["label_entry_definition"] = "NEXT_HOURLY_OPEN"
+    trade["runtime_entry_definition"] = str(
+        trade.get("entry_reference_kind") or "LIVE_QUOTE_AT_SIGNAL_RUN"
+    )
+    trade["execution_alignment_status"] = (
+        "APPROXIMATE_UNTIL_MINUTE_LEVEL_RETRAIN"
+    )
     return trade
 
 
@@ -40,8 +48,6 @@ def resolve_open_trades_after_entry(
     if candles.empty:
         return 0
 
-    # Reuse the lifecycle's barrier and accounting functions while replacing
-    # only the timestamp selection contract.
     from . import trade_lifecycle as lifecycle
 
     frame = candles.copy().sort_values("open_time").reset_index(drop=True)
