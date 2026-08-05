@@ -3,6 +3,7 @@ from __future__ import annotations
 import unittest
 
 from btc_ema_trader.execution_entry import (
+    BATCH_LABEL_ENTRY_CONTRACT,
     EXECUTION_ENTRY_CONTRACT,
     apply_execution_quote,
 )
@@ -15,6 +16,7 @@ class ExecutionEntryTests(unittest.TestCase):
             "trade_plan": {
                 "entry_reference": 100.0,
                 "entry_reference_kind": "CURRENT_CLOSE_PROXY",
+                "label_execution_aligned": True,
             },
         }
         result = apply_execution_quote(
@@ -25,12 +27,23 @@ class ExecutionEntryTests(unittest.TestCase):
             observed_at="2026-01-01T01:00:20Z",
             maximum_age_seconds=90,
         )
+        plan = result["trade_plan"]
         self.assertEqual(result["price"], 100.0)
-        self.assertEqual(result["trade_plan"]["source_candle_close"], 100.0)
-        self.assertEqual(result["trade_plan"]["entry_reference"], 101.25)
+        self.assertEqual(plan["source_candle_close"], 100.0)
+        self.assertEqual(plan["entry_reference"], 101.25)
+        self.assertEqual(plan["entry_reference_kind"], EXECUTION_ENTRY_CONTRACT)
+        self.assertFalse(plan["label_execution_aligned"])
         self.assertEqual(
-            result["trade_plan"]["entry_reference_kind"],
+            plan["label_entry_definition"],
+            BATCH_LABEL_ENTRY_CONTRACT,
+        )
+        self.assertEqual(
+            plan["runtime_entry_definition"],
             EXECUTION_ENTRY_CONTRACT,
+        )
+        self.assertEqual(
+            plan["execution_alignment_status"],
+            "APPROXIMATE_UNTIL_MINUTE_LEVEL_RETRAIN",
         )
         self.assertTrue(result["execution_quote"]["fresh"])
         self.assertEqual(result["execution_quote"]["age_seconds"], 10.0)
