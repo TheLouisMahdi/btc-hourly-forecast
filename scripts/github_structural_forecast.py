@@ -4,8 +4,12 @@ import json
 from pathlib import Path
 from typing import Any
 
-import github_hourly_forecast
 import btc_ema_trader.trade_lifecycle as trade_lifecycle_module
+import github_hourly_forecast
+from btc_ema_trader.active_position_contract import (
+    ACTIVE_POSITION_CONTRACT,
+    build_active_position_plan,
+)
 from btc_ema_trader.candle_context import (
     CONTEXT_CONTRACT,
     extract_candle_context,
@@ -23,6 +27,7 @@ from btc_ema_trader.strict_forecast_contract import (
 MODEL_PREFIX = "directional-breakout-hourly-"
 _BASE_RUNTIME_ENGINE = github_hourly_forecast.RuntimeEngine
 _BASE_OPEN_TRADE = github_hourly_forecast.open_trade_from_record
+_BASE_ADAPTIVE_TRADE_ENGINE = trade_lifecycle_module.AdaptiveTradeEngine
 
 
 class ContextRuntimeEngine:
@@ -59,6 +64,38 @@ class ContextRuntimeEngine:
         return getattr(self.delegate, name)
 
 
+class CanonicalAdaptiveTradeEngine(_BASE_ADAPTIVE_TRADE_ENGINE):
+    """Keep the active position contract separate from a new candidate plan."""
+
+    def __init__(self, *args, **kwargs) -> None:
+        super().__init__(*args, **kwargs)
+        self._active_position: dict[str, Any] | None = None
+
+    def synchronize(self, trades: list[dict[str, Any]]) -> dict[str, Any]:
+        summary = super().synchronize(trades)
+        self._active_position = trade_lifecycle_module.active_trade(trades)
+        return summary
+
+    def enrich_trade_plan(
+        self,
+        record: dict[str, Any],
+        plan: dict[str, Any],
+    ) -> dict[str, Any]:
+        candidate = super().enrich_trade_plan(record, plan)
+        active = self._active_position
+        if active is None:
+            return candidate
+
+        record["candidate_action"] = record.get("action")
+        record["candidate_trade_plan"] = candidate
+        record["candidate_blockers"] = list(record.get("blockers", []))
+        record["managed_trade_id"] = active.get("trade_id")
+        record["managed_position_direction"] = active.get("direction")
+        record["active_position_contract"] = ACTIVE_POSITION_CONTRACT
+        record["blockers"] = ["ACTIVE_TRADE_IN_PROGRESS"]
+        return build_active_position_plan(active)
+
+
 def open_trade_with_context(
     record: dict[str, Any],
 ) -> dict[str, Any] | None:
@@ -74,6 +111,12 @@ def open_trade_with_context(
         trade["candle_context_complete"] = bool(
             record.get("candle_context_complete", context.get("complete", False))
         )
+    trade["entry_definition"] = str(
+        record.get("trade_plan", {}).get(
+            "entry_definition",
+            "PAPER_MARKET_ORDER_AT_SIGNAL_RUN",
+        )
+    )
     return trade
 
 
@@ -107,9 +150,7 @@ def main() -> int:
         fetch_latest_contiguous_and_store
     )
     github_hourly_forecast.RuntimeEngine = ContextRuntimeEngine
-    github_hourly_forecast.AdaptiveTradeEngine = (
-        trade_lifecycle_module.AdaptiveTradeEngine
-    )
+    github_hourly_forecast.AdaptiveTradeEngine = CanonicalAdaptiveTradeEngine
     github_hourly_forecast.open_trade_from_record = open_trade_with_context
     github_hourly_forecast.build_next_candle_forecast = (
         build_strict_next_candle_forecast
