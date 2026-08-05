@@ -5,6 +5,10 @@ from typing import Iterable
 import pandas as pd
 
 from . import features as base_features
+from .candle_context import (
+    attach_causal_candle_context,
+    candle_context_feature_columns,
+)
 from .config import Settings
 from .directional_events import (
     attach_directional_breakout_candidates,
@@ -31,8 +35,9 @@ def build_feature_set(
         settings,
         include_labels=False,
     )
+    contextual_frame = attach_causal_candle_context(base.frame)
     frame = attach_directional_breakout_candidates(
-        base.frame,
+        contextual_frame,
         settings,
     )
     horizons = _configured_horizons(settings, base.horizons)
@@ -68,6 +73,9 @@ def build_feature_set(
         and pd.api.types.is_numeric_dtype(frame[column])
         and not column.startswith(label_prefixes)
     ]
+    for column in candle_context_feature_columns(frame):
+        if column not in feature_columns:
+            feature_columns.append(column)
     for column in (
         "event_score",
         "event_scale_hours",
