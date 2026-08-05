@@ -208,7 +208,7 @@ def _position_rows(snapshots: list[dict[str, Any]]) -> str:
             f"<td>{_price(item['stop'])}</td>"
             f"<td>{_price(item['mark'])}</td>"
             f'<td class="{pnl_class}">{_money(item["pnl_usd"])}</td>'
-            f'<td class="{pnl_class}">{_percent(item["net_return"])}</td>'
+            f'<td class="{pnl_class}">{_signed_percent(item["net_return"])}</td>'
             f'<td class="{pnl_class}">{_r(item["realized_r"])}</td>'
             f'<td><span class="pill {status_class}">{_escape(item["outcome"])}</span></td>'
             f"<td>{_escape(_time(item['closed_at']))}</td>"
@@ -368,6 +368,11 @@ def _money(value: Any) -> str:
 def _percent(value: Any) -> str:
     number = _number(value)
     return "—" if number is None else f"{number * 100:.2f}%"
+
+
+def _signed_percent(value: Any) -> str:
+    number = _number(value)
+    return "—" if number is None else f"{number * 100:+.2f}%"
 
 
 def _r(value: Any) -> str:
