@@ -5,6 +5,7 @@ from typing import Any
 import pandas as pd
 
 EXECUTION_ENTRY_CONTRACT = "LIVE_QUOTE_AT_SIGNAL_RUN"
+BATCH_LABEL_ENTRY_CONTRACT = "NEXT_HOURLY_OPEN"
 
 
 def apply_execution_quote(
@@ -58,6 +59,12 @@ def apply_execution_quote(
         plan["entry_quote_time"] = quote_timestamp.isoformat()
         plan["entry_quote_observed_at"] = observation_timestamp.isoformat()
         plan["entry_quote_age_seconds"] = max(0.0, age_seconds)
+        plan["label_execution_aligned"] = False
+        plan["label_entry_definition"] = BATCH_LABEL_ENTRY_CONTRACT
+        plan["runtime_entry_definition"] = EXECUTION_ENTRY_CONTRACT
+        plan["execution_alignment_status"] = (
+            "APPROXIMATE_UNTIL_MINUTE_LEVEL_RETRAIN"
+        )
         output["trade_plan"] = plan
     return output
 
