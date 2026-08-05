@@ -14,7 +14,7 @@ on:
       - "requirements-github.txt"
       - "pyproject.toml"
   schedule:
-    - cron: "17 * * * *"
+    - cron: "4 * * * *"
   workflow_dispatch:
   workflow_run:
     workflows: ["Weekly BTC model retraining"]
