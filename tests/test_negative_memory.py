@@ -101,7 +101,10 @@ class NegativeMemoryTests(unittest.TestCase):
             result["risk_budget_usd"],
             1000.0 * result["risk_fraction"],
         )
-        self.assertEqual(result["negative_memory_risk_multiplier"], 0.60)
+        self.assertAlmostEqual(
+            result["negative_memory_risk_multiplier"],
+            0.60,
+        )
         self.assertIn(
             "KNOWN_BAD_PATTERN_FRONT_BLOOM",
             result["soft_risk_flags"],
