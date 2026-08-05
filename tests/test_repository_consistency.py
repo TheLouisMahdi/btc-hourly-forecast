@@ -34,16 +34,20 @@ class RepositoryConsistencyTests(unittest.TestCase):
             (self.root / "README.md").read_text(encoding="utf-8"),
         )
 
-    def test_obsolete_local_dashboard_and_dependencies_are_absent(self) -> None:
+    def test_obsolete_local_ui_and_aliases_are_absent(self) -> None:
         self.assertFalse(
             (self.root / "src" / "btc_ema_trader" / "dashboard.py").exists()
         )
+        self.assertFalse((self.root / "tests" / "conftest.py").exists())
         project = tomllib.loads(
             (self.root / "pyproject.toml").read_text(encoding="utf-8")
         )
         dependencies = "\n".join(project["project"]["dependencies"]).lower()
+        scripts = project["project"]["scripts"]
         self.assertNotIn("gradio", dependencies)
         self.assertNotIn("plotly", dependencies)
+        self.assertNotIn("pytest", dependencies)
+        self.assertEqual(set(scripts), {"btc-regime"})
 
     def test_generated_artifacts_are_not_committed_to_main(self) -> None:
         forbidden = (
@@ -56,6 +60,18 @@ class RepositoryConsistencyTests(unittest.TestCase):
         ignore = (self.root / ".gitignore").read_text(encoding="utf-8")
         self.assertIn("artifacts/models/*", ignore)
         self.assertIn("artifacts/reports/*", ignore)
+
+    def test_canonical_runtime_contract_modules_exist(self) -> None:
+        required = (
+            "src/btc_ema_trader/active_position_contract.py",
+            "src/btc_ema_trader/candle_context.py",
+            "src/btc_ema_trader/execution_entry.py",
+            "src/btc_ema_trader/execution_path.py",
+            "src/btc_ema_trader/risk_economics.py",
+            "src/btc_ema_trader/strict_forecast_contract.py",
+        )
+        missing = [name for name in required if not (self.root / name).is_file()]
+        self.assertEqual(missing, [])
 
     def test_pages_workflow_has_one_dashboard_entry_point(self) -> None:
         workflow = (
@@ -85,6 +101,17 @@ class RepositoryConsistencyTests(unittest.TestCase):
         self.assertNotIn('values.setdefault("strategy"', common)
         self.assertNotIn('values.setdefault("trade_lifecycle"', common)
         self.assertNotIn('values.setdefault("negative_memory"', common)
+
+    def test_removed_local_dashboard_settings_are_absent(self) -> None:
+        config = yaml.safe_load(
+            (self.root / "config" / "default.yaml").read_text(
+                encoding="utf-8"
+            )
+        )
+        live = config["live"]
+        self.assertNotIn("dashboard_host", live)
+        self.assertNotIn("dashboard_port", live)
+        self.assertNotIn("quote_poll_seconds", live)
 
 
 if __name__ == "__main__":
