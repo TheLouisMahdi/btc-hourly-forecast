@@ -9,12 +9,7 @@ ACTIVE_POSITION_CONTRACT = "ACTIVE_TARGET_STOP_POSITION"
 def build_active_position_plan(
     trade: dict[str, Any],
 ) -> dict[str, Any]:
-    """Return one normalized management plan for the currently open position.
-
-    The hourly candidate plan must never masquerade as the active position.
-    This projection contains only values frozen at entry or updated by the
-    position lifecycle itself.
-    """
+    """Project the immutable entry contract of the currently open position."""
     direction = str(trade.get("direction") or "").upper()
     if direction not in {"LONG", "SHORT"}:
         raise ValueError("An active position must be LONG or SHORT")
@@ -46,6 +41,20 @@ def build_active_position_plan(
         "breakout_level": trade.get("breakout_level"),
         "invalidation_level": trade.get("invalidation_level"),
         "regime": trade.get("regime"),
+        "policy_name": trade.get("policy_name"),
+        "policy_version": trade.get("policy_version"),
+        "risk_contract_version": trade.get("risk_contract_version"),
+        "entry_contract": trade.get("entry_contract"),
+        "risk_score": trade.get("risk_score"),
+        "risk_fraction": trade.get("risk_fraction"),
+        "risk_assessment": trade.get("risk_assessment"),
+        "soft_risk_flags": list(trade.get("soft_risk_flags", [])),
+        "qualification_passed": bool(
+            trade.get("qualification_passed", False)
+        ),
+        "direction_qualified": bool(
+            trade.get("direction_qualified", False)
+        ),
         "entry_reference": entry,
         "entry_reference_kind": trade.get(
             "entry_reference_kind",
@@ -57,6 +66,7 @@ def build_active_position_plan(
         ),
         "entry_quote_provider": trade.get("entry_quote_provider"),
         "entry_quote_time": trade.get("entry_quote_time"),
+        "entry_quote_observed_at": trade.get("entry_quote_observed_at"),
         "source_candle_close": trade.get("source_candle_close"),
         "execution_quote": trade.get("execution_quote"),
         "opened_at": trade.get("opened_at"),
@@ -68,6 +78,10 @@ def build_active_position_plan(
         "partial_entry_candle_used_for_barriers": bool(
             trade.get("partial_entry_candle_used_for_barriers", False)
         ),
+        "label_execution_aligned": bool(
+            trade.get("label_execution_aligned", False)
+        ),
+        "label_entry_definition": trade.get("label_entry_definition"),
         "target_price": target,
         "stop_price": current_stop,
         "current_stop_price": current_stop,
@@ -90,6 +104,7 @@ def build_active_position_plan(
         "stress_execution_cost_bps": trade.get(
             "stress_execution_cost_bps"
         ),
+        "gap_risk_buffer_bps": trade.get("gap_risk_buffer_bps"),
         "target_net_profit_usd": trade.get("target_net_profit_usd"),
         "stop_net_loss_usd": trade.get("stop_net_loss_usd"),
         "expected_value_usd": trade.get("expected_value_usd"),
