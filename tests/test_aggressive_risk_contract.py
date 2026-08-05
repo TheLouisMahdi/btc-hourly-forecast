@@ -26,11 +26,12 @@ class _Settings:
             "minimum_risk_per_trade_fraction": 0.005,
             "maximum_risk_per_trade_fraction": 0.03,
             "maximum_leverage": 5.0,
+            "gap_risk_buffer_bps": 6.0,
         }
 
 
 class AggressiveRiskContractTests(unittest.TestCase):
-    def test_final_trade_economics_uses_decision_risk_fraction(self) -> None:
+    def test_final_trade_economics_uses_one_gap_aware_risk_budget(self) -> None:
         plan = {
             "entry_reference": 100.0,
             "stop_percent": 0.01,
@@ -46,7 +47,13 @@ class AggressiveRiskContractTests(unittest.TestCase):
 
         self.assertEqual(output["risk_fraction"], 0.025)
         self.assertEqual(output["risk_budget_usd"], 25.0)
+        self.assertEqual(output["gap_risk_buffer_bps"], 6.0)
         self.assertGreater(output["notional_usd"], 0.0)
+        self.assertLessEqual(
+            output["modeled_total_risk_usd"],
+            output["risk_budget_usd"] + 1e-9,
+        )
+        self.assertLessEqual(output["risk_budget_utilization"], 1.0 + 1e-12)
         self.assertGreater(output["target_net_profit_usd"], 0.0)
         self.assertLess(output["stop_net_loss_usd"], 0.0)
 
@@ -68,6 +75,7 @@ class AggressiveRiskContractTests(unittest.TestCase):
                 "risk_budget_usd": 20.0,
                 "risk_fraction": 0.02,
                 "risk_score": 0.60,
+                "risk_assessment": {"components": {"confidence": 0.5}},
                 "policy_name": "AGGRESSIVE_STRUCTURAL_RISK_SCALED",
                 "policy_version": 2,
                 "risk_contract_version": 2,
@@ -75,6 +83,11 @@ class AggressiveRiskContractTests(unittest.TestCase):
                 "soft_risk_flags": ["MODEL_NOT_QUALIFIED"],
                 "qualification_passed": False,
                 "direction_qualified": False,
+                "modeled_total_risk_usd": 20.0,
+                "gap_risk_buffer_bps": 6.0,
+                "label_execution_aligned": False,
+                "label_entry_definition": "NEXT_HOURLY_OPEN",
+                "runtime_entry_definition": "LIVE_QUOTE_AT_SIGNAL_RUN",
             },
         }
 
@@ -93,6 +106,12 @@ class AggressiveRiskContractTests(unittest.TestCase):
             "STRUCTURAL_EVENT_RISK_SCALED",
         )
         self.assertEqual(trade["risk_fraction"], 0.02)
+        self.assertEqual(trade["gap_risk_buffer_bps"], 6.0)
+        self.assertFalse(trade["label_execution_aligned"])
+        self.assertEqual(
+            trade["label_entry_definition"],
+            "NEXT_HOURLY_OPEN",
+        )
         self.assertEqual(
             trade["soft_risk_flags"],
             ["MODEL_NOT_QUALIFIED"],
