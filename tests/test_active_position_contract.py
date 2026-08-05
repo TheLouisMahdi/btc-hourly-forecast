@@ -23,6 +23,16 @@ class ActivePositionContractTests(unittest.TestCase):
             "risk_reward": 5.0,
             "maximum_holding_hours": 72,
             "stress_execution_cost_bps": 20.0,
+            "policy_name": "AGGRESSIVE_STRUCTURAL_RISK_SCALED",
+            "policy_version": 2,
+            "risk_contract_version": 2,
+            "entry_contract": "STRUCTURAL_EVENT_RISK_SCALED",
+            "risk_score": 0.6,
+            "risk_fraction": 0.02,
+            "soft_risk_flags": ["MODEL_NOT_QUALIFIED"],
+            "gap_risk_buffer_bps": 6.0,
+            "label_execution_aligned": False,
+            "label_entry_definition": "NEXT_HOURLY_OPEN",
         }
         plan = build_active_position_plan(trade)
         self.assertEqual(plan["contract_type"], ACTIVE_POSITION_CONTRACT)
@@ -32,6 +42,13 @@ class ActivePositionContractTests(unittest.TestCase):
         self.assertEqual(plan["target_price"], 105.0)
         self.assertEqual(plan["stop_price"], 100.2)
         self.assertEqual(plan["event_type"], "RESISTANCE_BREAKOUT_LONG")
+        self.assertEqual(
+            plan["policy_name"],
+            "AGGRESSIVE_STRUCTURAL_RISK_SCALED",
+        )
+        self.assertEqual(plan["risk_fraction"], 0.02)
+        self.assertEqual(plan["gap_risk_buffer_bps"], 6.0)
+        self.assertFalse(plan["label_execution_aligned"])
         self.assertNotIn("forecast_direction", plan)
 
     def test_closed_trade_cannot_create_active_plan(self) -> None:
