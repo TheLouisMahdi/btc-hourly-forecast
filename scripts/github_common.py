@@ -72,15 +72,21 @@ def build_github_settings(
             "start_on_next_closed_candle": False,
         }
     )
-    # GitHub is a paper-trading research environment. Here the public model
-    # deliberately explores more setups while preserving hard data checks.
+    # GitHub is the canonical paper-trading research runtime. It seeks valid
+    # structural positions aggressively while scaling capital risk from the
+    # event, model qualification, economic edge and current data warnings.
     values.setdefault("strategy", {}).update(
         {
             "paper_only": True,
-            "aggressive_paper_mode": True,
+            "position_policy": "AGGRESSIVE_STRUCTURAL_RISK_SCALED",
+            "policy_version": 2,
             "allow_short": True,
             "entry_order_style": "market",
-            "risk_per_trade_fraction": 0.01,
+            "risk_per_trade_fraction": 0.0125,
+            "minimum_risk_per_trade_fraction": 0.005,
+            "maximum_risk_per_trade_fraction": 0.03,
+            "risk_edge_lower_bps": -20.0,
+            "risk_edge_upper_bps": 20.0,
             "maximum_leverage": 5.0,
             "target_r_multiple": 5.0,
             "minimum_event_score": 0.10,
@@ -90,12 +96,14 @@ def build_github_settings(
             "block_during_news_shock": False,
         }
     )
-    values.setdefault("adaptive", {})["enabled"] = True
+    # The generic multi-horizon adaptive layer is intentionally shadowed off.
+    # Dedicated price adaptation and resolved-trade target/stop learning remain.
+    values.setdefault("adaptive", {})["enabled"] = False
     values.setdefault("negative_memory", {})["require_for_trade"] = False
     values.setdefault("trade_lifecycle", {}).update(
         {
             "enabled": True,
-            "mode": "AGGRESSIVE_PAPER",
+            "mode": "AGGRESSIVE_STRUCTURAL_RISK_SCALED",
             "base_reward_r": 5.0,
         }
     )
