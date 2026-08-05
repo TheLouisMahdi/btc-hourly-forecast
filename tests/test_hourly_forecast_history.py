@@ -31,12 +31,16 @@ class HourlyForecastHistoryTests(unittest.TestCase):
             [existing],
             replacement,
         )
-        self.assertEqual(result, existing)
-        self.assertEqual(result["model_id"], "first-model")
+        self.assertEqual(result["model_id"], "second-model")
         self.assertEqual(
             result["next_candle_forecast"]["likely_close_low"],
             99.0,
         )
+        self.assertEqual(
+            result["next_candle_forecast"]["likely_close_high"],
+            103.0,
+        )
+        self.assertEqual(result["prediction_result"], "PENDING")
 
     def test_legacy_record_can_be_replaced_by_new_contract(self) -> None:
         legacy = {
