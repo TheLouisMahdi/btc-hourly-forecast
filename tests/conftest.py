@@ -22,6 +22,9 @@ def settings(tmp_path: Path) -> Settings:
         "report_dir": "artifacts/reports",
         "log_dir": "logs",
         "runtime_state": "data/runtime_state.json",
+        "adaptive_state": "data/adaptive_state.joblib",
+        "price_adaptive_state": "data/price_adaptive_state.joblib",
+        "trade_adaptive_state": "data/trade_adaptive_state.joblib",
     }
     values["model"].update({
         "min_train_rows": 500,
