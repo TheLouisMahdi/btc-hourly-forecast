@@ -12,6 +12,10 @@ import yaml
 
 from btc_ema_trader.config import Settings, load_settings
 
+LEGACY_RUNTIME_VALUES = {
+    "AGGRESSIVE_ADAPTIVE_5R": "AGGRESSIVE_STRUCTURAL_RISK_SCALED",
+}
+
 
 def build_github_settings(
     project_root: Path,
@@ -107,7 +111,9 @@ def copy_latest_model_from_state(
 
 
 def json_safe(value: Any) -> Any:
-    if value is None or isinstance(value, (str, bool, int)):
+    if isinstance(value, str):
+        return LEGACY_RUNTIME_VALUES.get(value, value)
+    if value is None or isinstance(value, (bool, int)):
         return value
     if isinstance(value, float):
         return value if math.isfinite(value) else None
