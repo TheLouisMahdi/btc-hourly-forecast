@@ -1,15 +1,8 @@
 from __future__ import annotations
 
-import sys
 import unittest
-from pathlib import Path
 
-sys.path.insert(
-    0,
-    str(Path(__file__).resolve().parents[1] / "scripts"),
-)
-
-from github_hourly_forecast import preserve_existing_forecast
+from btc_ema_trader.github_runtime import preserve_canonical_forecast
 
 
 class HourlyForecastHistoryTests(unittest.TestCase):
@@ -34,16 +27,20 @@ class HourlyForecastHistoryTests(unittest.TestCase):
             },
             "prediction_result": "PENDING",
         }
-        result = preserve_existing_forecast(
+        result = preserve_canonical_forecast(
             [existing],
             replacement,
         )
-        self.assertEqual(result, existing)
-        self.assertEqual(result["model_id"], "first-model")
+        self.assertEqual(result["model_id"], "second-model")
         self.assertEqual(
             result["next_candle_forecast"]["likely_close_low"],
             99.0,
         )
+        self.assertEqual(
+            result["next_candle_forecast"]["likely_close_high"],
+            103.0,
+        )
+        self.assertEqual(result["prediction_result"], "PENDING")
 
     def test_legacy_record_can_be_replaced_by_new_contract(self) -> None:
         legacy = {
@@ -59,7 +56,7 @@ class HourlyForecastHistoryTests(unittest.TestCase):
                 "likely_close_high": 103.0,
             },
         }
-        result = preserve_existing_forecast(
+        result = preserve_canonical_forecast(
             [legacy],
             replacement,
         )

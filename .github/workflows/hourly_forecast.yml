@@ -87,7 +87,7 @@ jobs:
             done
           fi
 
-      - name: Run adaptive target-stop trade cycle
+      - name: Run canonical adaptive target-stop cycle
         run: python scripts/github_structural_forecast.py
 
       - name: Resolve secondary next-candle outcomes

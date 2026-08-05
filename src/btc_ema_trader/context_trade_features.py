@@ -32,6 +32,20 @@ NEUTRAL_CONTEXT_VECTOR = np.asarray(
 )
 
 
+def append_context_features(
+    base_vector: np.ndarray,
+    record: dict[str, Any],
+) -> np.ndarray:
+    """Append causal three-candle features without mutating another module."""
+    base = np.asarray(base_vector, dtype=float)
+    if base.shape != (len(BASE_TRADE_FEATURES),):
+        raise ValueError(
+            "Base trade vector has an incompatible shape: "
+            f"{base.shape!r}"
+        )
+    return np.concatenate([base, _context_vector(record)])
+
+
 def context_trade_feature_vector(
     record: dict[str, Any],
     plan: dict[str, Any],
@@ -47,6 +61,29 @@ def context_trade_feature_vector(
         base_reward_r=base_reward_r,
         direction_code=direction_code,
     )
+    return append_context_features(base, record)
+
+
+def migrate_trade_feature_vectors(trades: list[dict[str, Any]]) -> int:
+    """Pad schema-v1 positions with neutral context once and preserve outcomes."""
+    migrated = 0
+    for trade in trades:
+        vector = np.asarray(
+            trade.get("entry_feature_vector", []),
+            dtype=float,
+        )
+        if vector.shape != (len(BASE_TRADE_FEATURES),):
+            continue
+        trade["entry_feature_vector"] = np.concatenate(
+            [vector, NEUTRAL_CONTEXT_VECTOR]
+        ).tolist()
+        trade["entry_feature_names"] = list(EXTENDED_TRADE_FEATURES)
+        trade["candle_context_migration"] = "LEGACY_NEUTRAL_CONTEXT"
+        migrated += 1
+    return migrated
+
+
+def _context_vector(record: dict[str, Any]) -> np.ndarray:
     context = record.get("event_candle_context")
     context = context if isinstance(context, dict) else {}
     bars = context.get("bars")
@@ -108,13 +145,17 @@ def context_trade_feature_vector(
         else 0.0
     )
 
-    extra = np.asarray(
+    return np.asarray(
         [
             _scaled_percent(event.get("body_percent"), 0.02),
             _scaled_percent(event.get("range_percent"), 0.03),
             _clip(upper_share, 0.0, 1.0),
             _clip(lower_share, 0.0, 1.0),
-            _clip(_finite(event.get("close_location"), 0.5), 0.0, 1.0),
+            _clip(
+                _finite(event.get("close_location"), 0.5),
+                0.0,
+                1.0,
+            ),
             _scaled_percent(previous_1.get("body_percent"), 0.02),
             _clip(
                 _finite(previous_1.get("close_location"), 0.5),
@@ -133,40 +174,6 @@ def context_trade_feature_vector(
         ],
         dtype=float,
     )
-    return np.concatenate([np.asarray(base, dtype=float), extra])
-
-
-def migrate_trade_feature_vectors(trades: list[dict[str, Any]]) -> int:
-    """Pad schema-v1 positions with neutral context so their outcomes remain usable."""
-    migrated = 0
-    for trade in trades:
-        vector = np.asarray(trade.get("entry_feature_vector", []), dtype=float)
-        if vector.shape != (len(BASE_TRADE_FEATURES),):
-            continue
-        trade["entry_feature_vector"] = np.concatenate(
-            [vector, NEUTRAL_CONTEXT_VECTOR]
-        ).tolist()
-        trade["entry_feature_names"] = list(EXTENDED_TRADE_FEATURES)
-        trade["candle_context_migration"] = "LEGACY_NEUTRAL_CONTEXT"
-        migrated += 1
-    return migrated
-
-
-def install_context_trade_features(module: Any) -> None:
-    """Install schema-v2 features into the existing adaptive lifecycle module."""
-    module.TRADE_STATE_SCHEMA_VERSION = CONTEXT_TRADE_SCHEMA_VERSION
-    module.TRADE_FEATURES = EXTENDED_TRADE_FEATURES
-    module.trade_feature_vector = context_trade_feature_vector
-    if getattr(module.AdaptiveTradeEngine, "_context_sync_installed", False):
-        return
-    base_synchronize = module.AdaptiveTradeEngine.synchronize
-
-    def synchronize_with_context(self, trades):
-        migrate_trade_feature_vectors(trades)
-        return base_synchronize(self, trades)
-
-    module.AdaptiveTradeEngine.synchronize = synchronize_with_context
-    module.AdaptiveTradeEngine._context_sync_installed = True
 
 
 def _scaled_percent(value: Any, scale: float) -> float:
