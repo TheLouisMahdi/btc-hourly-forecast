@@ -1,5 +1,18 @@
 # Changelog
 
+## Unreleased — Exact trade ledger and causal candle context
+
+- Replaced the final forecast-history table with a position-only LONG/SHORT ledger.
+- Added realized P&L for closed positions and mark-to-market P&L for open positions.
+- Added entry, target, stop, mark/exit, P&L percentage, R-multiple and outcome columns.
+- Added a strict contract version 3 wrapper that refuses forecasts created before the source close or after the target close.
+- Bound every secondary forecast to one exact future closed hourly candle and added an explicit settlement timestamp.
+- Added a causal three-candle context contract: the event candle plus the two immediately preceding closed candles.
+- Added normalized body, range, upper-shadow, lower-shadow, close-location, volume and three-bar interaction features.
+- Persisted raw OHLCV and shadow values with each opened paper position for auditability.
+- Kept future candles out of model inputs; they remain available only for outcome labels and trade resolution.
+- Added regression tests for prefix stability, raw candle context, stale forecast rejection and position-only dashboard output.
+
 ## 5.0.0 — Deterministic directional breakout models
 
 - Replaced the shared event classifier with independent Long and Short model heads.
