@@ -55,29 +55,49 @@ def _panel(latest: dict[str, Any]) -> str:
     )
     qualified = bool(selected.get("qualified", memory.get("qualified", False)))
     loaded = bool(latest.get("negative_memory_loaded", False))
-    state_class = "safe" if loaded and qualified and not veto else "blocked"
-    verdict = "PASS" if state_class == "safe" else "VETO / LEARNING"
+    state_class, verdict = _state(loaded, qualified, veto, status)
+    note = {
+        "safe": "The selected side and horizon passed the locked memory holdout gate.",
+        "veto": "A recurring or learned hard-negative pattern vetoed this candidate.",
+        "shadow": "Memory is loaded but this context is not qualified; output remains diagnostic.",
+        "unavailable": "No compatible negative-memory artifact is active for this record.",
+    }[state_class]
     return f'''
 <section class="panel boundary-memory-panel">
   <div class="boundary-memory-heading">
     <div>
-      <div class="structure-eyebrow">Sandwiched learned Bloom protection</div>
-      <h2>Support / resistance negative memory</h2>
-      <p class="sub">A front Bloom memory catches recurring losing fingerprints, the learned middle estimates break and no-profit risk, and a backup Bloom catches hard negatives missed by the middle model.</p>
+      <div class="structure-eyebrow">Sandwiched negative memory</div>
+      <h2>Support / resistance risk memory</h2>
+      <p class="sub">{_escape(note)} Front and backup Bloom filters identify recurring fingerprints; the learned middle estimates boundary-break and no-profit risk.</p>
     </div>
     <span class="boundary-memory-state {state_class}">{_escape(verdict)}</span>
   </div>
   <div class="boundary-memory-grid">
-    {_tile("Context", side, status)}
-    {_tile("Boundary level", _price(memory.get("boundary_level")), "Fixed structural level used by the head")}
-    {_tile("Distance", _atr(memory.get("boundary_distance_atr")), "Distance from support or resistance")}
-    {_tile("Head", f"{selected_horizon}h" if selected_horizon else "—", "Chronological side-specific horizon")}
+    {_tile("Context", _label(side), status)}
+    {_tile("Boundary level", _price(memory.get("boundary_level")), "Structural level used by the side-specific head")}
+    {_tile("Distance", _atr(memory.get("boundary_distance_atr")), "Current distance from support or resistance")}
+    {_tile("Memory horizon", f"{selected_horizon}h" if selected_horizon else "—", "Chronological side-specific head")}
     {_tile("Break probability", _percent(p_break), "Probability the active level breaks in the modeled direction")}
     {_tile("No-profit risk", _percent(p_bad), "Probability the setup fails to produce stress-net profit")}
     {_tile("Front Bloom", "HIT" if front else "CLEAR", "Recurring historically bad fingerprint")}
     {_tile("Backup Bloom", "HIT" if backup else "CLEAR", "Hard negative missed by the learned middle")}
   </div>
 </section>'''
+
+
+def _state(
+    loaded: bool,
+    qualified: bool,
+    veto: bool,
+    status: str,
+) -> tuple[str, str]:
+    if not loaded or status.upper() == "UNAVAILABLE":
+        return "unavailable", "UNAVAILABLE"
+    if veto:
+        return "veto", "VETO"
+    if qualified:
+        return "safe", "PASS"
+    return "shadow", "SHADOW"
 
 
 def _tile(title: str, value: str, note: str) -> str:
@@ -91,20 +111,13 @@ def _tile(title: str, value: str, note: str) -> str:
 
 def _styles() -> str:
     return r'''
-.boundary-memory-panel{position:relative;overflow:hidden}
-.boundary-memory-panel:before{content:"";position:absolute;inset:-40% auto auto -15%;width:320px;height:320px;border-radius:50%;background:radial-gradient(circle,rgba(123,211,184,.11),transparent 68%);pointer-events:none}
-.boundary-memory-heading{display:flex;align-items:flex-start;justify-content:space-between;gap:20px;margin-bottom:20px}
-.boundary-memory-heading h2{margin:5px 0 8px;font-size:clamp(1.35rem,3vw,2rem)}
-.boundary-memory-state{display:inline-flex;align-items:center;justify-content:center;min-width:112px;padding:10px 14px;border-radius:999px;font-size:.78rem;font-weight:800;letter-spacing:.08em;border:1px solid rgba(255,255,255,.09)}
-.boundary-memory-state.safe{background:rgba(80,210,160,.12);color:#9ce5ca}
-.boundary-memory-state.blocked{background:rgba(238,151,126,.12);color:#efb0a2}
-.boundary-memory-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}
-.boundary-memory-tile{padding:16px;border:1px solid rgba(255,255,255,.07);border-radius:18px;background:rgba(5,11,10,.28);min-height:124px;display:flex;flex-direction:column;gap:8px}
-.boundary-memory-tile span{font-size:.78rem;color:var(--muted);text-transform:uppercase;letter-spacing:.06em}
-.boundary-memory-tile strong{font-size:1.12rem;overflow-wrap:anywhere}
-.boundary-memory-tile small{color:var(--muted);line-height:1.45}
-@media(max-width:850px){.boundary-memory-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
-@media(max-width:520px){.boundary-memory-heading{flex-direction:column}.boundary-memory-grid{grid-template-columns:1fr}.boundary-memory-state{align-self:flex-start}}
+.boundary-memory-panel{position:relative;margin-top:18px;overflow:hidden;background:linear-gradient(135deg,rgba(255,255,255,.9),rgba(236,234,245,.58))}
+.boundary-memory-panel:before{content:"";position:absolute;inset:-40% auto auto -15%;width:320px;height:320px;border-radius:50%;background:radial-gradient(circle,rgba(111,155,145,.12),transparent 68%);pointer-events:none}
+.boundary-memory-heading{position:relative;display:flex;align-items:flex-start;justify-content:space-between;gap:20px;margin-bottom:20px}.boundary-memory-heading h2{margin:5px 0 8px;font-size:clamp(1.35rem,3vw,2rem)}
+.boundary-memory-state{display:inline-flex;align-items:center;justify-content:center;min-width:112px;padding:10px 14px;border-radius:999px;font-size:.78rem;font-weight:850;letter-spacing:.08em;border:1px solid var(--line)}
+.boundary-memory-state.safe{background:rgba(77,139,118,.12);color:var(--ok)}.boundary-memory-state.veto{background:rgba(189,114,110,.12);color:var(--bad)}.boundary-memory-state.shadow{background:rgba(154,134,93,.12);color:var(--wait)}.boundary-memory-state.unavailable{background:rgba(116,131,127,.09);color:var(--muted)}
+.boundary-memory-grid{position:relative;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}.boundary-memory-tile{padding:16px;border:1px solid var(--line);border-radius:18px;background:rgba(255,255,255,.58);min-height:118px;display:flex;flex-direction:column;gap:8px}.boundary-memory-tile span{font-size:.68rem;color:var(--muted);text-transform:uppercase;letter-spacing:.07em}.boundary-memory-tile strong{font-size:1rem;overflow-wrap:anywhere}.boundary-memory-tile small{color:var(--muted);font-size:.68rem;line-height:1.45}
+@media(max-width:850px){.boundary-memory-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}@media(max-width:520px){.boundary-memory-heading{flex-direction:column}.boundary-memory-grid{grid-template-columns:1fr}.boundary-memory-state{align-self:flex-start}}
 '''
 
 
@@ -137,6 +150,10 @@ def _price(value: Any) -> str:
 def _atr(value: Any) -> str:
     number = _number(value)
     return "—" if number is None else f"{number:.2f} ATR"
+
+
+def _label(value: Any) -> str:
+    return str(value or "NONE").replace("_", " ").title()
 
 
 def _escape(value: Any) -> str:
