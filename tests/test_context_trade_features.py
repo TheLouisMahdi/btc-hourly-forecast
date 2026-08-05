@@ -8,6 +8,7 @@ from btc_ema_trader.context_trade_features import (
     CONTEXT_TRADE_FEATURES,
     EXTENDED_TRADE_FEATURES,
     context_trade_feature_vector,
+    migrate_trade_feature_vectors,
 )
 from btc_ema_trader.trade_lifecycle import TRADE_FEATURES
 
@@ -92,6 +93,22 @@ class ContextTradeFeatureTests(unittest.TestCase):
         )
         self.assertEqual(vector.shape, (len(EXTENDED_TRADE_FEATURES),))
         self.assertTrue(np.isfinite(vector).all())
+
+    def test_legacy_position_vector_is_migrated_once(self) -> None:
+        trade = {
+            "entry_feature_names": list(TRADE_FEATURES),
+            "entry_feature_vector": [0.0] * len(TRADE_FEATURES),
+        }
+        self.assertEqual(migrate_trade_feature_vectors([trade]), 1)
+        self.assertEqual(
+            len(trade["entry_feature_vector"]),
+            len(EXTENDED_TRADE_FEATURES),
+        )
+        self.assertEqual(
+            trade["candle_context_migration"],
+            "LEGACY_NEUTRAL_CONTEXT",
+        )
+        self.assertEqual(migrate_trade_feature_vectors([trade]), 0)
 
 
 if __name__ == "__main__":
