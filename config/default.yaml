@@ -358,9 +358,6 @@ strategy:
 
 live:
   poll_seconds: 15
-  quote_poll_seconds: 8
   start_on_next_closed_candle: true
   collect_recent_news_each_cycle: true
   auto_retrain: false
-  dashboard_host: 127.0.0.1
-  dashboard_port: 7860
