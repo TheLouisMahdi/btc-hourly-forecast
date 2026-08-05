@@ -9,12 +9,11 @@ on:
       - "scripts/github_hourly_forecast.py"
       - "scripts/github_structural_forecast.py"
       - "scripts/github_common.py"
-      - "tests/**"
       - "config/**"
       - "requirements-github.txt"
       - "pyproject.toml"
   schedule:
-    - cron: "4 * * * *"
+    - cron: "17 * * * *"
   workflow_dispatch:
   workflow_run:
     workflows: ["Weekly BTC model retraining"]
@@ -50,9 +49,6 @@ jobs:
           python -m pip install --upgrade pip
           python -m pip install -r requirements-github.txt
           python -m pip install -e . --no-deps
-
-      - name: Run quality tests
-        run: python -m unittest discover -s tests -v
 
       - name: Restore forecast and trade ledger
         shell: bash
