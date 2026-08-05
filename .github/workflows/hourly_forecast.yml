@@ -7,6 +7,7 @@ on:
       - ".github/workflows/hourly_forecast.yml"
       - "src/**"
       - "scripts/github_hourly_forecast.py"
+      - "scripts/github_structural_forecast.py"
       - "scripts/github_common.py"
       - "config/**"
       - "requirements-github.txt"
@@ -87,7 +88,7 @@ jobs:
           fi
 
       - name: Run canonical adaptive target-stop cycle
-        run: python scripts/github_hourly_forecast.py
+        run: python scripts/github_structural_forecast.py
 
       - name: Resolve secondary next-candle outcomes
         run: python scripts/github_dashboard.py
