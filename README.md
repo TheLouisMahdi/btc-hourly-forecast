@@ -25,7 +25,7 @@
 
 <br /><br />
 
-<img src="https://img.shields.io/badge/version-5.4.0-8f8ab8?style=flat-square" alt="Version 5.4.0" />
+<img src="https://img.shields.io/badge/version-5.5.0-8f8ab8?style=flat-square" alt="Version 5.5.0" />
 <img src="https://img.shields.io/badge/Python-3.11%2B-3776ab?style=flat-square&logo=python&logoColor=white" alt="Python 3.11 or newer" />
 <img src="https://img.shields.io/badge/training-no_random_sampling-6f9b91?style=flat-square" alt="No random sampling" />
 <img src="https://img.shields.io/badge/mode-paper_trading_only-c99078?style=flat-square" alt="Paper trading only" />
@@ -62,7 +62,9 @@ Each position stores:
 entry price
 target price
 initial and current stop
+risk score and risk fraction
 risk budget and notional
+policy and risk-contract versions
 stress execution cost
 expected value
 maximum favorable and adverse excursion
@@ -165,24 +167,52 @@ A direction-horizon pair is evaluated using event count, AUC, calibration, selec
 
 Candidate diagnostics are retained even when promotion is rejected. Production-facing artifacts live on `model-state`, not on `main`.
 
-## Aggressive paper mode
+## Aggressive risk-scaled position policy
 
-The GitHub runtime uses `AGGRESSIVE_PAPER` exploration. It may ignore selected soft blockers, including incomplete qualification or weak predicted economic edge, to collect paper outcomes. It never ignores hard conditions such as missing market data, stale quote protection, unsupported event type, absent breakout level, absent invalidation, duplicate event or an already active position.
+The repository has one canonical entry policy:
 
-The dashboard therefore separates:
+```text
+AGGRESSIVE_STRUCTURAL_RISK_SCALED
+policy_version: 2
+risk_contract_version: 2
+```
 
-- pipeline and data health;
-- economic qualification;
-- the current paper position;
-- candidate blockers and ignored soft blockers.
+A valid fresh structural breakout seeks a paper position. Qualification, predicted economic edge, confidence, tradeability, regime alignment and soft warnings do not create a second conservative mode and do not automatically veto the event. They are combined into a bounded risk score that selects between **0.5% and 3.0%** of paper-account equity.
 
-An exploratory paper position is not evidence of a profitable or qualified production strategy.
+Typical behavior is:
+
+```text
+weak or unqualified event with negative edge -> smaller position
+strong qualified event with positive edge   -> larger position
+```
+
+Soft risk evidence includes incomplete qualification, a missing economic policy, weak confidence, weak tradeability, negative stress edge, volatility or news shock, stale model/news evidence, signal frequency and regime uncertainty.
+
+Hard blockers remain fail-safe and non-negotiable:
+
+```text
+no fresh structural breakout
+unsupported event type
+missing breakout or invalidation level
+duplicate event
+Long/Short direction mismatch
+short venue disabled
+invalid ATR
+unhealthy candles
+stale or unavailable execution quote
+provider mismatch
+an already active position
+```
+
+The dashboard displays the policy version, risk score, allocated risk, qualification state and soft risk evidence. An exploratory paper position is not evidence of a profitable production strategy.
+
+Legacy positions are not deleted or placed in a separate operating mode. Positions created before this contract remain identifiable by a missing or version-1 policy tag, while all new positions persist `policy_version: 2` and `entry_contract: STRUCTURAL_EVENT_RISK_SCALED`.
 
 ## Adaptive learning and negative memory
 
-The price learner receives weight only when its prequential Brier score, direction accuracy and return error improve over the batch model.
+The generic multi-horizon adaptive layer is disabled because it can blend shared online estimates into the independent Long and Short event heads. The dedicated price learner remains separate and receives weight only when its prequential Brier score, direction accuracy and return error improve over the batch model.
 
-The trade learner updates only after a position resolves. It learns target probability, stop probability and realized R from the frozen entry feature vector, including the causal three-candle context.
+The trade learner remains enabled. It updates only after a position resolves and learns target probability, stop probability and realized R from the frozen entry feature vector, including the causal three-candle context. Its final target-stop economics preserve the risk fraction selected by the entry policy.
 
 The negative-memory layer uses a sandwiched design:
 
