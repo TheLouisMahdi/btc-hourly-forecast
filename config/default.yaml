@@ -1,6 +1,6 @@
 project:
   name: BTC Adaptive Target-Stop Trader
-  version: 5.3.0
+  version: 5.4.0
   timezone: UTC
 
 paths:
@@ -27,6 +27,7 @@ market:
   max_retries: 5
   retry_backoff_seconds: 1.5
   minimum_history_rows: 80000
+  runtime_minimum_contiguous_rows: 1000
   maximum_gap_hours: 3
   training_maximum_gap_hours: 24
   training_maximum_gap_count: 12
