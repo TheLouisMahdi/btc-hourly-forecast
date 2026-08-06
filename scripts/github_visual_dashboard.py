@@ -63,20 +63,20 @@ def _inject_theme_control(document: str) -> str:
 
 def _background() -> str:
     coins = [
-        ("btc", "₿", "7%", "11%", "88px", "34s", "-11s", "92px", "118px", "-62px", "74px", "38px", "-48px"),
-        ("eth", "Ξ", "80%", "13%", "74px", "41s", "-27s", "-108px", "94px", "54px", "-72px", "-36px", "44px"),
-        ("sol", "S", "17%", "68%", "68px", "37s", "-18s", "126px", "-66px", "44px", "88px", "-52px", "-36px"),
-        ("xrp", "X", "72%", "72%", "62px", "46s", "-7s", "-94px", "-102px", "72px", "38px", "34px", "82px"),
-        ("bnb", "B", "45%", "8%", "58px", "39s", "-30s", "72px", "86px", "-84px", "48px", "38px", "-62px"),
-        ("ada", "A", "91%", "45%", "66px", "44s", "-22s", "-86px", "48px", "-42px", "-92px", "54px", "78px"),
-        ("doge", "Ð", "35%", "84%", "72px", "49s", "-15s", "104px", "-88px", "-76px", "-48px", "64px", "52px"),
+        ("btc", "₿", "7%", "11%", "88px", "34s", "10s", "-11s", "92px", "118px", "-62px", "74px", "38px", "-48px", "-32px", "-26px"),
+        ("eth", "Ξ", "80%", "13%", "74px", "41s", "12s", "-27s", "-108px", "94px", "54px", "-72px", "-36px", "44px", "48px", "25px"),
+        ("sol", "S", "17%", "68%", "68px", "37s", "11s", "-18s", "126px", "-66px", "44px", "88px", "-52px", "-36px", "-46px", "31px"),
+        ("xrp", "X", "72%", "72%", "62px", "46s", "13s", "-7s", "-94px", "-102px", "72px", "38px", "34px", "82px", "27px", "-33px"),
+        ("bnb", "B", "45%", "8%", "58px", "39s", "9s", "-30s", "72px", "86px", "-84px", "48px", "38px", "-62px", "-25px", "17px"),
+        ("ada", "A", "91%", "45%", "66px", "44s", "12s", "-22s", "-86px", "48px", "-42px", "-92px", "54px", "78px", "34px", "-28px"),
+        ("doge", "Ð", "35%", "84%", "72px", "49s", "14s", "-15s", "104px", "-88px", "-76px", "-48px", "64px", "52px", "-36px", "29px"),
     ]
     items = []
-    for name, symbol, left, top, size, duration, delay, dx1, dy1, dx2, dy2, dx3, dy3 in coins:
+    for name, symbol, left, top, size, duration, pulse, delay, dx1, dy1, dx2, dy2, dx3, dy3, dx4, dy4 in coins:
         items.append(
             f'<span class="ambient-coin coin-{name}" style="--left:{left};--top:{top};--size:{size};'
-            f'--duration:{duration};--delay:{delay};--dx1:{dx1};--dy1:{dy1};'
-            f'--dx2:{dx2};--dy2:{dy2};--dx3:{dx3};--dy3:{dy3}">'
+            f'--duration:{duration};--pulse:{pulse};--delay:{delay};--dx1:{dx1};--dy1:{dy1};'
+            f'--dx2:{dx2};--dy2:{dy2};--dx3:{dx3};--dy3:{dy3};--dx4:{dx4};--dy4:{dy4}">'
             f'<span>{symbol}</span></span>'
         )
     return (
@@ -94,7 +94,9 @@ def _styles() -> str:
   --surface-strong:rgba(255,255,255,.92);
   --surface-soft:rgba(255,255,255,.60);
   --surface-faint:rgba(255,255,255,.46);
-  --coin-opacity:.095;
+  --coin-low:.058;
+  --coin-mid:.095;
+  --coin-high:.118;
   --coin-filter:saturate(.82) brightness(1.03);
 }
 :root[data-theme="dark"]{
@@ -118,7 +120,9 @@ def _styles() -> str:
   --surface-strong:rgba(20,34,32,.94);
   --surface-soft:rgba(24,39,36,.74);
   --surface-faint:rgba(26,43,40,.58);
-  --coin-opacity:.12;
+  --coin-low:.075;
+  --coin-mid:.12;
+  --coin-high:.145;
   --coin-filter:saturate(.92) brightness(1.08);
 }
 html{background:var(--bg);transition:background-color .25s ease,color .25s ease}
@@ -141,14 +145,14 @@ body{position:relative;isolation:isolate;overflow-x:hidden;transition:background
 .ambient-market{position:fixed;inset:-8vh -7vw;z-index:0;overflow:hidden;pointer-events:none;contain:strict}
 .ambient-market:after{content:"";position:absolute;inset:0;background:radial-gradient(circle at center,transparent 25%,rgba(243,247,245,.28) 100%);transition:background .3s ease}
 :root[data-theme="dark"] .ambient-market:after{background:radial-gradient(circle at center,transparent 22%,rgba(5,10,10,.42) 100%)}
-.ambient-coin{--coin-color:#d9a86c;position:absolute;left:var(--left);top:var(--top);width:var(--size);height:var(--size);display:grid;place-items:center;border-radius:50%;opacity:var(--coin-opacity);filter:var(--coin-filter);animation:coin-drift var(--duration) cubic-bezier(.45,.05,.55,.95) var(--delay) infinite alternate,coin-light calc(var(--duration)*.31) ease-in-out var(--delay) infinite;will-change:transform,opacity,filter}
+.ambient-coin{--coin-color:#d9a86c;position:absolute;left:var(--left);top:var(--top);width:var(--size);height:var(--size);display:grid;place-items:center;border-radius:50%;opacity:var(--coin-mid);filter:var(--coin-filter);animation:coin-drift var(--duration) cubic-bezier(.45,.05,.55,.95) var(--delay) infinite alternate,coin-light var(--pulse) ease-in-out var(--delay) infinite;will-change:transform,opacity,filter}
 .ambient-coin:before,.ambient-coin:after{content:"";position:absolute;border-radius:inherit}.ambient-coin:before{inset:0;border:1px solid color-mix(in srgb,var(--coin-color) 55%,transparent);background:radial-gradient(circle at 31% 24%,color-mix(in srgb,var(--coin-color) 52%,white),color-mix(in srgb,var(--coin-color) 25%,transparent) 38%,color-mix(in srgb,var(--coin-color) 12%,transparent) 72%);box-shadow:inset -9px -12px 20px rgba(0,0,0,.08),0 0 26px color-mix(in srgb,var(--coin-color) 22%,transparent)}
 .ambient-coin:after{inset:12%;border:1px solid color-mix(in srgb,var(--coin-color) 42%,transparent)}
-.ambient-coin>span{position:relative;z-index:1;color:color-mix(in srgb,var(--coin-color) 78%,var(--ink));font-size:calc(var(--size)*.42);font-weight:900;text-shadow:0 0 18px color-mix(in srgb,var(--coin-color) 50%,transparent);transform:rotate(-8deg)}
+.ambient-coin>span{position:relative;z-index:1;color:color-mix(in srgb,var(--coin-color) 78%,var(--ink));font-size:32px;font-weight:900;text-shadow:0 0 18px color-mix(in srgb,var(--coin-color) 50%,transparent);transform:rotate(-8deg)}
 .coin-btc{--coin-color:#f2a84b}.coin-eth{--coin-color:#9a91d1}.coin-sol{--coin-color:#65c7aa}.coin-xrp{--coin-color:#8ea7aa}.coin-bnb{--coin-color:#e3bd59}.coin-ada{--coin-color:#6fa9d8}.coin-doge{--coin-color:#cba86a}
 .ambient-heart{position:absolute;color:var(--peach);opacity:.055;font-size:56px;filter:blur(.2px);animation:heart-float 24s ease-in-out infinite alternate}.heart-one{left:57%;top:17%;animation-delay:-8s}.heart-two{left:9%;top:49%;font-size:38px;color:var(--lav);animation-delay:-17s}
-@keyframes coin-drift{0%{transform:translate3d(0,0,0) rotate(-8deg) scale(.96)}28%{transform:translate3d(var(--dx1),var(--dy1),0) rotate(72deg) scale(1.03)}57%{transform:translate3d(var(--dx2),var(--dy2),0) rotate(166deg) scale(.94)}79%{transform:translate3d(var(--dx3),var(--dy3),0) rotate(248deg) scale(1.02)}100%{transform:translate3d(calc(var(--dx1)*-.35),calc(var(--dy2)*-.35),0) rotate(350deg) scale(.98)}}
-@keyframes coin-light{0%,100%{opacity:calc(var(--coin-opacity)*.66);filter:var(--coin-filter) brightness(.88)}48%{opacity:calc(var(--coin-opacity)*1.18);filter:var(--coin-filter) brightness(1.22)}72%{opacity:calc(var(--coin-opacity)*.82);filter:var(--coin-filter) brightness(1.02)}}
+@keyframes coin-drift{0%{transform:translate3d(0,0,0) rotate(-8deg) scale(.96)}28%{transform:translate3d(var(--dx1),var(--dy1),0) rotate(72deg) scale(1.03)}57%{transform:translate3d(var(--dx2),var(--dy2),0) rotate(166deg) scale(.94)}79%{transform:translate3d(var(--dx3),var(--dy3),0) rotate(248deg) scale(1.02)}100%{transform:translate3d(var(--dx4),var(--dy4),0) rotate(350deg) scale(.98)}}
+@keyframes coin-light{0%,100%{opacity:var(--coin-low);filter:var(--coin-filter) brightness(.88)}48%{opacity:var(--coin-high);filter:var(--coin-filter) brightness(1.22)}72%{opacity:var(--coin-mid);filter:var(--coin-filter) brightness(1.02)}}
 @keyframes heart-float{0%{transform:translate3d(0,0,0) rotate(-12deg)}50%{transform:translate3d(48px,-38px,0) rotate(9deg)}100%{transform:translate3d(-28px,42px,0) rotate(-4deg)}}
 :root[data-theme="dark"] .hero{background:linear-gradient(135deg,rgba(22,37,34,.96),rgba(14,25,24,.82));border-color:rgba(177,218,207,.12)}
 :root[data-theme="dark"] .metric,:root[data-theme="dark"] .panel{border-color:rgba(177,218,207,.12);box-shadow:0 16px 48px rgba(0,0,0,.22)}
@@ -170,7 +174,7 @@ body{position:relative;isolation:isolate;overflow-x:hidden;transition:background
 :root[data-theme="dark"] .chip{background:rgba(143,89,70,.20);color:#ddb9aa;border-color:rgba(215,160,141,.16)}
 :root[data-theme="dark"] .axis{fill:var(--muted)}
 :root[data-theme="dark"] .grid-line{stroke:rgba(178,218,207,.09)}
-@media(max-width:760px){.top-controls{width:100%;justify-content:space-between}.health-stack{justify-content:flex-start}.ambient-coin{opacity:calc(var(--coin-opacity)*.78)}.ambient-coin:nth-child(n+6){display:none}}
+@media(max-width:760px){.top-controls{width:100%;justify-content:space-between}.health-stack{justify-content:flex-start}.ambient-coin{opacity:var(--coin-low)}.ambient-coin:nth-child(n+6){display:none}}
 @media(prefers-reduced-motion:reduce){.ambient-coin,.ambient-heart{animation:none!important}.theme-toggle{transition:none}}
 '''
 
