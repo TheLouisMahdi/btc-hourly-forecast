@@ -30,7 +30,8 @@ jobs:
       - name: Show retraining reason
         env:
           RETRAIN_REASON: ${{ inputs.trigger_reason }}
-        run: printf 'Retraining reason: %s\n' "$RETRAIN_REASON"
+        run: |
+          printf 'Retraining reason: %s\n' "$RETRAIN_REASON"
 
       - name: Set up Python
         uses: actions/setup-python@v6
