@@ -24,7 +24,7 @@ permissions:
 
 concurrency:
   group: hourly-btc-forecast
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 jobs:
   forecast:
