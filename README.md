@@ -10,14 +10,14 @@
 
 <br /><br />
 
-<a href="https://github.com/TheLouisMahdi/btc-hourly-forecast/actions/workflows/hourly_forecast.yml">
-  <img src="https://github.com/TheLouisMahdi/btc-hourly-forecast/actions/workflows/hourly_forecast.yml/badge.svg?branch=main" alt="Hourly BTC forecast status" />
+<a href="https://github.com/TheLouisMahdi/btc-hourly-forecast/actions/workflows/forecast.yml">
+  <img src="https://github.com/TheLouisMahdi/btc-hourly-forecast/actions/workflows/forecast.yml/badge.svg?branch=main" alt="Hourly BTC forecast status" />
 </a>
-<a href="https://github.com/TheLouisMahdi/btc-hourly-forecast/actions/workflows/weekly_retrain.yml">
-  <img src="https://github.com/TheLouisMahdi/btc-hourly-forecast/actions/workflows/weekly_retrain.yml/badge.svg?branch=main" alt="Weekly BTC model retraining status" />
+<a href="https://github.com/TheLouisMahdi/btc-hourly-forecast/actions/workflows/retrain.yml">
+  <img src="https://github.com/TheLouisMahdi/btc-hourly-forecast/actions/workflows/retrain.yml/badge.svg?branch=main" alt="On-demand BTC model retraining status" />
 </a>
-<a href="https://github.com/TheLouisMahdi/btc-hourly-forecast/actions/workflows/pages_dashboard.yml">
-  <img src="https://github.com/TheLouisMahdi/btc-hourly-forecast/actions/workflows/pages_dashboard.yml/badge.svg?branch=main" alt="Dashboard deployment status" />
+<a href="https://github.com/TheLouisMahdi/btc-hourly-forecast/actions/workflows/dashboard.yml">
+  <img src="https://github.com/TheLouisMahdi/btc-hourly-forecast/actions/workflows/dashboard.yml/badge.svg?branch=main" alt="Dashboard deployment status" />
 </a>
 <a href="https://github.com/TheLouisMahdi/btc-hourly-forecast/actions/workflows/quality.yml">
   <img src="https://github.com/TheLouisMahdi/btc-hourly-forecast/actions/workflows/quality.yml/badge.svg?branch=main" alt="Repository quality status" />
@@ -88,7 +88,11 @@ The live indicators above are sourced from the latest public forecast snapshot a
 | **Adaptive Position Lifecycle** | Maintains one auditable paper position from entry through target, stop-loss, breakeven, trailing management, or time exit. |
 | **Risk-Scaled Decisioning** | Adjusts paper risk according to event quality, confidence, tradeability, economic edge, volatility, data health, and negative-pattern evidence. |
 | **Continuous Evaluation** | Scores forecasts only after the exact target candle closes and preserves completed outcomes without retroactive rewriting. |
-| **Automated Research Operations** | Runs hourly market cycles, weekly challenger training, quality checks, state persistence, and public dashboard delivery. |
+| **Auditable Research Operations** | Provides explicit manual workflows for quality validation, hourly cycles, dashboard deployment and policy-driven challenger training. |
+
+## Maintenance mode
+
+GitHub Actions workflows are currently manual-only. This prevents overlapping scheduled runs while repository structure and data resilience are validated. The supported execution order is documented in [Repository structure](docs/REPOSITORY_STRUCTURE.md).
 
 ## Built for Trust, Not Hype
 
