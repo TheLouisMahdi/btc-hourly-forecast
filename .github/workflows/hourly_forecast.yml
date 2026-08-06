@@ -98,7 +98,7 @@ jobs:
         run: python scripts/github_dashboard.py
 
       - name: Evaluate automatic retraining need
-        id: retrain-policy
+        id: retrain_policy
         run: |
           python scripts/github_retrain_policy.py \
             --state-dir .github_state \
@@ -107,10 +107,10 @@ jobs:
             --github-output "$GITHUB_OUTPUT"
 
       - name: Request heavyweight retraining only when needed
-        if: steps.retrain-policy.outputs.required == 'true'
+        if: steps.retrain_policy.outputs.required == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
-          RETRAIN_REASON: ${{ steps.retrain-policy.outputs.reason }}
+          RETRAIN_REASON: ${{ steps.retrain_policy.outputs.reason }}
         shell: bash
         run: |
           set +e
