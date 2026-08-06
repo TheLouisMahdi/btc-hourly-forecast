@@ -74,6 +74,26 @@ jobs:
           python scripts/github_pages_dashboard.py --runtime-dir .dashboard_runtime
           python scripts/github_visual_dashboard.py
 
+      - name: Verify visual dashboard contract
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          document = Path("site/index.html").read_text(encoding="utf-8")
+          required = (
+              'data-market-ambience="v2"',
+              'id="themeToggle"',
+              'class="ambient-coin coin-btc"',
+              'class="ambient-coin coin-eth"',
+              '@keyframes coin-drift',
+              'btc-dashboard-theme',
+          )
+          missing = [marker for marker in required if marker not in document]
+          if missing:
+              raise SystemExit(f"Visual dashboard injection failed: {missing}")
+          print("Visual dashboard contract verified")
+          PY
+
       - name: Configure GitHub Pages
         uses: actions/configure-pages@v6
 
