@@ -1,38 +1,7 @@
 name: Repository quality
+run-name: Repository quality · manual
 
 on:
-  push:
-    branches: [main]
-    paths:
-      - ".github/workflows/**"
-      - ".editorconfig"
-      - "README.md"
-      - "CHANGELOG.md"
-      - "CONTRIBUTING.md"
-      - "SECURITY.md"
-      - "config/**"
-      - "docs/**"
-      - "scripts/**"
-      - "src/**"
-      - "tests/**"
-      - "pyproject.toml"
-      - "requirements-github.txt"
-  pull_request:
-    branches: [main]
-    paths:
-      - ".github/workflows/**"
-      - ".editorconfig"
-      - "README.md"
-      - "CHANGELOG.md"
-      - "CONTRIBUTING.md"
-      - "SECURITY.md"
-      - "config/**"
-      - "docs/**"
-      - "scripts/**"
-      - "src/**"
-      - "tests/**"
-      - "pyproject.toml"
-      - "requirements-github.txt"
   workflow_dispatch:
 
 permissions:
@@ -101,7 +70,6 @@ jobs:
           exit 0
 
       - name: Publish quality diagnostics
-        if: github.event_name != 'pull_request'
         env:
           GITHUB_TOKEN: ${{ github.token }}
         run: bash scripts/push_snapshot_branch.sh quality-state quality-state-output
