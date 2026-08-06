@@ -28,6 +28,7 @@ class NextCandleForecast:
     raw_fused_return: float
     likely_return_low: float
     likely_return_high: float
+    median_close: float | None
     likely_close_low: float
     likely_close_high: float
     probability_up: float
@@ -258,6 +259,7 @@ def build_next_candle_forecast(
         raw_fused_return=float(raw_fused_return),
         likely_return_low=likely_return_low,
         likely_return_high=likely_return_high,
+        median_close=None,
         likely_close_low=float(likely_close_low),
         likely_close_high=float(likely_close_high),
         probability_up=float(probability_up),
