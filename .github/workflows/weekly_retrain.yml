@@ -1,39 +1,21 @@
 name: Weekly BTC model retraining
+run-name: BTC model retraining · ${{ inputs.trigger_reason }}
 
 on:
-  push:
-    branches: [main]
-    paths:
-      - ".github/workflows/weekly_retrain.yml"
-      - "config/default.yaml"
-      - "scripts/github_weekly_retrain.py"
-      - "src/btc_ema_trader/candle_context.py"
-      - "src/btc_ema_trader/contract_features.py"
-      - "src/btc_ema_trader/contract_training.py"
-      - "src/btc_ema_trader/directional_events.py"
-      - "src/btc_ema_trader/economic_validation.py"
-      - "src/btc_ema_trader/features.py"
-      - "src/btc_ema_trader/market.py"
-      - "src/btc_ema_trader/market_structure.py"
-      - "src/btc_ema_trader/market_structure_fast.py"
-      - "src/btc_ema_trader/model.py"
-      - "src/btc_ema_trader/negative_memory*.py"
-      - "src/btc_ema_trader/price_adaptive.py"
-      - "src/btc_ema_trader/strategy.py"
-      - "src/btc_ema_trader/structure_training.py"
-      - "src/btc_ema_trader/forecast_contract.py"
-      - "requirements-github.txt"
-      - "pyproject.toml"
-  schedule:
-    - cron: "47 3 * * 0"
   workflow_dispatch:
+    inputs:
+      trigger_reason:
+        description: Automatic policy or manual reason for retraining
+        required: true
+        default: MANUAL_REQUEST
+        type: string
 
 permissions:
   contents: write
 
 concurrency:
   group: weekly-btc-retraining
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 jobs:
   retrain:
@@ -44,6 +26,9 @@ jobs:
         uses: actions/checkout@v6
         with:
           fetch-depth: 1
+
+      - name: Show retraining reason
+        run: echo "Retraining reason: ${{ inputs.trigger_reason }}"
 
       - name: Set up Python
         uses: actions/setup-python@v6
@@ -75,6 +60,8 @@ jobs:
       - name: Train and jointly validate challenger
         id: retraining
         shell: bash
+        env:
+          RETRAIN_TRIGGER_REASON: ${{ inputs.trigger_reason }}
         run: |
           set +e
           mkdir -p training-diagnostics-output
@@ -112,6 +99,7 @@ jobs:
           payload = {
               "status": os.environ["STATUS"],
               "promotion": os.environ["PROMOTION"],
+              "trigger_reason": os.environ.get("RETRAIN_TRIGGER_REASON"),
               "commit_sha": os.environ.get("GITHUB_SHA"),
               "workflow_run_id": os.environ.get("GITHUB_RUN_ID"),
               "workflow_run_attempt": os.environ.get("GITHUB_RUN_ATTEMPT"),
