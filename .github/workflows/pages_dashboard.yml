@@ -1,4 +1,4 @@
-# Visual contract v2 is verified against every generated Pages artifact before deployment.
+# Visual, uncertainty and data-resilience contracts are verified before deployment.
 name: Deploy BTC dashboard
 
 on:
@@ -13,6 +13,7 @@ on:
       - "scripts/github_timing_dashboard.py"
       - "scripts/github_visual_dashboard.py"
       - "scripts/github_uncertainty_dashboard.py"
+      - "scripts/github_resilience_dashboard.py"
       - "scripts/github_common.py"
       - "pyproject.toml"
       - "requirements-github.txt"
@@ -75,8 +76,9 @@ jobs:
           python scripts/github_pages_dashboard.py --runtime-dir .dashboard_runtime
           python scripts/github_visual_dashboard.py
           python scripts/github_uncertainty_dashboard.py
+          python scripts/github_resilience_dashboard.py
 
-      - name: Verify visual dashboard contract
+      - name: Verify dashboard contracts
         run: |
           python - <<'PY'
           from pathlib import Path
@@ -85,6 +87,7 @@ jobs:
           required = (
               'data-market-ambience="v2"',
               'data-uncertainty-display="range-only-v1"',
+              'data-resilience-dashboard="v1"',
               'id="themeToggle"',
               'class="ambient-coin coin-btc"',
               'class="ambient-coin coin-eth"',
@@ -92,6 +95,8 @@ jobs:
               'btc-dashboard-theme',
               'Likely next-close range',
               'no exact close is published',
+              'Data continuity &amp; learning safety',
+              'Missing workflow record; not interpolated',
           )
           missing = [marker for marker in required if marker not in document]
           forbidden = (
@@ -103,7 +108,7 @@ jobs:
               raise SystemExit(
                   f"Dashboard contract failed: missing={missing}, forbidden={present_forbidden}"
               )
-          print("Visual and uncertainty dashboard contracts verified")
+          print("Visual, uncertainty and resilience dashboard contracts verified")
           PY
 
       - name: Configure GitHub Pages
