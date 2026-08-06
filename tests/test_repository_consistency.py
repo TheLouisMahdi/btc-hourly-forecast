@@ -73,26 +73,48 @@ class RepositoryConsistencyTests(unittest.TestCase):
         missing = [name for name in required if not (self.root / name).is_file()]
         self.assertEqual(missing, [])
 
-    def test_pages_workflow_has_one_dashboard_entry_point(self) -> None:
+    def test_workflow_directory_is_small_and_manual_only(self) -> None:
+        workflow_dir = self.root / ".github" / "workflows"
+        expected = {"quality.yml", "forecast.yml", "dashboard.yml", "retrain.yml"}
+        actual = {path.name for path in workflow_dir.glob("*.yml")}
+        self.assertEqual(actual, expected)
+
+        forbidden_triggers = (
+            "\n  push:",
+            "\n  pull_request:",
+            "\n  schedule:",
+            "\n  workflow_run:",
+        )
+        for path in workflow_dir.glob("*.yml"):
+            workflow = path.read_text(encoding="utf-8")
+            self.assertIn("workflow_dispatch:", workflow, path.name)
+            for trigger in forbidden_triggers:
+                self.assertNotIn(trigger, workflow, path.name)
+
+    def test_forecast_workflow_uses_canonical_entry_point(self) -> None:
         workflow = (
-            self.root / ".github" / "workflows" / "pages_dashboard.yml"
+            self.root / ".github" / "workflows" / "forecast.yml"
+        ).read_text(encoding="utf-8")
+        self.assertIn("python scripts/github_hourly_forecast.py", workflow)
+        self.assertNotIn("python scripts/github_structural_forecast.py", workflow)
+        self.assertIn("gh workflow run retrain.yml", workflow)
+        self.assertIn("inputs.allow_retrain", workflow)
+
+    def test_dashboard_workflow_has_one_render_entry_point(self) -> None:
+        workflow = (
+            self.root / ".github" / "workflows" / "dashboard.yml"
         ).read_text(encoding="utf-8")
         self.assertIn(
-            "python scripts/github_pages_dashboard.py --runtime-dir",
+            "python scripts/render_dashboard.py --runtime-dir",
             workflow,
         )
-        self.assertNotIn(
-            "python scripts/github_boundary_dashboard.py\n",
-            workflow,
-        )
-        self.assertNotIn(
-            "python scripts/github_trade_dashboard.py\n",
-            workflow,
-        )
-        self.assertNotIn(
-            "python scripts/github_timing_dashboard.py\n",
-            workflow,
-        )
+        for component in (
+            "github_pages_dashboard.py",
+            "github_visual_dashboard.py",
+            "github_uncertainty_dashboard.py",
+            "github_resilience_dashboard.py",
+        ):
+            self.assertNotIn(f"python scripts/{component}", workflow)
 
     def test_github_runtime_does_not_redefine_strategy_parameters(self) -> None:
         common = (self.root / "scripts" / "github_common.py").read_text(
