@@ -8,6 +8,7 @@ on:
       - "src/**"
       - "scripts/github_hourly_forecast.py"
       - "scripts/github_structural_forecast.py"
+      - "scripts/github_retrain_policy.py"
       - "scripts/github_common.py"
       - "config/**"
       - "requirements-github.txt"
@@ -21,6 +22,7 @@ on:
 
 permissions:
   contents: write
+  actions: write
 
 concurrency:
   group: hourly-btc-forecast
@@ -59,13 +61,15 @@ jobs:
             git show origin/forecast-state:history.json > .github_state/history.json 2>/dev/null || printf '[]\n' > .github_state/history.json
             git show origin/forecast-state:latest.json > .github_state/latest.json 2>/dev/null || printf '{}\n' > .github_state/latest.json
             git show origin/forecast-state:trades.json > .github_state/trades.json 2>/dev/null || printf '[]\n' > .github_state/trades.json
+            git show origin/forecast-state:retrain_control.json > .github_state/retrain_control.json 2>/dev/null || printf '{}\n' > .github_state/retrain_control.json
           else
             printf '[]\n' > .github_state/history.json
             printf '{}\n' > .github_state/latest.json
             printf '[]\n' > .github_state/trades.json
+            printf '{}\n' > .github_state/retrain_control.json
           fi
 
-      - name: Restore weekly batch model and negative memory
+      - name: Restore batch champion and negative memory
         shell: bash
         run: |
           mkdir -p .model_state
@@ -93,7 +97,43 @@ jobs:
       - name: Resolve secondary next-candle outcomes
         run: python scripts/github_dashboard.py
 
-      - name: Persist forecast and trade ledger
+      - name: Evaluate automatic retraining need
+        id: retrain-policy
+        run: |
+          python scripts/github_retrain_policy.py \
+            --state-dir .github_state \
+            --adaptive-state-dir .adaptive_state \
+            --model-state-dir .model_state \
+            --github-output "$GITHUB_OUTPUT"
+
+      - name: Request heavyweight retraining only when needed
+        if: steps.retrain-policy.outputs.required == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RETRAIN_REASON: ${{ steps.retrain-policy.outputs.reason }}
+        shell: bash
+        run: |
+          set +e
+          gh workflow run weekly_retrain.yml \
+            --ref main \
+            -f trigger_reason="$RETRAIN_REASON"
+          dispatch_exit=$?
+          if [ "$dispatch_exit" -eq 0 ]; then
+            dispatch_status=SUCCESS
+            echo "Automatic retraining requested: $RETRAIN_REASON"
+          else
+            dispatch_status=FAILURE
+            echo "::warning::Automatic retraining dispatch failed; hourly forecasting remains protected."
+          fi
+          python scripts/github_retrain_policy.py \
+            --state-dir .github_state \
+            --adaptive-state-dir .adaptive_state \
+            --model-state-dir .model_state \
+            --record-dispatch "$dispatch_status" \
+            --reason "$RETRAIN_REASON"
+          exit 0
+
+      - name: Persist forecast, trade and retraining state
         env:
           GITHUB_TOKEN: ${{ github.token }}
         run: bash scripts/push_snapshot_branch.sh forecast-state .github_state
