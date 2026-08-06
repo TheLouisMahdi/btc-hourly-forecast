@@ -47,6 +47,9 @@ FORBIDDEN_FILES = {
 REQUIRED_FILES = {
     ".editorconfig",
     ".github/workflows/quality.yml",
+    ".github/workflows/forecast.yml",
+    ".github/workflows/dashboard.yml",
+    ".github/workflows/retrain.yml",
     "CHANGELOG.md",
     "CONTRIBUTING.md",
     "README.md",
@@ -55,6 +58,7 @@ REQUIRED_FILES = {
     "pyproject.toml",
     "scripts/github_pages_dashboard.py",
     "scripts/github_structural_forecast.py",
+    "scripts/render_dashboard.py",
     "src/btc_ema_trader/contract_features.py",
     "src/btc_ema_trader/contract_training.py",
     "src/btc_ema_trader/directional_events.py",
@@ -295,19 +299,21 @@ class RepositoryQualityTests(unittest.TestCase):
         self.assertIn("market_structure_fast", contract)
         self.assertIn("build_fast_market_structure", contract)
 
-    def test_hourly_workflow_uses_clean_structural_epoch(self) -> None:
+    def test_forecast_workflow_uses_canonical_entry_point(self) -> None:
         root = Path(__file__).resolve().parents[1]
         workflow = (
-            root / ".github" / "workflows" / "hourly_forecast.yml"
+            root / ".github" / "workflows" / "forecast.yml"
         ).read_text(encoding="utf-8")
         self.assertIn(
-            "python scripts/github_structural_forecast.py",
+            "python scripts/github_hourly_forecast.py",
             workflow,
         )
         self.assertNotIn(
-            "run: python scripts/github_hourly_forecast.py",
+            "python scripts/github_structural_forecast.py",
             workflow,
         )
+        self.assertIn("inputs.allow_retrain", workflow)
+        self.assertIn("gh workflow run retrain.yml", workflow)
 
 
 if __name__ == "__main__":
