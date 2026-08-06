@@ -1,3 +1,4 @@
+# Visual contract v2 is verified against the generated Pages artifact before deployment.
 name: Deploy BTC dashboard
 
 on:
