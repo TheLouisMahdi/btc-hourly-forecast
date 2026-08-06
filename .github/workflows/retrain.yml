@@ -28,7 +28,9 @@ jobs:
           fetch-depth: 1
 
       - name: Show retraining reason
-        run: echo "Retraining reason: ${{ inputs.trigger_reason }}"
+        env:
+          RETRAIN_REASON: ${{ inputs.trigger_reason }}
+        run: printf 'Retraining reason: %s\n' "$RETRAIN_REASON"
 
       - name: Set up Python
         uses: actions/setup-python@v6
