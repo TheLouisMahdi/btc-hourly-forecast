@@ -1,11 +1,11 @@
-name: Weekly BTC model retraining
+name: On-demand BTC model retraining
 run-name: BTC model retraining · ${{ inputs.trigger_reason }}
 
 on:
   workflow_dispatch:
     inputs:
       trigger_reason:
-        description: Automatic policy or manual reason for retraining
+        description: Policy or manual reason for retraining
         required: true
         default: MANUAL_REQUEST
         type: string
@@ -14,7 +14,7 @@ permissions:
   contents: write
 
 concurrency:
-  group: weekly-btc-retraining
+  group: on-demand-btc-retraining
   cancel-in-progress: false
 
 jobs:
