@@ -1,0 +1,49 @@
+PROPRIETARY LICENSE — ALL RIGHTS RESERVED
+
+Copyright © 2026 TheLouisMahdi. All rights reserved.
+
+1. OWNERSHIP
+
+All original source code, software, models, model artifacts, configuration files, documentation, graphics, data schemas, workflows, and other original materials contained in this repository (collectively, the "Work") are proprietary and are protected by applicable copyright, intellectual-property, and related laws.
+
+2. NO LICENSE GRANTED BY DEFAULT
+
+Except for rights that cannot lawfully be excluded and the limited rights required for GitHub to host, display, and operate the repository under GitHub's Terms of Service, no license, authorization, or permission is granted to any person or entity by making the Work publicly accessible.
+
+3. PRIOR WRITTEN PERMISSION AND ATTRIBUTION REQUIRED
+
+No part of the Work may be used, copied, reproduced, downloaded for reuse, modified, adapted, translated, published, redistributed, transmitted, sublicensed, sold, commercially exploited, incorporated into another project, used to create a derivative work, deployed as a product or service, or used for dataset or machine-learning-model training unless BOTH of the following conditions are satisfied:
+
+(a) prior, express, written permission has been obtained from TheLouisMahdi; and
+
+(b) clear and prominent attribution is provided to TheLouisMahdi and to the original source repository:
+https://github.com/TheLouisMahdi/btc-hourly-forecast
+
+Any permission is limited strictly to the purpose, scope, duration, and conditions stated in the written authorization. Silence, lack of response, public visibility, access to the repository, or the ability to view or fork the repository does not constitute consent or permission.
+
+4. PROHIBITED CONDUCT
+
+Without the prior written permission and attribution required above, it is expressly prohibited to:
+
+- remove, conceal, or alter copyright, authorship, attribution, or provenance notices;
+- present the Work, or any substantial part of it, as one's own;
+- publish or distribute copies or modified versions;
+- use the Work for commercial or non-commercial products, services, research, demonstrations, competitions, publications, or educational submissions;
+- reverse engineer, repackage, mirror, scrape for reuse, or otherwise exploit the Work beyond rights that cannot lawfully be restricted.
+
+5. THIRD-PARTY MATERIALS
+
+This license applies only to original material owned by TheLouisMahdi. Third-party libraries, dependencies, data, assets, trademarks, and other materials remain subject to their respective licenses and rights. Nothing in this license grants rights in third-party material.
+
+6. ENFORCEMENT AND RESERVATION OF RIGHTS
+
+Any unauthorized use is prohibited. The copyright holder reserves all rights and remedies available under applicable law, including requests for removal, injunctive relief, damages, and recovery of costs where permitted.
+
+No waiver is effective unless made expressly in writing by the copyright holder. A failure to enforce any provision on one occasion does not waive the right to enforce it later.
+
+7. DISCLAIMER
+
+THE WORK IS PROVIDED "AS IS" FOR VIEWING PURPOSES, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE, ACCURACY, NON-INFRINGEMENT, OR RELIABILITY. TO THE MAXIMUM EXTENT PERMITTED BY LAW, THE COPYRIGHT HOLDER SHALL NOT BE LIABLE FOR ANY CLAIM, LOSS, DAMAGE, OR OTHER LIABILITY ARISING FROM ACCESS TO OR RELIANCE ON THE WORK.
+
+For permission requests, contact the copyright holder through the GitHub account:
+https://github.com/TheLouisMahdi
