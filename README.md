@@ -34,308 +34,93 @@
 
 # BTC Adaptive Directional Breakout Trader
 
-This repository is a research-grade, paper-only Bitcoin trading system built around two independent structural events:
+<div align="center">
 
-- `RESISTANCE_BREAKOUT_LONG`: a confirmed close crossing above resistance;
-- `SUPPORT_BREAKDOWN_SHORT`: a confirmed close crossing below support.
+### Structural intelligence. Adaptive risk. Verifiable outcomes.
 
-The primary output is a persistent LONG or SHORT paper position with an execution quote, adaptive target, stop-loss and maximum holding time. A secondary public contract forecasts the exact `NEXT_CLOSED_1H_CANDLE` and is scored only after that candle closes.
+An always-on Bitcoin market intelligence platform that converts confirmed market-structure events into auditable paper positions and continuously evaluated one-hour forecasts.
 
-The project does not claim profitability and does not place live orders.
+</div>
 
-## One canonical product contract
+## Market Intelligence, Delivered Hourly
 
-### Primary: position lifecycle
+BTC Adaptive Directional Breakout Trader is a research-grade decision platform built to identify meaningful resistance breakouts and support breakdowns while filtering weak, duplicated, stale, or operationally unsafe signals.
 
-A fresh structural event may create one paper position. The position remains open across hourly candles until one of these immutable outcomes is recorded:
+The system combines structural market analysis, separate Long and Short predictive models, adaptive target-and-stop planning, execution-aware risk controls, and continuous outcome tracking in one automated research environment.
 
-```text
-TARGET
-STOP
-TIME_EXIT_WIN
-TIME_EXIT_LOSS
-```
+Its primary product is a persistent paper position with a frozen entry reference, target, stop-loss, risk allocation, holding window, and immutable final outcome. A secondary public forecast tracks the direction and likely closing range of the next completed one-hour candle.
 
-Each position stores:
+## Live Research Snapshot
 
-```text
-entry quote and observation time
-target price
-initial and current stop
-risk score and risk fraction
-risk budget, notional and leverage
-policy and risk-contract versions
-stress execution cost and expected value
-maximum favorable and adverse excursion
-realized net P/L and R-multiple
-```
+<div align="center">
 
-Only one active position is managed at a time. A new hourly candidate is stored separately and cannot replace the active position plan. Closed outcomes are never recomputed from later prices.
+<a href="https://thelouismahdi.github.io/btc-hourly-forecast/">
+  <img src="https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fraw.githubusercontent.com%2FTheLouisMahdi%2Fbtc-hourly-forecast%2Fforecast-state%2Flatest.json&query=%24.run_status&label=System+Status&style=for-the-badge&color=6f9b91&cacheSeconds=300" alt="Live system status" />
+</a>
+<a href="https://thelouismahdi.github.io/btc-hourly-forecast/">
+  <img src="https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fraw.githubusercontent.com%2FTheLouisMahdi%2Fbtc-hourly-forecast%2Fforecast-state%2Flatest.json&query=%24.action&label=Live+Position&style=for-the-badge&color=8f8ab8&cacheSeconds=300" alt="Live paper position" />
+</a>
+<a href="https://thelouismahdi.github.io/btc-hourly-forecast/">
+  <img src="https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fraw.githubusercontent.com%2FTheLouisMahdi%2Fbtc-hourly-forecast%2Fforecast-state%2Flatest.json&query=%24.next_candle_direction&label=Next+1H+Bias&style=for-the-badge&color=c99078&cacheSeconds=300" alt="Next one-hour directional bias" />
+</a>
+<a href="https://thelouismahdi.github.io/btc-hourly-forecast/">
+  <img src="https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fraw.githubusercontent.com%2FTheLouisMahdi%2Fbtc-hourly-forecast%2Fforecast-state%2Flatest.json&query=%24.direction_result&label=Forecast+Result&style=for-the-badge&color=6f9b91&cacheSeconds=300" alt="Latest resolved forecast result" />
+</a>
 
-### Execution-time contract
+<br /><br />
 
-A new paper position uses a fresh observed market quote, not the previous candle close. The source candle close remains frozen as the reference for the secondary forecast.
+<a href="https://thelouismahdi.github.io/btc-hourly-forecast/">
+  <img src="https://img.shields.io/badge/VIEW_FULL_LIVE_ANALYTICS-DASHBOARD-1f2937?style=for-the-badge&logo=bitcoin&logoColor=ffffff" alt="View full live analytics" />
+</a>
 
-Hourly OHLC data cannot determine whether a target or stop was touched before a mid-hour entry. The partial entry candle is therefore excluded from barrier resolution. Target, stop, breakeven and trailing calculations begin with the first fully observable hourly candle after entry.
+</div>
 
-This contract is conservative and auditable, but it exposes one known research limitation: batch event labels use the next hourly open while GitHub paper positions use the quote observed when the workflow runs. The resolved-trade learner evaluates the actual paper entry, but batch qualification is not fully execution-aligned until minute-level historical entry labels are added and a compatible challenger is promoted.
+The live indicators above are sourced from the latest public forecast snapshot and refresh automatically. The dashboard provides the complete market context, active-position lifecycle, forecast history, resolved outcomes, model status, and risk information.
 
-### Secondary: exact next-close forecast
+**Public live records:** [Latest forecast](https://github.com/TheLouisMahdi/btc-hourly-forecast/blob/forecast-state/latest.json) · [Forecast history](https://github.com/TheLouisMahdi/btc-hourly-forecast/blob/forecast-state/history.json) · [Paper-position ledger](https://github.com/TheLouisMahdi/btc-hourly-forecast/blob/forecast-state/trades.json) · [Model metrics](https://github.com/TheLouisMahdi/btc-hourly-forecast/blob/model-state/latest_metrics.csv)
 
-For a source candle with open time `T`:
+## Product Capabilities
 
-| Event | Time |
+| Capability | Business value |
 |---|---|
-| Source candle opens | `T` |
-| Source candle closes | `T + 1h` |
-| Forecast is created | after `T + 1h`, before the target closes |
-| Target candle opens | `T + 1h` |
-| Target candle closes | `T + 2h` |
-| Resolution becomes eligible | target close plus settlement delay |
+| **Structural Signal Engine** | Detects confirmed resistance breakouts and support breakdowns across multiple market scales instead of reacting to isolated indicator crosses. |
+| **Independent Long and Short Intelligence** | Models upside and downside events separately, allowing each direction to learn its own market behavior and risk profile. |
+| **Adaptive Position Lifecycle** | Maintains one auditable paper position from entry through target, stop-loss, breakeven, trailing management, or time exit. |
+| **Risk-Scaled Decisioning** | Adjusts paper risk according to event quality, confidence, tradeability, economic edge, volatility, data health, and negative-pattern evidence. |
+| **Continuous Evaluation** | Scores forecasts only after the exact target candle closes and preserves completed outcomes without retroactive rewriting. |
+| **Automated Research Operations** | Runs hourly market cycles, weekly challenger training, quality checks, state persistence, and public dashboard delivery. |
 
-The direction result is one of:
+## Built for Trust, Not Hype
 
-```text
-PENDING
-DIRECTION_CORRECT
-DIRECTION_WRONG
-LEGACY_NOT_SCORED
-```
+The platform is designed around causal inputs and auditable decisions. Future candles are never used as predictors, historical validation remains chronological, synthetic event duplication is prohibited, and model challengers cannot replace the active champion unless they pass locked economic and negative-memory validation gates.
 
-Interval scoring is independent:
+Operational safeguards can prevent a new position when market data is incomplete, the execution quote is stale, providers are inconsistent, the event has already been traded, or another position is still active.
 
-```text
-IN_RANGE
-OUT_OF_RANGE
-```
+Every published position and forecast remains attributable to the model, event, market timestamp, data provider, execution assumptions, and risk contract that created it.
 
-A wide interval cannot turn a wrong direction into a correct result. Resolved records are immutable. When the price model is unavailable or the target window is missed, the secondary forecast is `NOT_CREATED`; it cannot invalidate the primary position cycle.
+## Commercial Direction
 
-## Causal candle context
+This project is being developed as a foundation for real-time Bitcoin market intelligence, quantitative research dashboards, signal-quality analysis, auditable paper-trading operations, and future decision-support products.
 
-Every new event feature row is represented by exactly three closed candles:
+The platform is intentionally transparent about uncertainty. It does not present backtests as guaranteed performance, does not place live orders, and does not claim profitability. Its commercial value is built around disciplined research infrastructure, explainable market context, continuous measurement, and verifiable public outcomes.
 
-```text
-PREVIOUS_2
-PREVIOUS_1
-EVENT
-```
+## Current Product Scope
 
-The feature pipeline exposes OHLCV shape, candle body, full upper and lower shadows, close location, range, volume change and three-bar pressure. Future candles are never predictors; they are used only to create labels and resolve outcomes.
-
-A champion trained before these fields were introduced can continue to run because inputs are schema-aligned, but it does not use the new context columns until a compatible challenger is retrained, validated and promoted.
-
-## Deterministic event mining
-
-Support and resistance are evaluated across:
-
-```text
-24h · 48h · 96h · 168h · 336h · 720h
-```
-
-A candidate requires a real close-to-close crossing. Remaining above an already broken resistance or below an already broken support is not a new event.
-
-Each event records its unique ID, direction, source, scale, level, structural invalidation, ATR-normalized distance, touch count, age, line quality, market regime and diversity key. Near-duplicates are removed deterministically.
-
-## Separate Long and Short batch heads
-
-Long and Short do not share one batch event head. Every trade horizon contains independent classifiers and return regressors for each direction.
-
-Long logic emphasizes resistance quality, upward candle strength, upper close location, relative volume and upward structural alignment. Short logic separately emphasizes support quality, downward candle strength, lower close location, relative volume and downward structural alignment.
-
-The compatible model artifact contract is:
-
-```text
-schema_version: 5
-model_id prefix: directional-breakout-hourly-
-```
-
-Older model artifacts are rejected.
-
-## Training contract
-
-```text
-sampling: NONE
-shuffle: false
-synthetic events: 0
-oversampling: false
-undersampling: false
-split: chronological expanding window
-```
-
-Training requires at least **2,000 unique Long events** and **2,000 unique Short events**, plus multi-year, multi-quarter, multi-scale, volatility and regime diversity. Real events are never duplicated to satisfy the gate.
-
-The configured history target is ten years of real hourly BTC candles. One provider is selected for each training run; rows from different exchanges are not mixed into one dataset. Real gaps are segmented and audited rather than filled or interpolated.
-
-## Validation and champion promotion
-
-General prediction uses chronological time-series validation. Long and Short event heads use independent expanding-window Walk-Forward evaluation with an embargo.
-
-A direction-horizon pair is evaluated using event count, AUC, calibration, selected-trade count, hit rate, stress-adjusted expectancy and positive-fold consistency. A challenger replaces the current champion only when economic validation and sandwiched negative-memory validation agree.
-
-Candidate diagnostics are retained when promotion is rejected. Production-facing artifacts live on `model-state`, not on `main`.
-
-## Aggressive risk-scaled position policy
-
-The repository has one canonical entry policy:
-
-```text
-AGGRESSIVE_STRUCTURAL_RISK_SCALED
-policy_version: 2
-risk_contract_version: 2
-```
-
-A valid fresh structural breakout seeks a paper position. Qualification, predicted economic edge, confidence, tradeability, regime alignment and soft warnings are combined into a bounded risk score rather than creating a second conservative mode.
-
-Paper-account risk is selected between **0.5% and 3.0%**:
-
-```text
-weak or unqualified event with negative edge -> smaller position
-strong qualified event with positive edge   -> larger position
-```
-
-Soft risk evidence includes incomplete qualification, missing economic policy, weak confidence, weak tradeability, negative stress edge, volatility or news shock, stale model/news evidence, signal frequency and regime uncertainty.
-
-Hard blockers remain fail-safe and non-negotiable:
-
-```text
-no fresh structural breakout
-unsupported event type
-missing breakout or invalidation level
-duplicate event
-Long/Short direction mismatch
-short venue disabled
-invalid ATR
-unhealthy candles
-stale or unavailable execution quote
-provider mismatch
-an already active position
-```
-
-The dashboard exposes the policy version, risk score, allocated risk, qualification state and soft risk evidence. An exploratory paper position is not evidence of a profitable production strategy.
-
-Legacy positions stay in the same ledger and remain identifiable by their missing or version-1 policy metadata. New positions persist `policy_version: 2` and `entry_contract: STRUCTURAL_EVENT_RISK_SCALED`.
-
-## Adaptive learning and negative memory
-
-The generic shared multi-horizon adaptive blend is disabled because it can blend shared online estimates into otherwise independent Long and Short batch heads.
-
-The dedicated price learner remains performance-gated and receives weight only when its prequential Brier score, direction accuracy and return error improve over the batch model.
-
-The trade learner remains enabled. It updates only after a position resolves and learns target probability, stop probability and realized R from the frozen entry feature vector, including the causal three-candle context. Final target-stop economics preserve the risk fraction selected by the entry policy.
-
-The negative-memory layer uses a sandwiched design:
-
-```text
-front Bloom memory
-learned boundary-risk model
-backup Bloom memory
-```
-
-Bloom hits are stored as risk evidence. The current `ADAPTIVE_PENALTY_ONLY` runtime reports or penalizes risk and never rewrites historical outcomes.
-
-## State isolation
-
-Generated data is intentionally kept outside `main`:
-
-| Branch | Purpose |
+| Area | Current scope |
 |---|---|
-| `forecast-state` | latest record, forecast history and position ledger |
-| `model-state` | promoted champion, reports and negative memory |
-| `adaptive-state` | price and resolved-trade learner states and summaries |
-| `quality-state` | test and compile diagnostics |
-| `training-diagnostics` | challenger training diagnostics |
+| Market | Bitcoin spot and compatible BTC market data |
+| Decision cadence | Closed one-hour candles |
+| Primary output | Long, Short, Hold, or Wait paper-position lifecycle |
+| Secondary output | Exact next closed one-hour candle direction and likely close range |
+| Execution mode | Paper trading only |
+| Public transparency | Live dashboard, forecast history, position ledger, and model metrics |
 
-`main` contains source code, configuration, tests and documentation only.
+## Research Notice
 
-## Automation
+This repository is an experimental quantitative-research system. Forecasts, probabilities, target prices, stop prices, expected values, and dashboard outputs are research estimates rather than financial advice or guarantees of future performance.
 
-The repository-quality workflow validates source, configuration, documentation, tests and GitHub Actions files and publishes the exact result to `quality-state`.
+## Proprietary Rights
 
-The hourly workflow:
+Copyright © 2026 **TheLouisMahdi**. All rights reserved.
 
-1. restores forecast, position, champion and adaptive state;
-2. fetches the latest contiguous closed-candle segment;
-3. resolves existing positions using only fully observable post-entry candles;
-4. creates one new structural decision when eligible;
-5. freezes the execution quote, risk contract and position plan;
-6. creates the secondary next-close contract only when its target window is valid;
-7. persists forecast, position and adaptive states.
-
-The weekly workflow:
-
-1. runs the full validation suite;
-2. fetches long historical data;
-3. segments real gaps without filling or interpolation;
-4. mines deterministic Long and Short events;
-5. trains independent direction heads;
-6. performs chronological validation;
-7. trains sandwiched negative memory;
-8. promotes the challenger only when all promotion gates pass.
-
-GitHub Pages is the only canonical dashboard implementation and is rendered through one orchestration command.
-
-## Local setup
-
-```bash
-python -m venv .venv
-python -m pip install --upgrade pip
-python -m pip install -e .
-```
-
-Fetch and train:
-
-```bash
-btc-regime fetch --days 3650
-btc-regime news --historical --days 365
-btc-regime news
-btc-regime train
-```
-
-Run one local diagnostic cycle:
-
-```bash
-btc-regime cycle --force
-```
-
-Show the canonical dashboard URL:
-
-```bash
-btc-regime dashboard
-```
-
-Run validation:
-
-```bash
-python -m unittest discover -s tests -v
-python -m compileall -q src scripts
-```
-
-## Repository layout
-
-```text
-config/default.yaml                    Canonical strategy and model configuration
-scripts/github_weekly_retrain.py       Challenger training and promotion
-scripts/github_structural_forecast.py  Canonical GitHub hourly entry point
-scripts/github_pages_dashboard.py      Public dashboard orchestration
-src/btc_ema_trader/active_position_contract.py
-src/btc_ema_trader/candle_context.py   Causal three-candle context
-src/btc_ema_trader/context_trade_features.py
-src/btc_ema_trader/directional_events.py
-src/btc_ema_trader/execution_entry.py
-src/btc_ema_trader/execution_path.py
-src/btc_ema_trader/market_structure_fast.py
-src/btc_ema_trader/model.py
-src/btc_ema_trader/negative_memory.py
-src/btc_ema_trader/trade_lifecycle.py
-src/btc_ema_trader/strict_forecast_contract.py
-tests/
-```
-
-## Scope
-
-This software is for research and paper trading only. Model qualification, a positive expected value and past paper performance do not guarantee future profit. No exchange credentials or live-order path are included.
-
----
-
-© 2026 Mahdi Ghahremani · ID: [TheLouisMahdi](https://github.com/TheLouisMahdi)
+This repository is proprietary and is not open-source software. Reuse, copying, modification, redistribution, commercial or non-commercial deployment, derivative work, dataset creation, or model training requires prior written permission and clear attribution under the terms of the repository [LICENSE](LICENSE).
