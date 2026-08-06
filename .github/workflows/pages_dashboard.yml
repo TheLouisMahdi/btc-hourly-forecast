@@ -10,6 +10,7 @@ on:
       - "scripts/github_boundary_dashboard.py"
       - "scripts/github_trade_dashboard.py"
       - "scripts/github_timing_dashboard.py"
+      - "scripts/github_visual_dashboard.py"
       - "scripts/github_common.py"
       - "pyproject.toml"
       - "requirements-github.txt"
@@ -69,7 +70,9 @@ jobs:
           fi
 
       - name: Render canonical dashboard
-        run: python scripts/github_pages_dashboard.py --runtime-dir .dashboard_runtime
+        run: |
+          python scripts/github_pages_dashboard.py --runtime-dir .dashboard_runtime
+          python scripts/github_visual_dashboard.py
 
       - name: Configure GitHub Pages
         uses: actions/configure-pages@v6
