@@ -3,6 +3,12 @@ run-name: Hourly BTC forecast · manual
 
 on:
   workflow_dispatch:
+    inputs:
+      allow_retrain:
+        description: Allow this run to request on-demand model retraining
+        required: true
+        default: false
+        type: boolean
 
 permissions:
   contents: write
@@ -75,7 +81,7 @@ jobs:
           fi
 
       - name: Run canonical adaptive target-stop cycle
-        run: python scripts/github_structural_forecast.py
+        run: python scripts/github_hourly_forecast.py
 
       - name: Resolve secondary next-candle outcomes
         run: python scripts/github_dashboard.py
@@ -89,24 +95,24 @@ jobs:
             --model-state-dir .model_state \
             --github-output "$GITHUB_OUTPUT"
 
-      - name: Request heavyweight retraining only when needed
-        if: steps.retrain_policy.outputs.required == 'true'
+      - name: Request on-demand retraining when allowed and needed
+        if: inputs.allow_retrain && steps.retrain_policy.outputs.required == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
           RETRAIN_REASON: ${{ steps.retrain_policy.outputs.reason }}
         shell: bash
         run: |
           set +e
-          gh workflow run weekly_retrain.yml \
+          gh workflow run retrain.yml \
             --ref main \
             -f trigger_reason="$RETRAIN_REASON"
           dispatch_exit=$?
           if [ "$dispatch_exit" -eq 0 ]; then
             dispatch_status=SUCCESS
-            echo "Automatic retraining requested: $RETRAIN_REASON"
+            echo "On-demand retraining requested: $RETRAIN_REASON"
           else
             dispatch_status=FAILURE
-            echo "::warning::Automatic retraining dispatch failed; hourly forecasting remains protected."
+            echo "::warning::Retraining dispatch failed; forecast state remains protected."
           fi
           python scripts/github_retrain_policy.py \
             --state-dir .github_state \

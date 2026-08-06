@@ -54,11 +54,7 @@ jobs:
           fi
 
       - name: Render canonical dashboard
-        run: |
-          python scripts/github_pages_dashboard.py --runtime-dir .dashboard_runtime
-          python scripts/github_visual_dashboard.py
-          python scripts/github_uncertainty_dashboard.py
-          python scripts/github_resilience_dashboard.py
+        run: python scripts/render_dashboard.py --runtime-dir .dashboard_runtime
 
       - name: Verify dashboard contracts
         run: |
@@ -90,7 +86,7 @@ jobs:
               raise SystemExit(
                   f"Dashboard contract failed: missing={missing}, forbidden={present_forbidden}"
               )
-          print("Visual, uncertainty and resilience dashboard contracts verified")
+          print("Dashboard contracts verified")
           PY
 
       - name: Configure GitHub Pages

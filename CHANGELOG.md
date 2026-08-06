@@ -1,5 +1,14 @@
 # Changelog
 
+## Unreleased — Repository grooming and maintenance mode
+
+- Reduced GitHub Actions to four role-based workflow files: quality, forecast, dashboard and on-demand retraining.
+- Paused push, pull-request, schedule and workflow-chain triggers; all operational workflows are manual-only during maintenance mode.
+- Switched the forecast workflow from the compatibility shim to the canonical hourly entry point.
+- Added an explicit `allow_retrain` input so routine forecast validation cannot start heavyweight training unintentionally.
+- Added one deterministic dashboard render entry point and removed component-by-component commands from the deployment workflow.
+- Added compact repository and operational-script maps plus tests that prevent old workflow names or automatic triggers from returning.
+
 ## 5.5.0 — Structural risk policy and execution integrity
 
 - Added one canonical `AGGRESSIVE_STRUCTURAL_RISK_SCALED` paper-position policy.
