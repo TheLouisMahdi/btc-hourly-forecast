@@ -1,24 +1,8 @@
 name: Hourly BTC forecast
+run-name: Hourly BTC forecast · manual
 
 on:
-  push:
-    branches: [main]
-    paths:
-      - ".github/workflows/hourly_forecast.yml"
-      - "src/**"
-      - "scripts/github_hourly_forecast.py"
-      - "scripts/github_structural_forecast.py"
-      - "scripts/github_retrain_policy.py"
-      - "scripts/github_common.py"
-      - "config/**"
-      - "requirements-github.txt"
-      - "pyproject.toml"
-  schedule:
-    - cron: "17 * * * *"
   workflow_dispatch:
-  workflow_run:
-    workflows: ["Weekly BTC model retraining"]
-    types: [completed]
 
 permissions:
   contents: write
@@ -30,7 +14,6 @@ concurrency:
 
 jobs:
   forecast:
-    if: github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success'
     runs-on: ubuntu-latest
     timeout-minutes: 35
     steps:
