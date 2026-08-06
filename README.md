@@ -98,6 +98,16 @@ Operational safeguards can prevent a new position when market data is incomplete
 
 Every published position and forecast remains attributable to the model, event, market timestamp, data provider, execution assumptions, and risk contract that created it.
 
+## Verifiable Product Contracts
+
+The commercial surface is backed by explicit machine-tested contracts rather than marketing-only claims:
+
+- Structural opportunities are classified as `RESISTANCE_BREAKOUT_LONG` or `SUPPORT_BREAKDOWN_SHORT`.
+- Directional model inventory requires at least `2,000 unique` events per side with `sampling: NONE`.
+- Published champion identifiers follow the `directional-breakout-hourly-` model family.
+- The secondary public product is bound to the exact `NEXT_CLOSED_1H_CANDLE`.
+- Completed direction outcomes are immutable as `DIRECTION_CORRECT` or `DIRECTION_WRONG`; interval outcomes remain independently immutable as `IN_RANGE` or `OUT_OF_RANGE`.
+
 ## Commercial Direction
 
 This project is being developed as a foundation for real-time Bitcoin market intelligence, quantitative research dashboards, signal-quality analysis, auditable paper-trading operations, and future decision-support products.
