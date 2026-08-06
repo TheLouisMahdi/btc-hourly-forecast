@@ -16,10 +16,8 @@ on:
       - "pyproject.toml"
       - "requirements-github.txt"
   workflow_run:
-    workflows: ["Hourly BTC forecast", "Repository quality"]
+    workflows: ["Hourly BTC forecast"]
     types: [completed]
-  schedule:
-    - cron: "27 * * * *"
   workflow_dispatch:
 
 permissions:
@@ -28,8 +26,8 @@ permissions:
   id-token: write
 
 concurrency:
-  group: btc-dashboard-pages
-  cancel-in-progress: true
+  group: btc-dashboard-pages-v3
+  cancel-in-progress: false
 
 jobs:
   render-and-deploy:
