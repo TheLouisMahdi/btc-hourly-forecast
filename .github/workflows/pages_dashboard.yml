@@ -16,7 +16,7 @@ on:
       - "pyproject.toml"
       - "requirements-github.txt"
   workflow_run:
-    workflows: ["Hourly BTC forecast"]
+    workflows: ["Hourly BTC forecast", "Repository quality"]
     types: [completed]
   schedule:
     - cron: "27 * * * *"
@@ -33,6 +33,7 @@ concurrency:
 
 jobs:
   render-and-deploy:
+    if: github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success'
     runs-on: ubuntu-latest
     timeout-minutes: 20
     environment:

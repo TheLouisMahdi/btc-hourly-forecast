@@ -20,7 +20,7 @@
   <img src="https://github.com/TheLouisMahdi/btc-hourly-forecast/actions/workflows/pages_dashboard.yml/badge.svg?branch=main" alt="Dashboard deployment status" />
 </a>
 <a href="https://github.com/TheLouisMahdi/btc-hourly-forecast/actions/workflows/quality.yml">
-  <img src="https://github.com/TheLouisMahdi/btc-hourly-forecast/actions/workflows/quality.yml/badge.svg?branch=main" alt="Repository quality status" />
+  <img src="https://github.com/TheLouisMahdi/btc-hourly-forecast/actions/workflows/quality.yml/badge.svg" alt="Repository quality status" />
 </a>
 
 <br /><br />
