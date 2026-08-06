@@ -59,7 +59,7 @@ class ForecastContractTests(unittest.TestCase):
             result["interval_method"],
             "WALK_FORWARD_PRIOR_WITH_VOLATILITY_FLOOR",
         )
-        self.assertNotIn("median_close", result)
+        self.assertIsNone(result["median_close"])
         expected_center = 100.0 * (1.0 + expected_magnitude)
         self.assertLess(result["likely_close_low"], expected_center)
         self.assertGreater(result["likely_close_high"], expected_center)
@@ -92,7 +92,7 @@ class ForecastContractTests(unittest.TestCase):
         self.assertAlmostEqual(result["raw_fused_return"], -0.012)
         self.assertFalse(result["return_direction_consistent"])
         self.assertTrue(result["direction_alignment_applied"])
-        self.assertNotIn("median_close", result)
+        self.assertIsNone(result["median_close"])
 
     def test_direction_is_always_up_or_down(self) -> None:
         record = {
