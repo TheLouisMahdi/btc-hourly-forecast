@@ -12,6 +12,7 @@ on:
       - "scripts/github_trade_dashboard.py"
       - "scripts/github_timing_dashboard.py"
       - "scripts/github_visual_dashboard.py"
+      - "scripts/github_uncertainty_dashboard.py"
       - "scripts/github_common.py"
       - "pyproject.toml"
       - "requirements-github.txt"
@@ -73,6 +74,7 @@ jobs:
         run: |
           python scripts/github_pages_dashboard.py --runtime-dir .dashboard_runtime
           python scripts/github_visual_dashboard.py
+          python scripts/github_uncertainty_dashboard.py
 
       - name: Verify visual dashboard contract
         run: |
@@ -82,16 +84,26 @@ jobs:
           document = Path("site/index.html").read_text(encoding="utf-8")
           required = (
               'data-market-ambience="v2"',
+              'data-uncertainty-display="range-only-v1"',
               'id="themeToggle"',
               'class="ambient-coin coin-btc"',
               'class="ambient-coin coin-eth"',
               '@keyframes coin-drift',
               'btc-dashboard-theme',
+              'Likely next-close range',
+              'no exact close is published',
           )
           missing = [marker for marker in required if marker not in document]
-          if missing:
-              raise SystemExit(f"Visual dashboard injection failed: {missing}")
-          print("Visual dashboard contract verified")
+          forbidden = (
+              'Model-estimated next close',
+              '<th>Expected close</th>',
+          )
+          present_forbidden = [marker for marker in forbidden if marker in document]
+          if missing or present_forbidden:
+              raise SystemExit(
+                  f"Dashboard contract failed: missing={missing}, forbidden={present_forbidden}"
+              )
+          print("Visual and uncertainty dashboard contracts verified")
           PY
 
       - name: Configure GitHub Pages

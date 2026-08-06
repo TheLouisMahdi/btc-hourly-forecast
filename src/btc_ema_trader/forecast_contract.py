@@ -1,14 +1,17 @@
 from __future__ import annotations
 
 from dataclasses import asdict, dataclass
+from math import ceil
 from typing import Any, Iterable
 
 import numpy as np
 import pandas as pd
 
 DEFAULT_INTERVAL_PROBABILITY = 0.80
-MINIMUM_RESIDUAL_SAMPLES = 20
+MINIMUM_LIVE_CALIBRATION_SAMPLES = 60
 MAXIMUM_RESIDUAL_SAMPLES = 240
+MINIMUM_VOLATILITY_SAMPLES = 24
+MAXIMUM_VOLATILITY_SAMPLES = 168
 
 
 @dataclass(frozen=True)
@@ -25,7 +28,7 @@ class NextCandleForecast:
     raw_fused_return: float
     likely_return_low: float
     likely_return_high: float
-    median_close: float
+    median_close: float | None
     likely_close_low: float
     likely_close_high: float
     probability_up: float
@@ -36,6 +39,7 @@ class NextCandleForecast:
     scenario: str
     interval_method: str
     calibration_samples: int
+    volatility_samples: int
     forecast_source: str
     batch_probability_up: float
     online_probability_up: float
@@ -83,7 +87,6 @@ def build_next_candle_forecast(
     history: list[dict[str, Any]],
     interval_probability: float = DEFAULT_INTERVAL_PROBABILITY,
 ) -> dict[str, Any]:
-    del recent_candles
     source_open_time = _utc(record["candle_time"])
     source_close_time = source_open_time + pd.Timedelta(hours=1)
     target_open_time = source_close_time
@@ -92,6 +95,9 @@ def build_next_candle_forecast(
     if reference_close <= 0:
         raise ValueError("A positive source candle close is required")
 
+    interval_probability = float(
+        np.clip(interval_probability, 0.50, 0.99)
+    )
     adaptive = record.get("price_forecast_model")
     if not isinstance(adaptive, dict):
         adaptive = {}
@@ -182,59 +188,47 @@ def build_next_candle_forecast(
         atol=1e-12,
     )
 
-    residuals = _resolved_residuals(history)
-    if len(residuals) >= MINIMUM_RESIDUAL_SAMPLES:
-        alpha = (1.0 - interval_probability) / 2.0
-        lower_error, upper_error = np.quantile(
-            np.asarray(
-                residuals[-MAXIMUM_RESIDUAL_SAMPLES:],
-                dtype=float,
-            ),
-            [alpha, 1.0 - alpha],
-        )
-        likely_return_low = median_return + float(lower_error)
-        likely_return_high = median_return + float(upper_error)
-        interval_method = "LIVE_PREQUENTIAL_MODEL_RESIDUALS"
-        calibration_samples = min(
-            len(residuals),
-            MAXIMUM_RESIDUAL_SAMPLES,
-        )
-    else:
-        walk_forward = _walk_forward_interval(model_metrics)
-        if walk_forward is not None:
-            lower_error, upper_error, samples = walk_forward
-            likely_return_low = median_return + lower_error
-            likely_return_high = median_return + upper_error
-            interval_method = "WALK_FORWARD_MODEL_RESIDUALS"
-            calibration_samples = samples
-        else:
-            return_mae = max(
-                _model_return_mae(model_metrics),
-                0.0005,
-            )
-            half_width = 1.2815515655446004 * return_mae
-            likely_return_low = median_return - half_width
-            likely_return_high = median_return + half_width
-            interval_method = "MODEL_RETURN_ERROR_FALLBACK"
-            calibration_samples = 0
+    errors = _resolved_absolute_errors(history)
+    live_radius = (
+        _conformal_radius(errors, interval_probability)
+        if len(errors) >= MINIMUM_LIVE_CALIBRATION_SAMPLES
+        else None
+    )
+    walk_forward = _walk_forward_interval(model_metrics)
+    prior_radius = None
+    prior_samples = 0
+    if walk_forward is not None:
+        lower_error, upper_error, prior_samples = walk_forward
+        prior_radius = max(abs(lower_error), abs(upper_error))
 
+    volatility_radius, volatility_samples = _recent_volatility_radius(
+        recent_candles,
+        interval_probability,
+    )
     return_mae = max(
         _model_return_mae(model_metrics),
         0.0005,
     )
-    minimum_half_width = max(return_mae * 0.35, 0.0004)
-    current_half_width = max(
-        median_return - likely_return_low,
-        likely_return_high - median_return,
-    )
-    if current_half_width < minimum_half_width:
-        likely_return_low = median_return - minimum_half_width
-        likely_return_high = median_return + minimum_half_width
+    mae_floor = max(1.25 * return_mae, 0.0008)
+    volatility_floor = max(volatility_radius or 0.0, 0.0008)
 
-    likely_return_low, likely_return_high = sorted(
-        (float(likely_return_low), float(likely_return_high))
-    )
-    median_close = reference_close * (1.0 + median_return)
+    if live_radius is not None:
+        half_width = max(live_radius, mae_floor, 0.75 * volatility_floor)
+        interval_method = "LIVE_CONFORMAL_WITH_VOLATILITY_FLOOR"
+        calibration_samples = min(len(errors), MAXIMUM_RESIDUAL_SAMPLES)
+    elif prior_radius is not None:
+        adaptive_cap = max(2.5 * volatility_floor, 2.0 * mae_floor)
+        bounded_prior = min(prior_radius, adaptive_cap)
+        half_width = max(bounded_prior, mae_floor, volatility_floor)
+        interval_method = "WALK_FORWARD_PRIOR_WITH_VOLATILITY_FLOOR"
+        calibration_samples = prior_samples
+    else:
+        half_width = max(mae_floor, volatility_floor)
+        interval_method = "MAE_AND_VOLATILITY_FALLBACK"
+        calibration_samples = 0
+
+    likely_return_low = float(median_return - half_width)
+    likely_return_high = float(median_return + half_width)
     likely_close_low = max(
         0.0,
         reference_close * (1.0 + likely_return_low),
@@ -253,9 +247,9 @@ def build_next_candle_forecast(
     scenario = "BULLISH_BIAS" if direction == "UP" else "BEARISH_BIAS"
 
     return NextCandleForecast(
-        contract_version=2,
+        contract_version=3,
         target="NEXT_CLOSED_1H_CANDLE",
-        interval_probability=float(interval_probability),
+        interval_probability=interval_probability,
         source_open_time=source_open_time.isoformat(),
         source_close_time=source_close_time.isoformat(),
         target_open_time=target_open_time.isoformat(),
@@ -263,9 +257,9 @@ def build_next_candle_forecast(
         reference_close=float(reference_close),
         median_return=float(median_return),
         raw_fused_return=float(raw_fused_return),
-        likely_return_low=float(likely_return_low),
-        likely_return_high=float(likely_return_high),
-        median_close=float(median_close),
+        likely_return_low=likely_return_low,
+        likely_return_high=likely_return_high,
+        median_close=None,
         likely_close_low=float(likely_close_low),
         likely_close_high=float(likely_close_high),
         probability_up=float(probability_up),
@@ -276,6 +270,7 @@ def build_next_candle_forecast(
         scenario=scenario,
         interval_method=interval_method,
         calibration_samples=int(calibration_samples),
+        volatility_samples=int(volatility_samples),
         forecast_source=forecast_source,
         batch_probability_up=float(batch_probability_up),
         online_probability_up=float(online_probability_up),
@@ -288,10 +283,10 @@ def build_next_candle_forecast(
     ).to_dict()
 
 
-def _resolved_residuals(
+def _resolved_absolute_errors(
     history: list[dict[str, Any]],
 ) -> list[float]:
-    residuals: list[float] = []
+    errors: list[float] = []
     for item in history:
         interval_result = item.get("interval_result")
         if interval_result not in {"IN_RANGE", "OUT_OF_RANGE"}:
@@ -309,10 +304,47 @@ def _resolved_residuals(
         predicted_return = _optional_finite(
             contract.get("median_return")
         )
+        if predicted_return is None:
+            low = _optional_finite(contract.get("likely_return_low"))
+            high = _optional_finite(contract.get("likely_return_high"))
+            if low is not None and high is not None:
+                predicted_return = (low + high) / 2.0
         if actual_return is None or predicted_return is None:
             continue
-        residuals.append(actual_return - predicted_return)
-    return residuals[-MAXIMUM_RESIDUAL_SAMPLES:]
+        errors.append(abs(actual_return - predicted_return))
+    return errors[-MAXIMUM_RESIDUAL_SAMPLES:]
+
+
+def _conformal_radius(
+    absolute_errors: list[float],
+    interval_probability: float,
+) -> float:
+    values = np.asarray(absolute_errors[-MAXIMUM_RESIDUAL_SAMPLES:], dtype=float)
+    values = values[np.isfinite(values)]
+    if len(values) == 0:
+        return 0.0
+    quantile_level = min(
+        1.0,
+        ceil((len(values) + 1) * interval_probability) / len(values),
+    )
+    try:
+        return float(np.quantile(values, quantile_level, method="higher"))
+    except TypeError:
+        return float(np.quantile(values, quantile_level, interpolation="higher"))
+
+
+def _recent_volatility_radius(
+    recent_candles: pd.DataFrame,
+    interval_probability: float,
+) -> tuple[float | None, int]:
+    if recent_candles.empty or "close" not in recent_candles:
+        return None, 0
+    close = pd.to_numeric(recent_candles["close"], errors="coerce")
+    returns = close.pct_change().abs().replace([np.inf, -np.inf], np.nan).dropna()
+    returns = returns.tail(MAXIMUM_VOLATILITY_SAMPLES)
+    if len(returns) < MINIMUM_VOLATILITY_SAMPLES:
+        return None, len(returns)
+    return float(returns.quantile(interval_probability)), len(returns)
 
 
 def _walk_forward_interval(
