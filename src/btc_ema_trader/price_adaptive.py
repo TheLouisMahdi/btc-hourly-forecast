@@ -58,11 +58,12 @@ class PriceAdaptiveState:
 
 
 class PriceAdaptiveEngine:
-    """Shadow online learner with strict evidence-based blend gates.
+    """Online learner with strict primary gates and a tiny support-only path.
 
-    The online model is allowed to influence a forecast only when it is
-    measurably better than the current batch champion over the locked rolling
-    evaluation window. Being merely "not much worse" is no longer sufficient.
+    The normal blend still requires measurable improvement over the batch
+    champion. When those strict gates are not met, a mature online learner may
+    contribute a small direction-only nudge if it agrees with the batch side
+    and its rolling direction accuracy remains close to the batch model.
     """
 
     def __init__(self, settings: Settings, bundle: HourlyModelBundle) -> None:
@@ -135,8 +136,8 @@ class PriceAdaptiveEngine:
             target_up = int(row["target_up_h1"])
             target_return = float(row["future_return_h1"])
 
-            # The observation is recorded before fitting this row. This keeps
-            # the online comparison prequential rather than in-sample.
+            # Record the observation before fitting this row so the comparison
+            # remains prequential instead of becoming an in-sample score.
             if self.state.initialized:
                 self.state.observations.append(
                     {
@@ -191,10 +192,30 @@ class PriceAdaptiveEngine:
         online_return = self._predict_return(vector, base_return)
         metrics = self.metrics()
         direction_weight, return_weight = self._blend_weights(metrics)
+
+        blend_mode = (
+            "EVIDENCE_WEIGHTED"
+            if direction_weight > 0 or return_weight > 0
+            else "BATCH_ONLY"
+        )
+        online_probability_for_blend = online_probability_up
+        if direction_weight <= 0.0:
+            support_weight = self._support_direction_weight(
+                metrics,
+                base_probability_up,
+                online_probability_up,
+            )
+            if support_weight > 0.0:
+                direction_weight = support_weight
+                online_probability_for_blend = self._support_probability(
+                    online_probability_up
+                )
+                blend_mode = "SUPPORT_ONLY"
+
         fused_probability_up = float(
             np.clip(
                 (1.0 - direction_weight) * base_probability_up
-                + direction_weight * online_probability_up,
+                + direction_weight * online_probability_for_blend,
                 0.05,
                 0.95,
             )
@@ -213,8 +234,10 @@ class PriceAdaptiveEngine:
                 if direction_weight > 0 or return_weight > 0
                 else "BATCH_CHAMPION"
             ),
+            "blend_mode": blend_mode,
             "batch_probability_up": base_probability_up,
             "online_probability_up": online_probability_up,
+            "online_probability_used_for_blend": online_probability_for_blend,
             "fused_probability_up": fused_probability_up,
             "direction_blend_weight": direction_weight,
             "batch_return": base_return,
@@ -240,6 +263,63 @@ class PriceAdaptiveEngine:
             return float(np.clip(fallback, -0.05, 0.05))
         value = self.state.return_estimator.predict(vector.reshape(1, -1))[0]
         return float(np.clip(value, -0.05, 0.05))
+
+    def _support_direction_weight(
+        self,
+        metrics: dict[str, Any],
+        base_probability_up: float,
+        online_probability_up: float,
+    ) -> float:
+        minimum_samples = max(
+            1,
+            int(
+                self.config.get(
+                    "online_support_minimum_samples",
+                    self.config.get("online_minimum_samples", 168),
+                )
+            ),
+        )
+        samples = int(metrics.get("samples", 0))
+        if samples < minimum_samples:
+            return 0.0
+
+        base_side_up = float(base_probability_up) >= 0.5
+        online_side_up = float(online_probability_up) >= 0.5
+        if base_side_up != online_side_up:
+            return 0.0
+
+        base_accuracy = _number(metrics.get("base_direction_accuracy"), 0.0)
+        online_accuracy = _number(metrics.get("online_direction_accuracy"), 0.0)
+        minimum_accuracy = float(
+            self.config.get("online_support_minimum_accuracy", 0.50)
+        )
+        maximum_regression = max(
+            0.0,
+            float(
+                self.config.get(
+                    "online_support_maximum_accuracy_regression",
+                    0.03,
+                )
+            ),
+        )
+        if online_accuracy < minimum_accuracy:
+            return 0.0
+        if base_accuracy - online_accuracy > maximum_regression:
+            return 0.0
+
+        configured_weight = float(
+            self.config.get("online_support_direction_weight", 0.05)
+        )
+        configured_weight = float(np.clip(configured_weight, 0.0, 0.10))
+        maturity = min(1.0, samples / max(minimum_samples * 2, 1))
+        return float(configured_weight * maturity)
+
+    def _support_probability(self, probability: float) -> float:
+        cap = float(
+            self.config.get("online_support_probability_cap", 0.65)
+        )
+        cap = float(np.clip(cap, 0.51, 0.80))
+        return float(np.clip(probability, 1.0 - cap, cap))
 
     def _blend_weights(self, metrics: dict[str, Any]) -> tuple[float, float]:
         samples = int(metrics.get("samples", 0))
