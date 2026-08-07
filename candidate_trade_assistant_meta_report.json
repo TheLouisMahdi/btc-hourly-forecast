@@ -1,0 +1,222 @@
+{
+  "schema_version": 1,
+  "model_id": "directional-breakout-hourly-20260807T094738Z-01c67374",
+  "created_at": "2026-08-07T10:09:00.737566+00:00",
+  "method": "OOF_PRECISION_META_LABELING_WITH_FALSE_BREAKOUT_HEAD",
+  "qualified_heads": 0,
+  "passed": false,
+  "heads": {
+    "LONG": {
+      "3": {
+        "qualified": false,
+        "samples": 6546,
+        "train_samples": 4582,
+        "calibration_samples": 982,
+        "holdout_samples": 982,
+        "selected": 24,
+        "precision": 0.4583333333333333,
+        "fake_rate": 0.20833333333333334,
+        "mean_net_return": 0.0005518674308050957,
+        "policy": {
+          "minimum_take_probability": 0.65,
+          "maximum_false_probability": 0.25
+        },
+        "blockers": [
+          "holdout precision below minimum"
+        ]
+      },
+      "6": {
+        "qualified": false,
+        "samples": 6540,
+        "train_samples": 4578,
+        "calibration_samples": 981,
+        "holdout_samples": 981,
+        "selected": 46,
+        "precision": 0.3695652173913043,
+        "fake_rate": 0.34782608695652173,
+        "mean_net_return": -0.0007394098447498672,
+        "policy": {
+          "minimum_take_probability": 0.55,
+          "maximum_false_probability": 0.25
+        },
+        "blockers": [
+          "holdout precision below minimum",
+          "holdout mean net return is not positive"
+        ]
+      },
+      "12": {
+        "qualified": false,
+        "samples": 6534,
+        "train_samples": 4573,
+        "calibration_samples": 980,
+        "holdout_samples": 981,
+        "selected": 34,
+        "precision": 0.23529411764705882,
+        "fake_rate": 0.47058823529411764,
+        "mean_net_return": -0.0020289234591481346,
+        "policy": {
+          "minimum_take_probability": 0.7,
+          "maximum_false_probability": 0.5
+        },
+        "blockers": [
+          "holdout precision below minimum",
+          "holdout fake-breakout acceptance too high",
+          "holdout mean net return is not positive"
+        ]
+      }
+    },
+    "SHORT": {
+      "3": {
+        "qualified": false,
+        "samples": 5664,
+        "train_samples": 3964,
+        "calibration_samples": 850,
+        "holdout_samples": 850,
+        "selected": 52,
+        "precision": 0.40384615384615385,
+        "fake_rate": 0.21153846153846154,
+        "mean_net_return": -0.0007036017804970616,
+        "policy": {
+          "minimum_take_probability": 0.5,
+          "maximum_false_probability": 0.35
+        },
+        "blockers": [
+          "holdout precision below minimum",
+          "holdout mean net return is not positive"
+        ]
+      },
+      "6": {
+        "qualified": false,
+        "samples": 5658,
+        "train_samples": 3960,
+        "calibration_samples": 849,
+        "holdout_samples": 849,
+        "selected": 29,
+        "precision": 0.27586206896551724,
+        "fake_rate": 0.13793103448275862,
+        "mean_net_return": -0.0003247709864302455,
+        "policy": {
+          "minimum_take_probability": 0.5,
+          "maximum_false_probability": 0.3
+        },
+        "blockers": [
+          "holdout precision below minimum",
+          "holdout mean net return is not positive"
+        ]
+      },
+      "12": {
+        "qualified": false,
+        "samples": 5652,
+        "train_samples": 3956,
+        "calibration_samples": 848,
+        "holdout_samples": 848,
+        "selected": 19,
+        "precision": 0.21052631578947367,
+        "fake_rate": 0.21052631578947367,
+        "mean_net_return": -0.0007400702885610735,
+        "policy": {
+          "minimum_take_probability": 0.5,
+          "maximum_false_probability": 0.3
+        },
+        "blockers": [
+          "holdout precision below minimum",
+          "holdout mean net return is not positive"
+        ]
+      }
+    }
+  },
+  "exit_profiles": {
+    "LONG": {
+      "3": {
+        "horizon_hours": 3.0,
+        "target_atr": 0.9,
+        "stop_atr": 0.55,
+        "risk_reward": 1.6363636363636362,
+        "breakeven_trigger_r": 1.5,
+        "trailing_trigger_r": 2.5,
+        "successful_mfe_q25_atr": 1.2502259611673818,
+        "successful_mfe_q50_atr": 1.7283607067918885,
+        "successful_mae_q75_atr": 0.49559147143217863,
+        "successful_samples": 2012.0,
+        "fit_cutoff": "2025-04-27T00:00:00+00:00",
+        "locked_holdout_fraction": 0.15
+      },
+      "6": {
+        "horizon_hours": 6.0,
+        "target_atr": 1.3,
+        "stop_atr": 0.6056706757402048,
+        "risk_reward": 2.146380949368629,
+        "breakeven_trigger_r": 1.5,
+        "trailing_trigger_r": 2.5,
+        "successful_mfe_q25_atr": 1.827223871176625,
+        "successful_mfe_q50_atr": 2.575151305922427,
+        "successful_mae_q75_atr": 0.6056706757402048,
+        "successful_samples": 1927.0,
+        "fit_cutoff": "2025-04-27T18:00:00+00:00",
+        "locked_holdout_fraction": 0.15
+      },
+      "12": {
+        "horizon_hours": 12.0,
+        "target_atr": 1.9,
+        "stop_atr": 0.7044558763615623,
+        "risk_reward": 2.697117113726544,
+        "breakeven_trigger_r": 1.5,
+        "trailing_trigger_r": 2.5,
+        "successful_mfe_q25_atr": 2.775644083692418,
+        "successful_mfe_q50_atr": 3.8677958782973096,
+        "successful_mae_q75_atr": 0.7044558763615623,
+        "successful_samples": 1699.0,
+        "fit_cutoff": "2025-04-27T00:00:00+00:00",
+        "locked_holdout_fraction": 0.15
+      }
+    },
+    "SHORT": {
+      "3": {
+        "horizon_hours": 3.0,
+        "target_atr": 1.0,
+        "stop_atr": 0.65,
+        "risk_reward": 1.5384615384615383,
+        "breakeven_trigger_r": 1.5,
+        "trailing_trigger_r": 2.5,
+        "successful_mfe_q25_atr": 1.405294327791513,
+        "successful_mfe_q50_atr": 1.954763861522694,
+        "successful_mae_q75_atr": 0.516062077941887,
+        "successful_samples": 1649.0,
+        "fit_cutoff": "2025-06-27T17:00:00+00:00",
+        "locked_holdout_fraction": 0.15
+      },
+      "6": {
+        "horizon_hours": 6.0,
+        "target_atr": 1.45,
+        "stop_atr": 0.65,
+        "risk_reward": 2.230769230769231,
+        "breakeven_trigger_r": 1.5,
+        "trailing_trigger_r": 2.5,
+        "successful_mfe_q25_atr": 2.0691956996862113,
+        "successful_mfe_q50_atr": 2.7592209387612527,
+        "successful_mae_q75_atr": 0.6285789596992242,
+        "successful_samples": 1545.0,
+        "fit_cutoff": "2025-06-27T14:00:00+00:00",
+        "locked_holdout_fraction": 0.15
+      },
+      "12": {
+        "horizon_hours": 12.0,
+        "target_atr": 2.1,
+        "stop_atr": 0.7251444042094997,
+        "risk_reward": 2.8959749090103912,
+        "breakeven_trigger_r": 1.5,
+        "trailing_trigger_r": 2.5,
+        "successful_mfe_q25_atr": 2.8569424514803243,
+        "successful_mfe_q50_atr": 3.975272378293066,
+        "successful_mae_q75_atr": 0.7251444042094997,
+        "successful_samples": 1341.0,
+        "fit_cutoff": "2025-06-26T21:00:00+00:00",
+        "locked_holdout_fraction": 0.15
+      }
+    }
+  },
+  "exit_profile_contract": "FITTED_BEFORE_FINAL_15_PERCENT_META_HOLDOUT",
+  "joint_qualified_heads": [],
+  "joint_qualified_count": 0,
+  "joint_passed": false
+}

@@ -1,0 +1,10 @@
+{
+  "status": "PASS",
+  "promotion": "KEEP_INCUMBENT",
+  "trigger_reason": "MANUAL_REQUEST",
+  "commit_sha": "dea37aad22e74d25652a0b4e14d50294fc89abb6",
+  "workflow_run_id": "31161751312",
+  "workflow_run_attempt": "1",
+  "checked_at": "2026-08-07T10:09:02.290840+00:00",
+  "retrain_exit_code": 0
+}

@@ -1,0 +1,270 @@
+{
+  "schema_version": 1,
+  "model_id": "directional-breakout-hourly-20260807T094738Z-01c67374",
+  "created_at": "2026-08-07T10:07:44.986992+00:00",
+  "method": "CROSS_LAYER_FALSE_BREAKOUT_BLOOM_WITH_EXACT_COUNTS",
+  "horizons": [
+    1,
+    3,
+    6,
+    12
+  ],
+  "heads": {
+    "LONG": {
+      "1": {
+        "patterns": 7542,
+        "bad_patterns": 18,
+        "minimum_count": 2,
+        "minimum_bad_rate": 0.75
+      },
+      "3": {
+        "patterns": 7540,
+        "bad_patterns": 27,
+        "minimum_count": 2,
+        "minimum_bad_rate": 0.75
+      },
+      "6": {
+        "patterns": 7535,
+        "bad_patterns": 38,
+        "minimum_count": 2,
+        "minimum_bad_rate": 0.75
+      },
+      "12": {
+        "patterns": 7526,
+        "bad_patterns": 49,
+        "minimum_count": 2,
+        "minimum_bad_rate": 0.75
+      }
+    },
+    "SHORT": {
+      "1": {
+        "patterns": 6525,
+        "bad_patterns": 7,
+        "minimum_count": 2,
+        "minimum_bad_rate": 0.75
+      },
+      "3": {
+        "patterns": 6524,
+        "bad_patterns": 18,
+        "minimum_count": 2,
+        "minimum_bad_rate": 0.75
+      },
+      "6": {
+        "patterns": 6519,
+        "bad_patterns": 29,
+        "minimum_count": 2,
+        "minimum_bad_rate": 0.75
+      },
+      "12": {
+        "patterns": 6512,
+        "bad_patterns": 34,
+        "minimum_count": 2,
+        "minimum_bad_rate": 0.75
+      }
+    }
+  },
+  "market_data_segmentation": {
+    "policy": "CONTIGUOUS_SEGMENTS_WITHOUT_FILL",
+    "random_sampling": false,
+    "synthetic_candles": false,
+    "interpolation": false,
+    "forward_fill": false,
+    "input_rows": 87545,
+    "retained_input_rows": 85707,
+    "retained_input_fraction": 0.9790050831001199,
+    "training_rows": 85707,
+    "used_segment_count": 18,
+    "skipped_segment_count": 4,
+    "gap_count": 21,
+    "gap_count_policy": "AUDIT_ONLY",
+    "gap_count_advisory_exceeded": true,
+    "largest_gap_hours": 16.0,
+    "missing_candle_hours": 55,
+    "limits": {
+      "maximum_gap_hours": 24.0,
+      "advisory_maximum_gap_count": 12,
+      "maximum_missing_hours": 72,
+      "minimum_segment_rows": 1000
+    },
+    "segments": [
+      {
+        "segment_id": 1,
+        "start": "2016-09-19T05:00:00+00:00",
+        "end": "2017-02-28T19:00:00+00:00",
+        "input_rows": 3903,
+        "gap_before_hours": 3.0,
+        "feature_rows": 3903
+      },
+      {
+        "segment_id": 2,
+        "start": "2017-03-01T01:00:00+00:00",
+        "end": "2017-04-15T19:00:00+00:00",
+        "input_rows": 1099,
+        "gap_before_hours": 6.0,
+        "feature_rows": 1099
+      },
+      {
+        "segment_id": 3,
+        "start": "2017-04-15T23:00:00+00:00",
+        "end": "2017-09-25T08:00:00+00:00",
+        "input_rows": 3898,
+        "gap_before_hours": 4.0,
+        "feature_rows": 3898
+      },
+      {
+        "segment_id": 4,
+        "start": "2017-09-25T11:00:00+00:00",
+        "end": "2017-12-01T06:00:00+00:00",
+        "input_rows": 1604,
+        "gap_before_hours": 3.0,
+        "feature_rows": 1604
+      },
+      {
+        "segment_id": 6,
+        "start": "2017-12-12T07:00:00+00:00",
+        "end": "2018-02-01T04:00:00+00:00",
+        "input_rows": 1222,
+        "gap_before_hours": 2.0,
+        "feature_rows": 1222
+      },
+      {
+        "segment_id": 7,
+        "start": "2018-02-01T08:00:00+00:00",
+        "end": "2018-05-10T03:00:00+00:00",
+        "input_rows": 2348,
+        "gap_before_hours": 4.0,
+        "feature_rows": 2348
+      },
+      {
+        "segment_id": 10,
+        "start": "2018-06-04T04:00:00+00:00",
+        "end": "2018-08-10T00:00:00+00:00",
+        "input_rows": 1605,
+        "gap_before_hours": 2.0,
+        "feature_rows": 1605
+      },
+      {
+        "segment_id": 11,
+        "start": "2018-08-10T16:00:00+00:00",
+        "end": "2018-12-26T01:00:00+00:00",
+        "input_rows": 3298,
+        "gap_before_hours": 16.0,
+        "feature_rows": 3298
+      },
+      {
+        "segment_id": 12,
+        "start": "2018-12-26T03:00:00+00:00",
+        "end": "2019-04-11T12:00:00+00:00",
+        "input_rows": 2554,
+        "gap_before_hours": 2.0,
+        "feature_rows": 2554
+      },
+      {
+        "segment_id": 13,
+        "start": "2019-04-11T14:00:00+00:00",
+        "end": "2019-06-20T14:00:00+00:00",
+        "input_rows": 1681,
+        "gap_before_hours": 2.0,
+        "feature_rows": 1681
+      },
+      {
+        "segment_id": 14,
+        "start": "2019-06-20T16:00:00+00:00",
+        "end": "2019-10-31T19:00:00+00:00",
+        "input_rows": 3196,
+        "gap_before_hours": 2.0,
+        "feature_rows": 3196
+      },
+      {
+        "segment_id": 15,
+        "start": "2019-10-31T21:00:00+00:00",
+        "end": "2020-01-30T16:00:00+00:00",
+        "input_rows": 2180,
+        "gap_before_hours": 2.0,
+        "feature_rows": 2180
+      },
+      {
+        "segment_id": 16,
+        "start": "2020-01-30T18:00:00+00:00",
+        "end": "2020-09-04T22:00:00+00:00",
+        "input_rows": 5237,
+        "gap_before_hours": 2.0,
+        "feature_rows": 5237
+      },
+      {
+        "segment_id": 17,
+        "start": "2020-09-05T00:00:00+00:00",
+        "end": "2020-10-20T19:00:00+00:00",
+        "input_rows": 1100,
+        "gap_before_hours": 2.0,
+        "feature_rows": 1100
+      },
+      {
+        "segment_id": 18,
+        "start": "2020-10-20T21:00:00+00:00",
+        "end": "2023-03-04T17:00:00+00:00",
+        "input_rows": 20757,
+        "gap_before_hours": 2.0,
+        "feature_rows": 20757
+      },
+      {
+        "segment_id": 19,
+        "start": "2023-03-04T21:00:00+00:00",
+        "end": "2025-10-25T15:00:00+00:00",
+        "input_rows": 23179,
+        "gap_before_hours": 4.0,
+        "feature_rows": 23179
+      },
+      {
+        "segment_id": 20,
+        "start": "2025-10-25T21:00:00+00:00",
+        "end": "2026-05-08T01:00:00+00:00",
+        "input_rows": 4661,
+        "gap_before_hours": 6.0,
+        "feature_rows": 4661
+      },
+      {
+        "segment_id": 21,
+        "start": "2026-05-08T07:00:00+00:00",
+        "end": "2026-08-07T07:00:00+00:00",
+        "input_rows": 2185,
+        "gap_before_hours": 6.0,
+        "feature_rows": 2185
+      }
+    ],
+    "skipped_segments": [
+      {
+        "segment_id": 0,
+        "start": "2016-08-09T08:00:00+00:00",
+        "end": "2016-09-19T02:00:00+00:00",
+        "input_rows": 979,
+        "gap_before_hours": null,
+        "reason": "BELOW_MINIMUM_SEGMENT_ROWS"
+      },
+      {
+        "segment_id": 5,
+        "start": "2017-12-01T08:00:00+00:00",
+        "end": "2017-12-12T05:00:00+00:00",
+        "input_rows": 262,
+        "gap_before_hours": 2.0,
+        "reason": "BELOW_MINIMUM_SEGMENT_ROWS"
+      },
+      {
+        "segment_id": 8,
+        "start": "2018-05-10T05:00:00+00:00",
+        "end": "2018-05-30T02:00:00+00:00",
+        "input_rows": 478,
+        "gap_before_hours": 2.0,
+        "reason": "BELOW_MINIMUM_SEGMENT_ROWS"
+      },
+      {
+        "segment_id": 9,
+        "start": "2018-05-30T04:00:00+00:00",
+        "end": "2018-06-04T02:00:00+00:00",
+        "input_rows": 119,
+        "gap_before_hours": 2.0,
+        "reason": "BELOW_MINIMUM_SEGMENT_ROWS"
+      }
+    ]
+  }
+}

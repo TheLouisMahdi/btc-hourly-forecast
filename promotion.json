@@ -1,0 +1,12 @@
+{
+  "decision": "KEEP_INCUMBENT",
+  "reason": "Candidate did not pass locked economic holdout gates",
+  "candidate_model_id": "directional-breakout-hourly-20260807T094738Z-01c67374",
+  "candidate_score_bps": null,
+  "incumbent_score_bps": null,
+  "joint_economic_memory_pairs": [],
+  "checked_at": "2026-08-07T09:50:39.477255+00:00",
+  "trade_assistant_passed": false,
+  "trade_assistant_qualified_heads": 0,
+  "trade_assistant_joint_heads": []
+}
