@@ -291,10 +291,7 @@ class RepositoryQualityTests(unittest.TestCase):
     def test_fast_structure_engine_is_canonical(self) -> None:
         root = Path(__file__).resolve().parents[1]
         contract = (
-            root
-            / "src"
-            / "btc_ema_trader"
-            / "contract_features.py"
+            root / "src" / "btc_ema_trader" / "contract_features.py"
         ).read_text(encoding="utf-8")
         self.assertIn("market_structure_fast", contract)
         self.assertIn("build_fast_market_structure", contract)
@@ -312,8 +309,9 @@ class RepositoryQualityTests(unittest.TestCase):
             "python scripts/github_structural_forecast.py",
             workflow,
         )
-        self.assertIn("inputs.allow_retrain", workflow)
-        self.assertIn("gh workflow run retrain.yml", workflow)
+        self.assertIn('cron: "12 * * * *"', workflow)
+        self.assertNotIn("inputs.allow_retrain", workflow)
+        self.assertNotIn("gh workflow run retrain.yml", workflow)
 
 
 if __name__ == "__main__":
