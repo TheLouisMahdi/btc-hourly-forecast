@@ -242,6 +242,11 @@ forecast:
   online_minimum_brier_improvement: 0.0015
   online_minimum_accuracy_improvement: 0.002
   online_minimum_return_mae_improvement: 0.00002
+  online_support_minimum_samples: 168
+  online_support_direction_weight: 0.05
+  online_support_probability_cap: 0.65
+  online_support_minimum_accuracy: 0.50
+  online_support_maximum_accuracy_regression: 0.03
 
 adaptive:
   enabled: false
