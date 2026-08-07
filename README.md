@@ -25,7 +25,7 @@
 
 <br /><br />
 
-<img src="https://img.shields.io/badge/version-5.5.0-8f8ab8?style=flat-square" alt="Version 5.5.0" />
+<img src="https://img.shields.io/badge/version-5.6.0-8f8ab8?style=flat-square" alt="Version 5.6.0" />
 <img src="https://img.shields.io/badge/Python-3.11%2B-3776ab?style=flat-square&logo=python&logoColor=white" alt="Python 3.11 or newer" />
 <img src="https://img.shields.io/badge/training-no_random_sampling-6f9b91?style=flat-square" alt="No random sampling" />
 <img src="https://img.shields.io/badge/mode-paper_trading_only-c99078?style=flat-square" alt="Paper trading only" />
