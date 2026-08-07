@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import sys
+import tempfile
 import unittest
 from pathlib import Path
 from unittest.mock import patch
@@ -38,12 +39,17 @@ class DashboardOrchestratorTests(unittest.TestCase):
                 "main",
                 side_effect=lambda: calls.append("resilience") or 0,
             ),
+            patch.object(
+                render_dashboard,
+                "_ensure_resilience_panel",
+                side_effect=lambda: calls.append("contract"),
+            ),
         ):
             self.assertEqual(render_dashboard.main(), 0)
 
         self.assertEqual(
             calls,
-            ["base", "visual", "uncertainty", "resilience"],
+            ["base", "visual", "uncertainty", "resilience", "contract"],
         )
 
     def test_failure_stops_later_components(self) -> None:
@@ -70,10 +76,38 @@ class DashboardOrchestratorTests(unittest.TestCase):
                 "main",
                 side_effect=lambda: calls.append("resilience") or 0,
             ),
+            patch.object(
+                render_dashboard,
+                "_ensure_resilience_panel",
+                side_effect=lambda: calls.append("contract"),
+            ),
         ):
             self.assertEqual(render_dashboard.main(), 7)
 
         self.assertEqual(calls, ["base", "visual"])
+
+    def test_resilience_panel_uses_position_ledger_anchor(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            site = Path(temporary) / "site"
+            site.mkdir()
+            index = site / "index.html"
+            index.write_text(
+                '<html><body><main><section class="panel ledger position-ledger">'
+                "ledger"
+                "</section></main></body></html>",
+                encoding="utf-8",
+            )
+            (site / "latest.json").write_text("{}", encoding="utf-8")
+            (site / "history.json").write_text("[]", encoding="utf-8")
+
+            render_dashboard._ensure_resilience_panel(index)
+            document = index.read_text(encoding="utf-8")
+
+        self.assertIn(render_dashboard.RESILIENCE_HEADING, document)
+        self.assertLess(
+            document.index(render_dashboard.RESILIENCE_HEADING),
+            document.index('class="panel ledger position-ledger"'),
+        )
 
 
 if __name__ == "__main__":
