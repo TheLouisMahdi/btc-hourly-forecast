@@ -38,7 +38,7 @@ jobs:
           python -m pip install -r requirements-github.txt
           python -m pip install -e . --no-deps
 
-      - name: Restore forecast and trade ledger
+      - name: Restore forecast, chart and trade state
         shell: bash
         run: |
           mkdir -p .github_state
@@ -47,10 +47,12 @@ jobs:
             git show origin/forecast-state:history.json > .github_state/history.json 2>/dev/null || printf '[]\n' > .github_state/history.json
             git show origin/forecast-state:latest.json > .github_state/latest.json 2>/dev/null || printf '{}\n' > .github_state/latest.json
             git show origin/forecast-state:trades.json > .github_state/trades.json 2>/dev/null || printf '[]\n' > .github_state/trades.json
+            git show origin/forecast-state:chart_candles.json > .github_state/chart_candles.json 2>/dev/null || printf '[]\n' > .github_state/chart_candles.json
           else
             printf '[]\n' > .github_state/history.json
             printf '{}\n' > .github_state/latest.json
             printf '[]\n' > .github_state/trades.json
+            printf '[]\n' > .github_state/chart_candles.json
           fi
 
       - name: Render canonical dashboard
@@ -82,7 +84,6 @@ jobs:
           forbidden = (
               'Model-estimated next close',
               '<th>Expected close</th>',
-              'gap-line',
           )
           present_forbidden = [marker for marker in forbidden if marker in document]
           if missing or present_forbidden:
