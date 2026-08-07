@@ -73,23 +73,27 @@ class RepositoryConsistencyTests(unittest.TestCase):
         missing = [name for name in required if not (self.root / name).is_file()]
         self.assertEqual(missing, [])
 
-    def test_workflow_directory_is_small_and_manual_only(self) -> None:
+    def test_workflow_directory_is_small_and_forecast_only_is_scheduled(self) -> None:
         workflow_dir = self.root / ".github" / "workflows"
         expected = {"quality.yml", "forecast.yml", "dashboard.yml", "retrain.yml"}
         actual = {path.name for path in workflow_dir.glob("*.yml")}
         self.assertEqual(actual, expected)
 
-        forbidden_triggers = (
+        forbidden_common_triggers = (
             "\n  push:",
             "\n  pull_request:",
-            "\n  schedule:",
             "\n  workflow_run:",
         )
         for path in workflow_dir.glob("*.yml"):
             workflow = path.read_text(encoding="utf-8")
             self.assertIn("workflow_dispatch:", workflow, path.name)
-            for trigger in forbidden_triggers:
+            for trigger in forbidden_common_triggers:
                 self.assertNotIn(trigger, workflow, path.name)
+            if path.name == "forecast.yml":
+                self.assertIn("\n  schedule:\n", workflow)
+                self.assertIn('cron: "12 * * * *"', workflow)
+            else:
+                self.assertNotIn("\n  schedule:\n", workflow, path.name)
 
     def test_forecast_workflow_uses_canonical_entry_point(self) -> None:
         workflow = (
@@ -99,6 +103,7 @@ class RepositoryConsistencyTests(unittest.TestCase):
         self.assertNotIn("python scripts/github_structural_forecast.py", workflow)
         self.assertIn("gh workflow run retrain.yml", workflow)
         self.assertIn("inputs.allow_retrain", workflow)
+        self.assertIn("github.event_name == 'workflow_dispatch'", workflow)
 
     def test_dashboard_workflow_has_one_render_entry_point(self) -> None:
         workflow = (
