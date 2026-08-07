@@ -100,6 +100,7 @@ def evaluate_policy(
         if created is not None
         else None
     )
+    assistant_ready = metadata.get("trade_assistant_artifact_ready")
     result.update(
         {
             "model_created_at": None if created is None else created.isoformat(),
@@ -109,8 +110,15 @@ def evaluate_policy(
             "online_direction_accuracy": online_accuracy,
             "base_direction_brier": base_brier,
             "online_direction_brier": online_brier,
+            "trade_assistant_artifact_ready": assistant_ready,
         }
     )
+
+    # Missing precision-meta artifacts are a legitimate challenger need, not a
+    # reason to weaken the primary one-hour forecast. Dispatch still requires
+    # the workflow caller to opt in with allow_retrain=true.
+    if assistant_ready is False:
+        return _request(result, "TRADE_ASSISTANT_ARTIFACT_MISSING")
 
     health = latest.get("data_health")
     health = health if isinstance(health, dict) else {}
@@ -209,6 +217,10 @@ def main() -> int:
 
     price_summary = _load_dict(adaptive_dir / "price_summary.json")
     metadata = _load_dict(model_dir / "model_metadata.json")
+    metadata["trade_assistant_artifact_ready"] = bool(
+        (model_dir / "trade_assistant_meta.joblib").is_file()
+        and (model_dir / "trade_assistant_patterns.joblib").is_file()
+    )
     config = _load_policy_config(Path(args.config))
     decision = evaluate_policy(
         latest,
