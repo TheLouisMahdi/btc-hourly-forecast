@@ -98,6 +98,8 @@ class RepositoryConsistencyTests(unittest.TestCase):
         self.assertIn('cron: "12 * * * *"', forecast)
         self.assertNotIn("\n  push:\n", forecast)
         self.assertNotIn("\n  workflow_run:\n", forecast)
+        self.assertNotIn("gh workflow run retrain.yml", forecast)
+        self.assertNotIn("inputs.allow_retrain", forecast)
 
         dashboard = workflows["dashboard.yml"]
         self.assertIn("\n  workflow_run:\n", dashboard)
@@ -117,9 +119,9 @@ class RepositoryConsistencyTests(unittest.TestCase):
         ).read_text(encoding="utf-8")
         self.assertIn("python scripts/github_hourly_forecast.py", workflow)
         self.assertNotIn("python scripts/github_structural_forecast.py", workflow)
-        self.assertIn("gh workflow run retrain.yml", workflow)
-        self.assertIn("inputs.allow_retrain", workflow)
-        self.assertIn("github.event_name == 'workflow_dispatch'", workflow)
+        self.assertNotIn("gh workflow run retrain.yml", workflow)
+        self.assertNotIn("inputs.allow_retrain", workflow)
+        self.assertIn('cron: "12 * * * *"', workflow)
 
     def test_dashboard_workflow_has_one_render_entry_point(self) -> None:
         workflow = (
