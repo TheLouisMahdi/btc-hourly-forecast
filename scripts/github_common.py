@@ -84,7 +84,17 @@ def build_github_settings(
         yaml.safe_dump(values, sort_keys=False),
         encoding="utf-8",
     )
-    return load_settings(config_path)
+    settings = load_settings(config_path)
+
+    # Runtime-only overlay. It leaves the serialized champion untouched and
+    # installs the precision meta gate, cross-layer pattern memory and
+    # horizon-aligned exit policy only for GitHub execution.
+    from btc_ema_trader.trade_assistant_bootstrap import (
+        install_trade_assistant_runtime,
+    )
+
+    install_trade_assistant_runtime()
+    return settings
 
 
 def copy_latest_model_from_state(
