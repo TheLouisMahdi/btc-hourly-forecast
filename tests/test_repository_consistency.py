@@ -73,34 +73,43 @@ class RepositoryConsistencyTests(unittest.TestCase):
         missing = [name for name in required if not (self.root / name).is_file()]
         self.assertEqual(missing, [])
 
-    def test_workflow_directory_has_locked_automatic_triggers(self) -> None:
+    def test_workflow_automation_contract(self) -> None:
         workflow_dir = self.root / ".github" / "workflows"
         expected = {"quality.yml", "forecast.yml", "dashboard.yml", "retrain.yml"}
         actual = {path.name for path in workflow_dir.glob("*.yml")}
         self.assertEqual(actual, expected)
 
-        for path in workflow_dir.glob("*.yml"):
-            workflow = path.read_text(encoding="utf-8")
-            self.assertIn("workflow_dispatch:", workflow, path.name)
-            self.assertNotIn("\n  push:", workflow, path.name)
-            self.assertNotIn("\n  pull_request:", workflow, path.name)
+        workflows = {
+            path.name: path.read_text(encoding="utf-8")
+            for path in workflow_dir.glob("*.yml")
+        }
+        for name, workflow in workflows.items():
+            self.assertIn("workflow_dispatch:", workflow, name)
 
-            if path.name == "forecast.yml":
-                self.assertIn("\n  schedule:\n", workflow)
-                self.assertIn('cron: "12 * * * *"', workflow)
-                self.assertNotIn("\n  workflow_run:\n", workflow)
-            elif path.name == "dashboard.yml":
-                self.assertNotIn("\n  schedule:\n", workflow)
-                self.assertIn("\n  workflow_run:\n", workflow)
-                self.assertIn("- Hourly BTC forecast", workflow)
-                self.assertIn("- completed", workflow)
-                self.assertIn(
-                    "github.event.workflow_run.conclusion == 'success'",
-                    workflow,
-                )
-            else:
-                self.assertNotIn("\n  schedule:\n", workflow, path.name)
-                self.assertNotIn("\n  workflow_run:\n", workflow, path.name)
+        quality = workflows["quality.yml"]
+        self.assertIn("\n  push:\n", quality)
+        self.assertIn("\n      - main\n", quality)
+        self.assertIn("\n  schedule:\n", quality)
+        self.assertIn('cron: "37 3 * * *"', quality)
+        self.assertNotIn("\n  workflow_run:\n", quality)
+
+        forecast = workflows["forecast.yml"]
+        self.assertIn("\n  schedule:\n", forecast)
+        self.assertIn('cron: "12 * * * *"', forecast)
+        self.assertNotIn("\n  push:\n", forecast)
+        self.assertNotIn("\n  workflow_run:\n", forecast)
+
+        dashboard = workflows["dashboard.yml"]
+        self.assertIn("\n  workflow_run:\n", dashboard)
+        self.assertIn("- Hourly BTC forecast", dashboard)
+        self.assertIn("github.event.workflow_run.conclusion == 'success'", dashboard)
+        self.assertNotIn("\n  schedule:\n", dashboard)
+        self.assertNotIn("\n  push:\n", dashboard)
+
+        retrain = workflows["retrain.yml"]
+        self.assertNotIn("\n  schedule:\n", retrain)
+        self.assertNotIn("\n  push:\n", retrain)
+        self.assertNotIn("\n  workflow_run:\n", retrain)
 
     def test_forecast_workflow_uses_canonical_entry_point(self) -> None:
         workflow = (
@@ -120,8 +129,6 @@ class RepositoryConsistencyTests(unittest.TestCase):
             "python scripts/render_dashboard.py --runtime-dir",
             workflow,
         )
-        self.assertIn("workflow_run:", workflow)
-        self.assertIn("Hourly BTC forecast", workflow)
         for component in (
             "github_pages_dashboard.py",
             "github_visual_dashboard.py",
