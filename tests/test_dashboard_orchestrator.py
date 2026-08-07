@@ -40,6 +40,11 @@ class DashboardOrchestratorTests(unittest.TestCase):
                 side_effect=lambda: calls.append("resilience") or 0,
             ),
             patch.object(
+                render_dashboard.github_chart_dashboard,
+                "main",
+                side_effect=lambda: calls.append("chart") or 0,
+            ),
+            patch.object(
                 render_dashboard,
                 "_ensure_resilience_panel",
                 side_effect=lambda: calls.append("contract"),
@@ -49,7 +54,14 @@ class DashboardOrchestratorTests(unittest.TestCase):
 
         self.assertEqual(
             calls,
-            ["base", "visual", "uncertainty", "resilience", "contract"],
+            [
+                "base",
+                "visual",
+                "uncertainty",
+                "resilience",
+                "chart",
+                "contract",
+            ],
         )
 
     def test_failure_stops_later_components(self) -> None:
@@ -75,6 +87,11 @@ class DashboardOrchestratorTests(unittest.TestCase):
                 render_dashboard.github_resilience_dashboard,
                 "main",
                 side_effect=lambda: calls.append("resilience") or 0,
+            ),
+            patch.object(
+                render_dashboard.github_chart_dashboard,
+                "main",
+                side_effect=lambda: calls.append("chart") or 0,
             ),
             patch.object(
                 render_dashboard,
