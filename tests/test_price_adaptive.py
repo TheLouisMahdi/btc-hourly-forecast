@@ -84,7 +84,7 @@ class PriceAdaptiveTests(unittest.TestCase):
         self.assertLessEqual(direction_weight, 0.35)
         self.assertLessEqual(return_weight, 0.35)
 
-    def test_worse_online_model_gets_zero_weight(self) -> None:
+    def test_worse_online_model_gets_zero_primary_weight(self) -> None:
         engine = object.__new__(PriceAdaptiveEngine)
         engine.config = {
             "online_minimum_samples": 72,
@@ -107,6 +107,70 @@ class PriceAdaptiveTests(unittest.TestCase):
         )
         self.assertEqual(direction_weight, 0.0)
         self.assertEqual(return_weight, 0.0)
+
+    def test_support_only_weight_is_small_when_directions_agree(self) -> None:
+        engine = object.__new__(PriceAdaptiveEngine)
+        engine.config = {
+            "online_minimum_samples": 168,
+            "online_support_direction_weight": 0.05,
+            "online_support_minimum_accuracy": 0.50,
+            "online_support_maximum_accuracy_regression": 0.03,
+        }
+        weight = engine._support_direction_weight(
+            {
+                "samples": 504,
+                "base_direction_accuracy": 0.524,
+                "online_direction_accuracy": 0.502,
+            },
+            base_probability_up=0.522,
+            online_probability_up=0.95,
+        )
+        self.assertAlmostEqual(weight, 0.05)
+
+    def test_support_only_weight_is_zero_when_directions_disagree(self) -> None:
+        engine = object.__new__(PriceAdaptiveEngine)
+        engine.config = {
+            "online_minimum_samples": 168,
+            "online_support_direction_weight": 0.05,
+            "online_support_minimum_accuracy": 0.50,
+            "online_support_maximum_accuracy_regression": 0.03,
+        }
+        weight = engine._support_direction_weight(
+            {
+                "samples": 504,
+                "base_direction_accuracy": 0.524,
+                "online_direction_accuracy": 0.502,
+            },
+            base_probability_up=0.522,
+            online_probability_up=0.20,
+        )
+        self.assertEqual(weight, 0.0)
+
+    def test_support_only_rejects_weak_online_accuracy(self) -> None:
+        engine = object.__new__(PriceAdaptiveEngine)
+        engine.config = {
+            "online_minimum_samples": 168,
+            "online_support_direction_weight": 0.05,
+            "online_support_minimum_accuracy": 0.50,
+            "online_support_maximum_accuracy_regression": 0.03,
+        }
+        weight = engine._support_direction_weight(
+            {
+                "samples": 504,
+                "base_direction_accuracy": 0.54,
+                "online_direction_accuracy": 0.49,
+            },
+            base_probability_up=0.48,
+            online_probability_up=0.30,
+        )
+        self.assertEqual(weight, 0.0)
+
+    def test_support_probability_caps_overconfidence(self) -> None:
+        engine = object.__new__(PriceAdaptiveEngine)
+        engine.config = {"online_support_probability_cap": 0.65}
+        self.assertAlmostEqual(engine._support_probability(0.95), 0.65)
+        self.assertAlmostEqual(engine._support_probability(0.05), 0.35)
+        self.assertAlmostEqual(engine._support_probability(0.61), 0.61)
 
 
 if __name__ == "__main__":
