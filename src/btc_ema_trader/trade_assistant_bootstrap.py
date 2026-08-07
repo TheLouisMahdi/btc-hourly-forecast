@@ -78,6 +78,12 @@ def install_trade_assistant_runtime() -> None:
         else:
             assessment = meta.assess(record, patterns)
 
+        base_qualified = bool(record.get("direction_qualified", False))
+        assessment["base_direction_qualified"] = base_qualified
+        if assessment.get("status") == "READY" and not base_qualified:
+            assessment["selected"] = False
+            assessment["reason"] = "BASE_DIRECTION_HORIZON_NOT_QUALIFIED"
+
         live_assessment = _assess_live_position_pattern(record)
         if live_assessment is not None:
             assessment["live_candle_memory"] = live_assessment
