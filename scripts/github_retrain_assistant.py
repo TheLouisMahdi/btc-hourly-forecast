@@ -12,10 +12,13 @@ import pandas as pd
 import github_weekly_retrain as base_retrain
 from btc_ema_trader.contract_training import build_segmented_feature_set
 from btc_ema_trader.meta_filter import (
+    build_exit_profile,
     save_precision_meta_filter,
     train_precision_meta_filter,
 )
 from btc_ema_trader.pattern_memory import (
+    LONG,
+    SHORT,
     build_static_pattern_bundle,
     save_static_pattern_bundle,
 )
@@ -105,6 +108,13 @@ def main() -> int:
             oof,
             settings,
             model_id=model_id,
+        )
+        _lock_exit_profiles_before_meta_holdout(
+            meta,
+            meta_report,
+            feature_set.frame,
+            oof,
+            settings,
         )
         pattern_report["market_data_segmentation"] = segmentation
 
@@ -202,6 +212,71 @@ def main() -> int:
             },
         )
     return 0
+
+
+def _lock_exit_profiles_before_meta_holdout(
+    meta: Any,
+    report: dict[str, Any],
+    frame: pd.DataFrame,
+    oof: pd.DataFrame,
+    settings: Any,
+) -> None:
+    """Keep the final 15% event OOF interval unseen by exit-profile fitting."""
+    data = frame.copy().sort_values("open_time").reset_index(drop=True)
+    event_oof = oof.loc[oof["record_type"].astype(str) == "EVENT"].copy()
+    event_oof["open_time"] = pd.to_datetime(event_oof["open_time"], utc=True)
+    locked: dict[str, dict[int, dict[str, float]]] = {
+        "LONG": {},
+        "SHORT": {},
+    }
+    for direction, name in ((LONG, "LONG"), (SHORT, "SHORT")):
+        for horizon in settings.section("model").get(
+            "trade_horizons_hours", [3, 6, 12]
+        ):
+            horizon = int(horizon)
+            rows = event_oof.loc[
+                (
+                    pd.to_numeric(
+                        event_oof["event_direction"], errors="coerce"
+                    )
+                    == direction
+                )
+                & (
+                    pd.to_numeric(event_oof["horizon"], errors="coerce")
+                    == horizon
+                )
+            ].sort_values("open_time")
+            if len(rows) < 100:
+                profile_frame = data.iloc[0:0]
+                cutoff = None
+            else:
+                holdout_start = min(
+                    max(1, int(len(rows) * 0.85)),
+                    len(rows) - 1,
+                )
+                cutoff = pd.Timestamp(rows.iloc[holdout_start]["open_time"])
+                profile_frame = data.loc[
+                    pd.to_datetime(data["open_time"], utc=True) < cutoff
+                ]
+            profile = build_exit_profile(
+                data=profile_frame,
+                direction=direction,
+                horizon=horizon,
+                settings=settings,
+            )
+            profile["fit_cutoff"] = (
+                cutoff.isoformat() if cutoff is not None else None
+            )
+            profile["locked_holdout_fraction"] = 0.15
+            locked[name][horizon] = profile
+            meta.exit_profiles[name][horizon] = profile
+    report["exit_profiles"] = {
+        name: {str(horizon): item for horizon, item in values.items()}
+        for name, values in locked.items()
+    }
+    report["exit_profile_contract"] = (
+        "FITTED_BEFORE_FINAL_15_PERCENT_META_HOLDOUT"
+    )
 
 
 def _patch_metadata(path: Path, assistant: dict[str, Any]) -> None:
