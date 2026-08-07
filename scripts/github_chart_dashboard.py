@@ -24,8 +24,10 @@ def main() -> int:
     latest = _load_json(site_dir / "latest.json", {})
     history = _load_json(site_dir / "history.json", [])
     history = history if isinstance(history, list) else []
+    chart_candles = _load_json(root / ".github_state" / "chart_candles.json", [])
+    chart_candles = chart_candles if isinstance(chart_candles, list) else []
 
-    chart = _chart(history, latest)
+    chart = _chart(history, latest, chart_candles)
     pattern = re.compile(
         r'<svg class="chart".*?</svg>\s*<div class="legend">.*?</div>',
         flags=re.DOTALL,
@@ -43,8 +45,14 @@ def main() -> int:
     return 0
 
 
-def _chart(history: list[dict[str, Any]], latest: dict[str, Any]) -> str:
-    points = _points(history)
+def _chart(
+    history: list[dict[str, Any]],
+    latest: dict[str, Any],
+    chart_candles: list[dict[str, Any]] | None = None,
+) -> str:
+    points = _candle_points(chart_candles or [])
+    if len(points) < 2:
+        points = _history_points(history)
     if len(points) < 2:
         return (
             f'<div class="price-chart-empty" {MARKER}>'
@@ -58,8 +66,7 @@ def _chart(history: list[dict[str, Any]], latest: dict[str, Any]) -> str:
 
     contract = latest.get("next_candle_forecast")
     if not isinstance(contract, dict):
-        contract = points[-1]["item"].get("next_candle_forecast")
-    contract = contract if isinstance(contract, dict) else {}
+        contract = {}
 
     prices = [point["price"] for point in points]
     range_low = _number(contract.get("likely_close_low"))
@@ -134,25 +141,14 @@ def _chart(history: list[dict[str, Any]], latest: dict[str, Any]) -> str:
             f'class="chart-x-label{mobile_hide}">{_time_label(timestamp, index == 4)}</text>'
         )
 
-    outcome_candidates = [
-        point
-        for point in points
-        if str(point["item"].get("direction_result") or "")
-        in {"DIRECTION_CORRECT", "DIRECTION_WRONG"}
-    ][-MAX_OUTCOME_MARKERS:]
+    price_by_time = {point["time"]: point["price"] for point in points}
     outcomes: list[str] = []
-    for point in outcome_candidates:
-        x, y = xy(point["time"], point["price"])
-        result = str(point["item"].get("direction_result"))
-        css_class = "correct" if result == "DIRECTION_CORRECT" else "wrong"
-        direction = str(
-            (point["item"].get("next_candle_forecast") or {}).get("direction")
-            if isinstance(point["item"].get("next_candle_forecast"), dict)
-            else ""
-        ).upper()
+    for outcome in _outcome_points(history, price_by_time, start, last_time):
+        x, y = xy(outcome["time"], outcome["price"])
+        css_class = outcome["class"]
         title = html.escape(
-            f"{_time_label(point['time'], False)} · Forecast {direction or '—'} · "
-            f"{'Correct' if css_class == 'correct' else 'Wrong'} · ${point['price']:,.2f}"
+            f"{_time_label(outcome['time'], False)} · Forecast {outcome['direction']} · "
+            f"{outcome['label']} · ${outcome['price']:,.2f}"
         )
         outcomes.append(
             f'<g class="outcome-marker {css_class}"><title>{title}</title>'
@@ -196,7 +192,7 @@ def _chart(history: list[dict[str, Any]], latest: dict[str, Any]) -> str:
     gap_legend = '<span class="legend-gap">⋯ Data gap</span>' if has_gaps else ""
     return f'''
 <div class="price-chart-shell" {MARKER}>
-  <svg class="chart price-chart-v2" viewBox="0 0 {int(width)} {int(height)}" role="img" aria-label="BTC closed-candle price path with breaks for missing records and a calibrated next-candle range">
+  <svg class="chart price-chart-v2" viewBox="0 0 {int(width)} {int(height)}" role="img" aria-label="Recent BTC closed-candle price path with a calibrated next-candle range">
     <defs>
       <linearGradient id="priceAreaGradient" x1="0" y1="0" x2="0" y2="1">
         <stop offset="0%" class="price-area-stop top"/>
@@ -221,7 +217,20 @@ def _chart(history: list[dict[str, Any]], latest: dict[str, Any]) -> str:
 </div>'''
 
 
-def _points(history: list[dict[str, Any]]) -> list[dict[str, Any]]:
+def _candle_points(candles: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    keyed: dict[pd.Timestamp, dict[str, Any]] = {}
+    for item in candles[-MAX_POINTS * 2 :]:
+        if not isinstance(item, dict):
+            continue
+        timestamp = _timestamp(item.get("open_time"))
+        close = _number(item.get("close"))
+        if timestamp is None or close is None:
+            continue
+        keyed[timestamp] = {"time": timestamp, "price": close}
+    return [keyed[key] for key in sorted(keyed)][-MAX_POINTS:]
+
+
+def _history_points(history: list[dict[str, Any]]) -> list[dict[str, Any]]:
     keyed: dict[pd.Timestamp, dict[str, Any]] = {}
     for item in history[-MAX_POINTS * 2 :]:
         if not isinstance(item, dict):
@@ -230,8 +239,47 @@ def _points(history: list[dict[str, Any]]) -> list[dict[str, Any]]:
         timestamp = _timestamp(item.get("candle_time") or item.get("run_finished_at"))
         if price is None or timestamp is None:
             continue
-        keyed[timestamp] = {"time": timestamp, "price": price, "item": item}
+        keyed[timestamp] = {"time": timestamp, "price": price}
     return [keyed[key] for key in sorted(keyed)][-MAX_POINTS:]
+
+
+def _outcome_points(
+    history: list[dict[str, Any]],
+    price_by_time: dict[pd.Timestamp, float],
+    start: pd.Timestamp,
+    end: pd.Timestamp,
+) -> list[dict[str, Any]]:
+    output: list[dict[str, Any]] = []
+    for item in history:
+        if not isinstance(item, dict):
+            continue
+        result = str(item.get("direction_result") or "")
+        if result not in {"DIRECTION_CORRECT", "DIRECTION_WRONG"}:
+            continue
+        timestamp = _timestamp(item.get("candle_time") or item.get("run_finished_at"))
+        if timestamp is None or not (start <= timestamp <= end):
+            continue
+        price = price_by_time.get(timestamp)
+        if price is None:
+            price = _number(item.get("price"))
+        if price is None:
+            continue
+        contract = item.get("next_candle_forecast")
+        direction = (
+            str(contract.get("direction") or "—").upper()
+            if isinstance(contract, dict)
+            else "—"
+        )
+        output.append(
+            {
+                "time": timestamp,
+                "price": price,
+                "direction": direction,
+                "class": "correct" if result == "DIRECTION_CORRECT" else "wrong",
+                "label": "Correct" if result == "DIRECTION_CORRECT" else "Wrong",
+            }
+        )
+    return output[-MAX_OUTCOME_MARKERS:]
 
 
 def _segments(points: list[dict[str, Any]]) -> tuple[list[list[dict[str, Any]]], bool]:
@@ -251,8 +299,6 @@ def _styles() -> str:
     return r'''
 :root{
   --chart-price:#5f8f86;
-  --chart-fill-top:rgba(95,143,134,.13);
-  --chart-fill-bottom:rgba(95,143,134,0);
   --chart-grid:rgba(41,56,52,.075);
   --chart-label:rgba(54,70,66,.58);
   --chart-correct:#5f9e87;
@@ -263,8 +309,6 @@ def _styles() -> str:
 }
 :root[data-theme="dark"]{
   --chart-price:#8fc9bb;
-  --chart-fill-top:rgba(143,201,187,.17);
-  --chart-fill-bottom:rgba(143,201,187,0);
   --chart-grid:rgba(230,240,236,.085);
   --chart-label:rgba(226,239,234,.58);
   --chart-correct:#86cbb4;
@@ -286,7 +330,6 @@ def _styles() -> str:
 .forecast-band{fill:var(--chart-range);stroke:var(--chart-range-border);stroke-width:1.2;vector-effect:non-scaling-stroke}.forecast-band-label{fill:var(--chart-range-text);font-size:9px;font-weight:800;letter-spacing:.04em}.forecast-price-label{fill:var(--chart-range-text);font-size:9px;font-weight:700}
 .chart-legend{display:flex;align-items:center;flex-wrap:wrap;gap:10px 18px;margin-top:8px;color:var(--muted);font-size:12px}.chart-legend span{display:inline-flex;align-items:center;gap:7px}.legend-dot{width:8px!important;height:8px!important;border-radius:50%!important}.legend-dot.correct{background:var(--chart-correct)!important}.legend-dot.wrong{background:var(--chart-wrong)!important}.legend-range{width:18px!important;height:8px!important;border-radius:4px!important;background:var(--chart-range)!important;border:1px solid var(--chart-range-border)}.legend-gap{letter-spacing:.01em}
 .price-chart-empty{padding:54px 16px;text-align:center;color:var(--muted);border:1px dashed var(--line);border-radius:18px}
-/* Give the compact controls a little breathing room without enlarging the header. */
 .health-badge{padding:10px 12px!important}
 .theme-toggle{padding:9px 13px 9px 10px!important;min-height:46px!important}
 @media(max-width:620px){
@@ -299,7 +342,6 @@ def _styles() -> str:
   .health-badge{padding:10px 12px!important}
   .theme-toggle{padding:9px 12px!important}
 }
-@media(prefers-reduced-motion:reduce){.latest-ring{animation:none}}
 '''
 
 
