@@ -1,5 +1,5 @@
 name: Hourly BTC forecast
-run-name: Hourly BTC forecast · manual
+run-name: Hourly BTC forecast · ${{ github.event_name }}
 
 on:
   workflow_dispatch:
@@ -9,6 +9,8 @@ on:
         required: true
         default: false
         type: boolean
+  schedule:
+    - cron: "12 * * * *"
 
 permissions:
   contents: write
@@ -107,7 +109,7 @@ jobs:
             --github-output "$GITHUB_OUTPUT"
 
       - name: Request on-demand retraining when allowed and needed
-        if: inputs.allow_retrain && steps.retrain_policy.outputs.required == 'true'
+        if: github.event_name == 'workflow_dispatch' && inputs.allow_retrain && steps.retrain_policy.outputs.required == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
           RETRAIN_REASON: ${{ steps.retrain_policy.outputs.reason }}
