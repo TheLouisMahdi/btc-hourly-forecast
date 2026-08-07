@@ -1,8 +1,9 @@
 from __future__ import annotations
 
+import json
 import logging
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any, Callable, Iterable
 
 from .config import load_settings
 from .meta_filter import (
@@ -77,6 +78,16 @@ def install_trade_assistant_runtime() -> None:
         else:
             assessment = meta.assess(record, patterns)
 
+        live_assessment = _assess_live_position_pattern(record)
+        if live_assessment is not None:
+            assessment["live_candle_memory"] = live_assessment
+            if (
+                live_assessment.get("bad_pattern", False)
+                and assessment.get("selected", False)
+            ):
+                assessment["selected"] = False
+                assessment["reason"] = "KNOWN_BAD_1H_CANDLE_PATTERN"
+
         gated, blockers = apply_precision_gate(
             record,
             candidate,
@@ -119,12 +130,7 @@ def install_trade_assistant_runtime() -> None:
         live = _live_memory()
         if live is not None:
             try:
-                causal_history = [
-                    item
-                    for item in history
-                    if bool(item.get("candle_context_complete", False))
-                ]
-                live.synchronize(causal_history)
+                _synchronize_live_memory(live, history)
                 live_assessment = live.assess(
                     record,
                     direction=raw_direction,
@@ -175,6 +181,46 @@ def install_trade_assistant_runtime() -> None:
     runtime_module.CanonicalAdaptiveTradeEngine.enrich_trade_plan = assistant_enrich
     runtime_module.build_strict_next_candle_forecast = assistant_strict_forecast
     _INSTALLED = True
+
+
+def _assess_live_position_pattern(
+    record: dict[str, Any],
+) -> dict[str, Any] | None:
+    live = _live_memory()
+    if live is None:
+        return None
+    try:
+        _synchronize_live_memory(live, _history_from_state())
+        base = record.get("base_model")
+        base = base if isinstance(base, dict) else {}
+        p1 = _mapping_value(base.get("probabilities"), 1, 0.5)
+        direction = "UP" if p1 >= 0.5 else "DOWN"
+        return live.assess(record, direction=direction)
+    except Exception:
+        LOGGER.exception("Position live-pattern assessment failed")
+        return None
+
+
+def _synchronize_live_memory(
+    live: LiveCandlePatternMemory,
+    history: Iterable[dict[str, Any]],
+) -> None:
+    causal_history = [
+        item
+        for item in history
+        if isinstance(item, dict)
+        and bool(item.get("candle_context_complete", False))
+    ]
+    live.synchronize(causal_history)
+
+
+def _history_from_state() -> list[dict[str, Any]]:
+    path = Path.cwd() / ".github_state" / "history.json"
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except Exception:
+        return []
+    return [item for item in payload if isinstance(item, dict)] if isinstance(payload, list) else []
 
 
 def _align_meta_probabilities(
