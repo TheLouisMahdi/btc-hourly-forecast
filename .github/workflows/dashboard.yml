@@ -1,9 +1,14 @@
 # Visual, uncertainty, resilience, trade-assistant and elegant chart contracts are verified before deployment.
 name: Deploy BTC dashboard
-run-name: Deploy BTC dashboard · manual
+run-name: Deploy BTC dashboard · ${{ github.event_name }}
 
 on:
   workflow_dispatch:
+  workflow_run:
+    workflows:
+      - Hourly BTC forecast
+    types:
+      - completed
 
 permissions:
   contents: read
@@ -16,6 +21,7 @@ concurrency:
 
 jobs:
   render-and-deploy:
+    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
     runs-on: ubuntu-latest
     timeout-minutes: 20
     environment:
