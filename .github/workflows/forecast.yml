@@ -82,7 +82,9 @@ jobs:
             done
           fi
 
-      - name: Run canonical adaptive target-stop cycle
+      - name: Run canonical trade-assistant cycle
+        env:
+          BTC_TRADE_ASSISTANT_RUNTIME: "1"
         run: python scripts/github_hourly_forecast.py
 
       - name: Export recent closed candles for dashboard chart
