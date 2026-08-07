@@ -51,11 +51,13 @@ jobs:
             git show origin/forecast-state:latest.json > .github_state/latest.json 2>/dev/null || printf '{}\n' > .github_state/latest.json
             git show origin/forecast-state:trades.json > .github_state/trades.json 2>/dev/null || printf '[]\n' > .github_state/trades.json
             git show origin/forecast-state:retrain_control.json > .github_state/retrain_control.json 2>/dev/null || printf '{}\n' > .github_state/retrain_control.json
+            git show origin/forecast-state:chart_candles.json > .github_state/chart_candles.json 2>/dev/null || printf '[]\n' > .github_state/chart_candles.json
           else
             printf '[]\n' > .github_state/history.json
             printf '{}\n' > .github_state/latest.json
             printf '[]\n' > .github_state/trades.json
             printf '{}\n' > .github_state/retrain_control.json
+            printf '[]\n' > .github_state/chart_candles.json
           fi
 
       - name: Restore batch champion and negative memory
@@ -82,6 +84,13 @@ jobs:
 
       - name: Run canonical adaptive target-stop cycle
         run: python scripts/github_hourly_forecast.py
+
+      - name: Export recent closed candles for dashboard chart
+        run: |
+          python scripts/export_chart_candles.py \
+            --runtime-dir .github_runtime/hourly \
+            --state-dir .github_state \
+            --hours 168
 
       - name: Resolve secondary next-candle outcomes
         run: python scripts/github_dashboard.py

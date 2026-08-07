@@ -5,6 +5,7 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
+import github_chart_dashboard
 import github_pages_dashboard
 import github_resilience_dashboard
 import github_uncertainty_dashboard
@@ -23,6 +24,7 @@ def main() -> int:
         github_visual_dashboard,
         github_uncertainty_dashboard,
         github_resilience_dashboard,
+        github_chart_dashboard,
     ):
         status = component.main()
         if status != 0:
