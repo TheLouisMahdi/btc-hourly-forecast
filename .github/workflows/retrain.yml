@@ -55,7 +55,7 @@ jobs:
           mkdir -p incumbent-model-state
           if git ls-remote --exit-code --heads origin model-state >/dev/null 2>&1; then
             git fetch origin model-state --depth=1
-            for file in latest.joblib latest_training_report.json latest_metrics.csv economic_validation.json model_metadata.json negative_memory.joblib negative_memory_report.json; do
+            for file in latest.joblib latest_training_report.json latest_metrics.csv economic_validation.json model_metadata.json negative_memory.joblib negative_memory_report.json trade_assistant_meta.joblib trade_assistant_patterns.joblib trade_assistant_meta_report.json trade_assistant_pattern_report.json; do
               git show "origin/model-state:$file" > "incumbent-model-state/$file" 2>/dev/null || true
             done
           fi
@@ -68,7 +68,7 @@ jobs:
         run: |
           set +e
           mkdir -p training-diagnostics-output
-          python scripts/github_weekly_retrain.py \
+          python scripts/github_retrain_assistant.py \
             --incumbent-dir incumbent-model-state \
             > training-diagnostics-output/training.log 2>&1
           retrain_exit=$?
@@ -93,6 +93,8 @@ jobs:
           cp model-state-output/economic_validation.json training-diagnostics-output/ 2>/dev/null || true
           cp model-state-output/model_metadata.json training-diagnostics-output/ 2>/dev/null || true
           cp model-state-output/candidate_negative_memory_report.json training-diagnostics-output/ 2>/dev/null || true
+          cp model-state-output/candidate_trade_assistant_meta_report.json training-diagnostics-output/ 2>/dev/null || true
+          cp model-state-output/candidate_trade_assistant_pattern_report.json training-diagnostics-output/ 2>/dev/null || true
           RETRAIN_EXIT="$retrain_exit" STATUS="$status" PROMOTION="$promotion" python - <<'PY'
           import json
           import os
@@ -129,7 +131,7 @@ jobs:
           cat training-diagnostics-output/training.log
           exit 1
 
-      - name: Publish promoted champion and negative memory
+      - name: Publish promoted champion and assistant artifacts
         if: >-
           steps.retraining.outputs.status == 'PASS' &&
           steps.retraining.outputs.promotion == 'PROMOTE'
@@ -142,5 +144,5 @@ jobs:
           steps.retraining.outputs.status == 'PASS' &&
           steps.retraining.outputs.promotion != 'PROMOTE'
         run: |
-          echo "Challenger did not jointly pass the economic and sandwiched negative-memory promotion gates."
+          echo "Challenger did not jointly pass the economic, negative-memory and precision-meta promotion gates."
           cat model-state-output/promotion.json

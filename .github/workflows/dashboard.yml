@@ -1,4 +1,4 @@
-# Visual, uncertainty, resilience and elegant chart contracts are verified before deployment.
+# Visual, uncertainty, resilience, trade-assistant and elegant chart contracts are verified before deployment.
 name: Deploy BTC dashboard
 run-name: Deploy BTC dashboard · manual
 
@@ -77,6 +77,9 @@ jobs:
               'Likely next-close range',
               'no exact close is published',
               'Data continuity &amp; learning safety',
+              'class="panel trade-assistant-panel"',
+              'Primary forecast · secondary position contract',
+              'Position entries are precision-gated',
               'class="price-line"',
               'Forecast range',
           )

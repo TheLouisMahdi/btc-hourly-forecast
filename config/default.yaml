@@ -1,6 +1,6 @@
 project:
   name: BTC Adaptive Target-Stop Trader
-  version: 5.5.0
+  version: 5.6.0
   timezone: UTC
 
 paths:
@@ -276,6 +276,34 @@ negative_memory:
   front_memory_minimum_count: 2
   front_memory_bad_rate: 0.80
   bloom_false_positive_rate: 0.005
+
+trade_assistant:
+  enabled: true
+  mode: PRECISION_FIRST_META_LABELING
+  require_qualified_meta_for_position: true
+  minimum_meta_samples: 600
+  minimum_meta_calibration_selected: 20
+  minimum_meta_holdout_selected: 12
+  minimum_meta_holdout_precision: 0.55
+  maximum_meta_holdout_fake_rate: 0.35
+  minimum_meta_holdout_mean_net_return: 0.0
+  fallback_minimum_take_probability: 0.72
+  fallback_maximum_false_probability: 0.30
+  learning_rate: 0.035
+  max_iter: 180
+  max_leaf_nodes: 9
+  min_samples_leaf: 35
+  l2_regularization: 5.0
+  random_state: 20260807
+  static_pattern_minimum_count: 2
+  static_pattern_bad_rate: 0.75
+  live_pattern_minimum_count: 3
+  live_pattern_bad_rate: 0.67
+  bloom_false_positive_rate: 0.005
+  static_forecast_penalty_gain: 0.25
+  live_forecast_penalty_gain: 0.30
+  maximum_static_forecast_penalty: 0.08
+  maximum_live_forecast_penalty: 0.10
 
 trade_lifecycle:
   enabled: true

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import math
+import os
 import shutil
 from pathlib import Path
 from typing import Any
@@ -84,7 +85,17 @@ def build_github_settings(
         yaml.safe_dump(values, sort_keys=False),
         encoding="utf-8",
     )
-    return load_settings(config_path)
+    settings = load_settings(config_path)
+
+    # The overlay is opt-in so tests, training and maintenance helpers can use
+    # GitHub paths without mutating runtime classes in their Python process.
+    if os.environ.get("BTC_TRADE_ASSISTANT_RUNTIME") == "1":
+        from btc_ema_trader.trade_assistant_bootstrap import (
+            install_trade_assistant_runtime,
+        )
+
+        install_trade_assistant_runtime()
+    return settings
 
 
 def copy_latest_model_from_state(

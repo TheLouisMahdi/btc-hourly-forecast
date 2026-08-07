@@ -40,6 +40,11 @@ class DashboardOrchestratorTests(unittest.TestCase):
                 side_effect=lambda: calls.append("resilience") or 0,
             ),
             patch.object(
+                render_dashboard.github_assistant_dashboard,
+                "main",
+                side_effect=lambda: calls.append("assistant") or 0,
+            ),
+            patch.object(
                 render_dashboard.github_chart_dashboard,
                 "main",
                 side_effect=lambda: calls.append("chart") or 0,
@@ -59,6 +64,7 @@ class DashboardOrchestratorTests(unittest.TestCase):
                 "visual",
                 "uncertainty",
                 "resilience",
+                "assistant",
                 "chart",
                 "contract",
             ],
@@ -87,6 +93,11 @@ class DashboardOrchestratorTests(unittest.TestCase):
                 render_dashboard.github_resilience_dashboard,
                 "main",
                 side_effect=lambda: calls.append("resilience") or 0,
+            ),
+            patch.object(
+                render_dashboard.github_assistant_dashboard,
+                "main",
+                side_effect=lambda: calls.append("assistant") or 0,
             ),
             patch.object(
                 render_dashboard.github_chart_dashboard,

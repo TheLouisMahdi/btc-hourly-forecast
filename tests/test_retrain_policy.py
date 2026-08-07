@@ -42,6 +42,22 @@ class RetrainPolicyTests(unittest.TestCase):
         self.assertFalse(decision["required"])
         self.assertEqual(decision["status"], "IDLE")
 
+    def test_missing_trade_assistant_artifact_requests_challenger(self) -> None:
+        model_metadata = metadata("2026-08-04T00:00:00Z")
+        model_metadata["trade_assistant_artifact_ready"] = False
+        decision = evaluate_policy(
+            fresh_latest(),
+            {"metrics": {"samples": 504}},
+            model_metadata,
+            {},
+            now=NOW,
+        )
+        self.assertTrue(decision["required"])
+        self.assertEqual(
+            decision["reason"],
+            "TRADE_ASSISTANT_ARTIFACT_MISSING",
+        )
+
     def test_old_model_requests_retraining(self) -> None:
         decision = evaluate_policy(
             fresh_latest(),
