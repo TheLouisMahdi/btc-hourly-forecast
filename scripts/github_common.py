@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import math
+import os
 import shutil
 from pathlib import Path
 from typing import Any
@@ -86,14 +87,14 @@ def build_github_settings(
     )
     settings = load_settings(config_path)
 
-    # Runtime-only overlay. It leaves the serialized champion untouched and
-    # installs the precision meta gate, cross-layer pattern memory and
-    # horizon-aligned exit policy only for GitHub execution.
-    from btc_ema_trader.trade_assistant_bootstrap import (
-        install_trade_assistant_runtime,
-    )
+    # The overlay is opt-in so tests, training and maintenance helpers can use
+    # GitHub paths without mutating runtime classes in their Python process.
+    if os.environ.get("BTC_TRADE_ASSISTANT_RUNTIME") == "1":
+        from btc_ema_trader.trade_assistant_bootstrap import (
+            install_trade_assistant_runtime,
+        )
 
-    install_trade_assistant_runtime()
+        install_trade_assistant_runtime()
     return settings
 
 
