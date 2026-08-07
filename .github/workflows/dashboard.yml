@@ -1,4 +1,4 @@
-# Visual, uncertainty and data-resilience contracts are verified before deployment.
+# Visual, uncertainty, resilience and elegant chart contracts are verified before deployment.
 name: Deploy BTC dashboard
 run-name: Deploy BTC dashboard · manual
 
@@ -66,6 +66,7 @@ jobs:
               'data-market-ambience="v2"',
               'data-uncertainty-display="range-only-v1"',
               'data-resilience-dashboard="v1"',
+              'data-elegant-chart="v2"',
               'id="themeToggle"',
               'class="ambient-coin coin-btc"',
               'class="ambient-coin coin-eth"',
@@ -74,12 +75,14 @@ jobs:
               'Likely next-close range',
               'no exact close is published',
               'Data continuity &amp; learning safety',
-              'Missing workflow record; not interpolated',
+              'class="price-line"',
+              'Forecast range',
           )
           missing = [marker for marker in required if marker not in document]
           forbidden = (
               'Model-estimated next close',
               '<th>Expected close</th>',
+              'gap-line',
           )
           present_forbidden = [marker for marker in forbidden if marker in document]
           if missing or present_forbidden:
