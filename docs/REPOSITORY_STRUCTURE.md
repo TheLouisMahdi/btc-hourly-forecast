@@ -4,10 +4,10 @@ The repository keeps product logic in the installable package and limits root-le
 
 ```text
 .
-├── .github/workflows/       # Manual operational workflows only
-│   ├── quality.yml          # Tests and compile validation
-│   ├── forecast.yml         # One forecast/trade-assistant cycle
-│   ├── dashboard.yml        # Render and deploy GitHub Pages
+├── .github/workflows/       # Small operational workflows
+│   ├── quality.yml          # Manual tests and compile validation
+│   ├── forecast.yml         # Hourly forecast/trade-assistant cycle + manual run
+│   ├── dashboard.yml        # Manual render and deploy of GitHub Pages
 │   └── retrain.yml          # Heavy challenger training on demand
 ├── config/
 │   └── default.yaml         # Canonical strategy and runtime configuration
@@ -24,7 +24,7 @@ The repository keeps product logic in the installable package and limits root-le
 - `src/btc_ema_trader/` owns forecasting, feature engineering, market data, risk, trade lifecycle, pattern memory, precision meta filtering and model behavior.
 - `config/default.yaml` is the only source of strategy and trade-assistant parameters.
 - `scripts/` adapts package logic to GitHub Actions; it must not redefine model or risk formulas.
-- `.github/workflows/` contains orchestration only. Every workflow is manual while maintenance mode is active.
+- `.github/workflows/` contains orchestration only. `forecast.yml` is the only scheduled workflow and runs every hour at minute 12 UTC; quality, dashboard and retraining remain manual/on-demand.
 - Generated models, reports and live state are stored on dedicated state branches, not on `main`.
 
 ## Trade-assistant layers
@@ -49,10 +49,16 @@ See `docs/TRADE_ASSISTANT_ARCHITECTURE.md` for the full data, qualification and 
 
 ## Canonical operations
 
-Run workflows in this order after a maintenance change:
+Normal operation:
+
+1. `Hourly BTC forecast` runs automatically at `HH:12 UTC` and fetches fresh closed-market data before producing the new cycle.
+2. `Deploy BTC dashboard` remains manual unless deployment policy is changed separately.
+3. `On-demand BTC model retraining` remains manual/policy-gated and is never dispatched by the scheduled hourly run.
+
+After a maintenance change, run:
 
 1. `Repository quality`
-2. `Hourly BTC forecast` with `allow_retrain=false`
+2. `Hourly BTC forecast` manually with `allow_retrain=false`
 3. `Deploy BTC dashboard`
 4. `On-demand BTC model retraining` only when the retraining policy or a deliberate manual review requires it
 
