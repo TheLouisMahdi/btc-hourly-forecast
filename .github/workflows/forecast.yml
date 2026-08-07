@@ -60,13 +60,13 @@ jobs:
             printf '[]\n' > .github_state/chart_candles.json
           fi
 
-      - name: Restore batch champion and negative memory
+      - name: Restore batch champion, memories and trade assistant
         shell: bash
         run: |
           mkdir -p .model_state
           if git ls-remote --exit-code --heads origin model-state >/dev/null 2>&1; then
             git fetch origin model-state --depth=1
-            for file in latest.joblib latest_training_report.json latest_metrics.csv model_metadata.json negative_memory.joblib negative_memory_report.json; do
+            for file in latest.joblib latest_training_report.json latest_metrics.csv model_metadata.json negative_memory.joblib negative_memory_report.json trade_assistant_meta.joblib trade_assistant_patterns.joblib trade_assistant_meta_report.json trade_assistant_pattern_report.json; do
               git show "origin/model-state:${file}" > ".model_state/${file}" 2>/dev/null || rm -f ".model_state/${file}"
             done
           fi
@@ -77,7 +77,7 @@ jobs:
           mkdir -p .adaptive_state
           if git ls-remote --exit-code --heads origin adaptive-state >/dev/null 2>&1; then
             git fetch origin adaptive-state --depth=1
-            for file in adaptive_state.joblib price_adaptive_state.joblib trade_adaptive_state.joblib summary.json price_summary.json trade_summary.json; do
+            for file in adaptive_state.joblib price_adaptive_state.joblib trade_adaptive_state.joblib candle_pattern_memory.joblib summary.json price_summary.json trade_summary.json; do
               git show "origin/adaptive-state:${file}" > ".adaptive_state/${file}" 2>/dev/null || rm -f ".adaptive_state/${file}"
             done
           fi
