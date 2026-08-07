@@ -116,6 +116,10 @@ def main() -> int:
             oof,
             settings,
         )
+        joint_heads = _joint_qualified_heads(candidate_report, meta_report)
+        meta_report["joint_qualified_heads"] = joint_heads
+        meta_report["joint_qualified_count"] = len(joint_heads)
+        meta_report["joint_passed"] = bool(joint_heads)
         pattern_report["market_data_segmentation"] = segmentation
 
         runtime_pattern = runtime_dir / "trade_assistant_patterns.joblib"
@@ -152,12 +156,13 @@ def main() -> int:
         decision = str(
             promotion.get("decision") or "KEEP_INCUMBENT"
         ).upper()
-        assistant_passed = bool(meta_report.get("passed", False))
+        assistant_passed = bool(joint_heads)
         if decision == "PROMOTE" and not assistant_passed:
             promotion["decision"] = "KEEP_INCUMBENT"
             promotion["reason"] = (
-                "Candidate model passed prior gates but no precision meta "
-                "head passed the locked holdout gate"
+                "Candidate model passed prior gates but no identical "
+                "direction/horizon passed both base qualification and the "
+                "locked precision meta gate"
             )
         elif decision == "PROMOTE":
             shutil.copy2(
@@ -181,6 +186,7 @@ def main() -> int:
         promotion["trade_assistant_qualified_heads"] = int(
             meta_report.get("qualified_heads", 0)
         )
+        promotion["trade_assistant_joint_heads"] = joint_heads
         write_json(promotion_path, promotion)
         _patch_metadata(
             output_dir / "model_metadata.json",
@@ -212,6 +218,34 @@ def main() -> int:
             },
         )
     return 0
+
+
+def _joint_qualified_heads(
+    candidate_report: dict[str, Any],
+    meta_report: dict[str, Any],
+) -> list[str]:
+    qualification = candidate_report.get("qualification")
+    qualification = qualification if isinstance(qualification, dict) else {}
+    base = qualification.get("qualified_directions")
+    base = base if isinstance(base, dict) else {}
+    meta_heads = meta_report.get("heads")
+    meta_heads = meta_heads if isinstance(meta_heads, dict) else {}
+    joint: list[str] = []
+    for name in ("LONG", "SHORT"):
+        raw_horizons = base.get(name, [])
+        try:
+            horizons = {int(value) for value in raw_horizons}
+        except (TypeError, ValueError):
+            horizons = set()
+        direction_heads = meta_heads.get(name)
+        direction_heads = (
+            direction_heads if isinstance(direction_heads, dict) else {}
+        )
+        for horizon in sorted(horizons):
+            item = direction_heads.get(str(horizon), direction_heads.get(horizon))
+            if isinstance(item, dict) and bool(item.get("qualified", False)):
+                joint.append(f"{name}_H{horizon}")
+    return joint
 
 
 def _lock_exit_profiles_before_meta_holdout(
