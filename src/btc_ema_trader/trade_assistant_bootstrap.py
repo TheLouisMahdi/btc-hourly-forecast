@@ -84,6 +84,7 @@ def install_trade_assistant_runtime() -> None:
             self.settings,
         )
         if not blockers and gated.get("position_quality_status") == "META_QUALIFIED":
+            gated = _align_meta_probabilities(gated, assessment)
             gated = apply_risk_scaled_economics(gated, self.settings)
         record["trade_assistant"] = assessment
         if blockers:
@@ -176,6 +177,28 @@ def install_trade_assistant_runtime() -> None:
     _INSTALLED = True
 
 
+def _align_meta_probabilities(
+    plan: dict[str, Any],
+    assessment: dict[str, Any],
+) -> dict[str, Any]:
+    """Align target/stop economics with the meta labels used by the exit profile."""
+    output = dict(plan)
+    p_target = max(0.0, min(0.98, _number(assessment.get("p_take"), 0.5)))
+    p_stop = max(0.0, min(0.98, _number(assessment.get("p_false"), 0.4)))
+    total = p_target + p_stop
+    if total > 0.95:
+        scale = 0.95 / total
+        p_target *= scale
+        p_stop *= scale
+    output["adaptive_target_probability"] = float(p_target)
+    output["adaptive_stop_probability"] = float(p_stop)
+    output["adaptive_expiry_probability"] = float(
+        max(0.0, 1.0 - p_target - p_stop)
+    )
+    output["probability_source"] = "PRECISION_META_TAKE_AND_FALSE_HEADS"
+    return output
+
+
 def _artifacts_for_record(record: dict[str, Any]):
     root = Path.cwd()
     model_id = str(record.get("model_id") or "")
@@ -243,7 +266,14 @@ def _mapping_value(value: Any, key: int, default: float) -> float:
     if not isinstance(value, dict):
         return float(default)
     raw = value.get(key, value.get(str(key), default))
+    return _number(raw, default)
+
+
+def _number(value: Any, default: float = 0.0) -> float:
     try:
-        return float(raw)
+        number = float(value)
     except (TypeError, ValueError):
         return float(default)
+    if number != number or abs(number) == float("inf"):
+        return float(default)
+    return number
