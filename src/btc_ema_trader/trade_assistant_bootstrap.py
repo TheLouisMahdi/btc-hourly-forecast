@@ -14,6 +14,7 @@ from .pattern_memory import (
     adjust_forecast_with_pattern_memory,
     load_static_pattern_bundle,
 )
+from .risk_economics import apply_risk_scaled_economics
 
 LOGGER = logging.getLogger(__name__)
 _INSTALLED = False
@@ -82,6 +83,8 @@ def install_trade_assistant_runtime() -> None:
             assessment,
             self.settings,
         )
+        if not blockers and gated.get("position_quality_status") == "META_QUALIFIED":
+            gated = apply_risk_scaled_economics(gated, self.settings)
         record["trade_assistant"] = assessment
         if blockers:
             record["candidate_action_before_meta_gate"] = action
@@ -115,7 +118,12 @@ def install_trade_assistant_runtime() -> None:
         live = _live_memory()
         if live is not None:
             try:
-                live.synchronize(history)
+                causal_history = [
+                    item
+                    for item in history
+                    if bool(item.get("candle_context_complete", False))
+                ]
+                live.synchronize(causal_history)
                 live_assessment = live.assess(
                     record,
                     direction=raw_direction,
