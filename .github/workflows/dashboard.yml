@@ -77,7 +77,7 @@ jobs:
               'Likely next-close range',
               'no exact close is published',
               'Data continuity &amp; learning safety',
-              'class="trade-assistant-panel"',
+              'class="panel trade-assistant-panel"',
               'Primary forecast · secondary position contract',
               'Position entries are precision-gated',
               'class="price-line"',
