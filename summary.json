@@ -1,0 +1,67 @@
+{
+  "schema_version": 1,
+  "status": "DISABLED",
+  "champion_model_id": "directional-breakout-hourly-20260804T091016Z-fc3a2f87",
+  "active_horizons": [],
+  "suspended_horizons": [],
+  "last_trained_open_time": {
+    "1": null,
+    "3": null,
+    "6": null,
+    "12": null
+  },
+  "rebase_count": 0,
+  "created_at": "2026-08-08T20:44:36.015831+00:00",
+  "updated_at": "2026-08-08T20:44:36.015831+00:00",
+  "feature_count": 22,
+  "metrics": {
+    "1": {
+      "direction_samples": 0,
+      "event_samples": 0,
+      "base_direction_brier": null,
+      "online_direction_brier": null,
+      "base_direction_accuracy": null,
+      "online_direction_accuracy": null,
+      "base_event_brier": null,
+      "online_event_brier": null,
+      "base_return_mae": null,
+      "online_return_mae": null
+    },
+    "3": {
+      "direction_samples": 0,
+      "event_samples": 0,
+      "base_direction_brier": null,
+      "online_direction_brier": null,
+      "base_direction_accuracy": null,
+      "online_direction_accuracy": null,
+      "base_event_brier": null,
+      "online_event_brier": null,
+      "base_return_mae": null,
+      "online_return_mae": null
+    },
+    "6": {
+      "direction_samples": 0,
+      "event_samples": 0,
+      "base_direction_brier": null,
+      "online_direction_brier": null,
+      "base_direction_accuracy": null,
+      "online_direction_accuracy": null,
+      "base_event_brier": null,
+      "online_event_brier": null,
+      "base_return_mae": null,
+      "online_return_mae": null
+    },
+    "12": {
+      "direction_samples": 0,
+      "event_samples": 0,
+      "base_direction_brier": null,
+      "online_direction_brier": null,
+      "base_direction_accuracy": null,
+      "online_direction_accuracy": null,
+      "base_event_brier": null,
+      "online_event_brier": null,
+      "base_return_mae": null,
+      "online_return_mae": null
+    }
+  }
+}
