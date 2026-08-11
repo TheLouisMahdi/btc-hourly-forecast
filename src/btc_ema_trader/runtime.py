@@ -96,6 +96,15 @@ class RuntimeEngine:
                 provider=provider,
                 symbol=bundle.symbol,
             )
+            if candles.empty:
+                raise RuntimeError("No closed candle is available")
+            latest_market_open = _utc(candles["open_time"].max())
+            if latest_market_open.dayofweek > 4:
+                return self._excluded_result(
+                    latest_market_open,
+                    "WEEKEND_EXCLUDED",
+                )
+
             news = self.database.load_news(
                 start=candles["open_time"].min(),
                 end=pd.Timestamp.now(tz="UTC"),
@@ -113,6 +122,20 @@ class RuntimeEngine:
                 raise RuntimeError("No feature row is ready")
             latest_row = usable.iloc[-1]
             candle_open = _utc(latest_row["open_time"])
+            if not bool(latest_row.get("model_sample_eligible", True)):
+                return self._excluded_result(
+                    candle_open,
+                    "LOW_LIQUIDITY_EXCLUDED",
+                    {
+                        "model_dollar_volume": latest_row.get(
+                            "model_dollar_volume"
+                        ),
+                        "model_liquidity_threshold": latest_row.get(
+                            "model_liquidity_threshold"
+                        ),
+                    },
+                )
+
             candle_close = candle_open + pd.Timedelta(hours=1)
             first_eligible = _utc(self.state["first_eligible_close"])
             last_processed = self.state.get("last_processed_open_time")
@@ -243,6 +266,12 @@ class RuntimeEngine:
                 "price": float(latest_row["close"]),
                 "trend_kama": float(latest_row["kama"]),
                 "donchian_mid": float(latest_row["donchian_mid"]),
+                "model_sample_eligible": True,
+                "model_low_liquidity": False,
+                "model_dollar_volume": latest_row.get("model_dollar_volume"),
+                "model_liquidity_threshold": latest_row.get(
+                    "model_liquidity_threshold"
+                ),
                 "event_id": event_id,
                 "event_type": str(
                     latest_row.get("event_type", "NONE")
@@ -389,9 +418,7 @@ class RuntimeEngine:
     ) -> dict[str, Any]:
         self.state.update(
             {
-                "last_cycle": pd.Timestamp.now(
-                    tz="UTC"
-                ).isoformat(),
+                "last_cycle": pd.Timestamp.now(tz="UTC").isoformat(),
                 "status": "WAITING_FOR_NEXT_CLOSED_CANDLE",
             }
         )
@@ -400,6 +427,30 @@ class RuntimeEngine:
             "status": "WAITING_FOR_NEXT_CLOSED_CANDLE",
             "latest_closed_candle": latest_close.isoformat(),
             "first_eligible_close": first_eligible.isoformat(),
+        }
+
+    def _excluded_result(
+        self,
+        candle_open: pd.Timestamp,
+        reason: str,
+        details: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
+        now = pd.Timestamp.now(tz="UTC")
+        self.state.update(
+            {
+                "last_processed_open_time": candle_open.isoformat(),
+                "last_cycle": now.isoformat(),
+                "status": "MODEL_SAMPLE_EXCLUDED",
+                "last_error": None,
+            }
+        )
+        self._save_state(self.state)
+        return {
+            "status": "MODEL_SAMPLE_EXCLUDED",
+            "exclusion_reason": reason,
+            "excluded_open_time": candle_open.isoformat(),
+            "model_sample_eligible": False,
+            **(details or {}),
         }
 
     def _save_state(self, state: dict[str, Any]) -> None:
