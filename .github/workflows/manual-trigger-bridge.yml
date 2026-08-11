@@ -1,3 +1,4 @@
+# Scoped dispatch bridge for explicit operator-requested runs.
 name: Dispatch BTC workflows
 run-name: Dispatch BTC forecast and retraining
 
