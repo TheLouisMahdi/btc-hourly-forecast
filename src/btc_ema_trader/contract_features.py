@@ -19,6 +19,12 @@ from .forecast_contract import attach_close_based_general_labels
 from .market_structure_fast import (
     build_market_structure as build_fast_market_structure,
 )
+from .sample_policy import (
+    apply_model_calendar,
+    attach_sample_policy,
+    invalidate_ineligible_labels,
+    suppress_ineligible_events,
+)
 
 base_features.build_market_structure = build_fast_market_structure
 
@@ -29,17 +35,23 @@ def build_feature_set(
     settings: Settings,
     include_labels: bool = True,
 ) -> FeatureSet:
+    model_candles = apply_model_calendar(candles)
+    if model_candles.empty:
+        raise ValueError("No Monday-Friday UTC candles are available")
+
     base = base_features.build_feature_set(
-        candles,
+        model_candles,
         news,
         settings,
         include_labels=False,
     )
     contextual_frame = attach_causal_candle_context(base.frame)
+    contextual_frame = attach_sample_policy(contextual_frame, settings)
     frame = attach_directional_breakout_candidates(
         contextual_frame,
         settings,
     )
+    frame = suppress_ineligible_events(frame)
     horizons = _configured_horizons(settings, base.horizons)
     if include_labels:
         frame = attach_close_based_general_labels(frame, horizons)
@@ -48,6 +60,7 @@ def build_feature_set(
             settings,
             horizons,
         )
+        frame = invalidate_ineligible_labels(frame, horizons)
 
     label_prefixes = (
         "target_",
@@ -65,6 +78,7 @@ def build_feature_set(
         "event_hold_ratio_",
         "event_target_first_",
         "event_stop_first_",
+        "model_path_eligible_",
     )
     feature_columns = [
         column
