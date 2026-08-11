@@ -42,6 +42,20 @@ market:
   okx_base_url: https://www.okx.com
   okx_instrument: BTC-USDT-SWAP
 
+sample_policy:
+  calendar_timezone: UTC
+  weekdays_only: true
+  excluded_weekdays: [Saturday, Sunday]
+  invalidate_cross_weekend_targets: true
+  low_liquidity:
+    enabled: true
+    volume_source: QUOTE_VOLUME_OR_CLOSE_X_VOLUME
+    eligible_lookback: 480
+    quantile: 0.10
+    current_candle_in_threshold: false
+    previous_eligible_samples_only: true
+    invalidate_horizon_if_path_touches_low_liquidity: true
+
 news:
   enabled: true
   historical_days: 365
