@@ -1,0 +1,128 @@
+{
+  "schema_version": 1,
+  "method": "LOCKED_CHRONOLOGICAL_DEVELOPMENT_HOLDOUT",
+  "development_fraction": 0.7,
+  "economic_stress_cost_bps": 25.0,
+  "qualification": {
+    "passed": false,
+    "qualified_horizons": [],
+    "qualified_directions": {
+      "LONG": [],
+      "SHORT": []
+    },
+    "per_direction": {
+      "LONG": {
+        "3": {
+          "passed": false,
+          "event_samples": 5098,
+          "development_samples": 0,
+          "holdout_samples": 0,
+          "policy": null,
+          "development": null,
+          "holdout": null,
+          "development_objective_bps": null,
+          "holdout_objective_bps": null,
+          "blockers": [
+            "no cost-aware policy produced enough positive development trades"
+          ]
+        },
+        "6": {
+          "passed": false,
+          "event_samples": 5094,
+          "development_samples": 0,
+          "holdout_samples": 0,
+          "policy": null,
+          "development": null,
+          "holdout": null,
+          "development_objective_bps": null,
+          "holdout_objective_bps": null,
+          "blockers": [
+            "no cost-aware policy produced enough positive development trades"
+          ]
+        },
+        "12": {
+          "passed": false,
+          "event_samples": 5088,
+          "development_samples": 0,
+          "holdout_samples": 0,
+          "policy": null,
+          "development": null,
+          "holdout": null,
+          "development_objective_bps": null,
+          "holdout_objective_bps": null,
+          "blockers": [
+            "no cost-aware policy produced enough positive development trades"
+          ]
+        }
+      },
+      "SHORT": {
+        "3": {
+          "passed": false,
+          "event_samples": 4410,
+          "development_samples": 0,
+          "holdout_samples": 0,
+          "policy": null,
+          "development": null,
+          "holdout": null,
+          "development_objective_bps": null,
+          "holdout_objective_bps": null,
+          "blockers": [
+            "no cost-aware policy produced enough positive development trades"
+          ]
+        },
+        "6": {
+          "passed": false,
+          "event_samples": 4408,
+          "development_samples": 0,
+          "holdout_samples": 0,
+          "policy": null,
+          "development": null,
+          "holdout": null,
+          "development_objective_bps": null,
+          "holdout_objective_bps": null,
+          "blockers": [
+            "no cost-aware policy produced enough positive development trades"
+          ]
+        },
+        "12": {
+          "passed": false,
+          "event_samples": 4402,
+          "development_samples": 0,
+          "holdout_samples": 0,
+          "policy": null,
+          "development": null,
+          "holdout": null,
+          "development_objective_bps": null,
+          "holdout_objective_bps": null,
+          "blockers": [
+            "no cost-aware policy produced enough positive development trades"
+          ]
+        }
+      }
+    },
+    "blockers": [
+      "LONG h3: no cost-aware policy produced enough positive development trades",
+      "LONG h6: no cost-aware policy produced enough positive development trades",
+      "LONG h12: no cost-aware policy produced enough positive development trades",
+      "SHORT h3: no cost-aware policy produced enough positive development trades",
+      "SHORT h6: no cost-aware policy produced enough positive development trades",
+      "SHORT h12: no cost-aware policy produced enough positive development trades"
+    ],
+    "economic_policy": {
+      "LONG": {},
+      "SHORT": {}
+    },
+    "economic_stress_cost_bps": 25.0,
+    "economic_validation_version": 1
+  },
+  "aggregate_holdout_objective_bps": null,
+  "passed_pairs": 0,
+  "promotion": {
+    "decision": "KEEP_INCUMBENT",
+    "reason": "Candidate did not pass locked economic holdout gates",
+    "candidate_score_bps": null,
+    "incumbent_score_bps": null
+  },
+  "joint_economic_memory_pairs": [],
+  "joint_economic_memory_gate_passed": false
+}
