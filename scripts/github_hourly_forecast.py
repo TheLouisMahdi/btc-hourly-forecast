@@ -22,6 +22,7 @@ from btc_ema_trader.github_runtime import (
     retain_directional_history,
 )
 from btc_ema_trader.logging_setup import configure_logging
+from btc_ema_trader.market import MarketDataClient
 from btc_ema_trader.model import latest_bundle
 from btc_ema_trader.negative_memory import (
     install_runtime_guard,
@@ -104,6 +105,18 @@ def main() -> int:
     configure_logging(settings, verbose=True)
     database = Database(settings)
     database.initialize()
+
+    display_quote: dict[str, Any] | None = None
+    try:
+        quote = MarketDataClient(settings).live_quote()
+        display_quote = {
+            "provider": quote.provider,
+            "symbol": quote.symbol,
+            "price": float(quote.price),
+            "timestamp": quote.timestamp,
+        }
+    except Exception as exc:
+        LOGGER.warning("Independent display quote unavailable: %s", exc)
 
     memory = None
     memory_error = None
@@ -259,6 +272,12 @@ def main() -> int:
         }
         status = "FAIL_SAFE"
 
+    if display_quote is not None and result.get("price") is None:
+        result["price"] = display_quote["price"]
+        result["display_price_provider"] = display_quote["provider"]
+        result["display_price_symbol"] = display_quote["symbol"]
+        result["display_price_time"] = display_quote["timestamp"]
+
     finished_at = pd.Timestamp.now(tz="UTC")
     fresh_record = json_safe(
         {
@@ -294,6 +313,12 @@ def main() -> int:
             fresh_record,
         )
         history = append_unique(previous_history, record)[-MAX_HISTORY:]
+
+    if display_quote is not None and record.get("price") is None:
+        record["price"] = float(display_quote["price"])
+        record["display_price_provider"] = display_quote["provider"]
+        record["display_price_symbol"] = display_quote["symbol"]
+        record["display_price_time"] = json_safe(display_quote["timestamp"])
 
     trades = trades[-MAX_TRADES:]
     write_json(latest_path, record)
