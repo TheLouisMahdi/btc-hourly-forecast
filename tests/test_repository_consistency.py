@@ -75,7 +75,13 @@ class RepositoryConsistencyTests(unittest.TestCase):
 
     def test_workflow_automation_contract(self) -> None:
         workflow_dir = self.root / ".github" / "workflows"
-        expected = {"quality.yml", "forecast.yml", "dashboard.yml", "retrain.yml"}
+        expected = {
+            "quality.yml",
+            "forecast.yml",
+            "dashboard.yml",
+            "retrain.yml",
+            "manual-trigger-bridge.yml",
+        }
         actual = {path.name for path in workflow_dir.glob("*.yml")}
         self.assertEqual(actual, expected)
 
