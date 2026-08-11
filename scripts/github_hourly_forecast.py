@@ -11,7 +11,6 @@ import pandas as pd
 
 from btc_ema_trader.contract_features import build_feature_set
 from btc_ema_trader.execution_path import resolve_open_trades_after_entry
-from btc_ema_trader.forecast_contract import attach_close_based_general_labels
 from btc_ema_trader.github_runtime import (
     CanonicalAdaptiveTradeEngine,
     CanonicalRuntimeEngine,
@@ -30,6 +29,7 @@ from btc_ema_trader.negative_memory import (
 )
 from btc_ema_trader.price_adaptive import PriceAdaptiveEngine
 from btc_ema_trader.runtime_history import fetch_latest_contiguous_and_store
+from btc_ema_trader.sample_policy import filter_history_for_model_policy
 from btc_ema_trader.storage import Database
 from btc_ema_trader.trade_lifecycle import active_trade
 
@@ -80,11 +80,15 @@ def main() -> int:
     latest_path = state_dir / "latest.json"
     trades_path = state_dir / "trades.json"
     raw_history = load_history(history_path)
-    previous_history = retain_directional_history(raw_history)
+    previous_history = filter_history_for_model_policy(
+        retain_directional_history(raw_history)
+    )
     if previous_history != raw_history:
         write_json(history_path, previous_history)
     previous_latest = load_record(latest_path)
-    if previous_latest and not retain_directional_history([previous_latest]):
+    if previous_latest and not filter_history_for_model_policy(
+        retain_directional_history([previous_latest])
+    ):
         write_json(latest_path, {})
     trades = load_history(trades_path)
 
@@ -280,12 +284,17 @@ def main() -> int:
         "adaptive",
         {"status": "UNAVAILABLE"},
     )
-    record = preserve_canonical_forecast(
-        previous_history,
-        fresh_record,
-    )
+    excluded_cycle = result.get("status") == "MODEL_SAMPLE_EXCLUDED"
+    if excluded_cycle and previous_history:
+        record = dict(previous_history[-1])
+        history = previous_history[-MAX_HISTORY:]
+    else:
+        record = preserve_canonical_forecast(
+            previous_history,
+            fresh_record,
+        )
+        history = append_unique(previous_history, record)[-MAX_HISTORY:]
 
-    history = append_unique(previous_history, record)[-MAX_HISTORY:]
     trades = trades[-MAX_TRADES:]
     write_json(latest_path, record)
     write_json(history_path, history)
@@ -307,7 +316,7 @@ def main() -> int:
     )
     (site_dir / ".nojekyll").write_text("", encoding="utf-8")
 
-    print(json.dumps(record, ensure_ascii=False, indent=2))
+    print(json.dumps(fresh_record if excluded_cycle else record, ensure_ascii=False, indent=2))
     if status != "OK":
         print(
             "::warning::Trade cycle completed in FAIL_SAFE mode; "
@@ -335,16 +344,15 @@ def build_price_prediction(
         settings,
         include_labels=True,
     )
-    prepared = attach_close_based_general_labels(
-        feature_set.frame,
-        feature_set.horizons,
-    )
+    prepared = feature_set.frame.copy()
     usable = prepared.dropna(
         subset=["kama", "donchian_mid", "atr", "adx"]
     )
+    if "model_sample_eligible" in usable:
+        usable = usable.loc[usable["model_sample_eligible"].astype(bool)]
     if usable.empty:
         raise RuntimeError(
-            "No closed candle is available for the price forecast"
+            "No eligible closed candle is available for the price forecast"
         )
     latest_row = usable.iloc[-1]
     base_prediction = bundle.predict_frame(usable.tail(1))
