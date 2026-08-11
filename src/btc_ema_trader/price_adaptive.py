@@ -135,6 +135,7 @@ class PriceAdaptiveEngine:
             vector = price_vector(row, base_probability, base_return)
             target_up = int(row["target_up_h1"])
             target_return = float(row["future_return_h1"])
+            sample_weight = _sample_weight_multiplier(row)
 
             # Record the observation before fitting this row so the comparison
             # remains prequential instead of becoming an in-sample score.
@@ -150,11 +151,13 @@ class PriceAdaptiveEngine:
                         ),
                         "base_return": base_return,
                         "online_return": self._predict_return(vector, base_return),
+                        "sample_weight": sample_weight,
                     }
                 )
 
             matrix = vector.reshape(1, -1)
-            kwargs: dict[str, Any] = {}
+            weight = np.asarray([sample_weight], dtype=float)
+            kwargs: dict[str, Any] = {"sample_weight": weight}
             if not self.state.initialized:
                 kwargs["classes"] = np.asarray([0, 1], dtype=int)
             self.state.direction_estimator.partial_fit(
@@ -165,6 +168,7 @@ class PriceAdaptiveEngine:
             self.state.return_estimator.partial_fit(
                 matrix,
                 np.asarray([target_return], dtype=float),
+                sample_weight=weight,
             )
             self.state.initialized = True
             self.state.samples_seen += 1
@@ -497,6 +501,16 @@ def price_vector(
         neginf=-PRICE_VECTOR_LIMIT,
     )
     return np.clip(values, -PRICE_VECTOR_LIMIT, PRICE_VECTOR_LIMIT)
+
+
+def _sample_weight_multiplier(row: pd.Series) -> float:
+    try:
+        value = float(row.get("model_sample_weight_multiplier", 1.0))
+    except (TypeError, ValueError):
+        return 1.0
+    if not np.isfinite(value):
+        return 1.0
+    return float(np.clip(value, 0.01, 1.0))
 
 
 def _series_number(row: pd.Series, key: str) -> float:
