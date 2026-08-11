@@ -32,6 +32,20 @@ def _logit(probability: np.ndarray) -> np.ndarray:
     return np.log(values / (1 - values)).reshape(-1, 1)
 
 
+def _effective_sample_weight(
+    X: pd.DataFrame,
+    sample_weight: np.ndarray,
+) -> np.ndarray:
+    weights = np.asarray(sample_weight, dtype=float)
+    if "model_sample_weight_multiplier" not in X:
+        return weights
+    multiplier = pd.to_numeric(
+        X["model_sample_weight_multiplier"],
+        errors="coerce",
+    ).fillna(1.0).clip(0.01, 1.0).to_numpy(dtype=float)
+    return weights * multiplier
+
+
 @dataclass
 class BlendClassifier:
     tree_classifier: Any
@@ -153,7 +167,10 @@ class DirectionalEventHead:
             self.available = False
             return self
         event_X = X.iloc[indices].reindex(columns=self.feature_columns)
-        event_weight = sample_weight[indices]
+        event_weight = _effective_sample_weight(
+            event_X,
+            sample_weight[indices],
+        )
         self.success_classifier.fit(
             event_X,
             y_success[indices].astype(int),
@@ -207,15 +224,19 @@ class HorizonModel:
         sample_weight: np.ndarray,
     ) -> "HorizonModel":
         general_X = X.reindex(columns=self.general_feature_columns)
+        effective_weight = _effective_sample_weight(
+            general_X,
+            sample_weight,
+        )
         self.general_direction_classifier.fit(
             general_X,
             y_direction,
-            sample_weight,
+            effective_weight,
         )
         self.general_return_regressor.fit(
             general_X,
             y_return,
-            sample_weight=sample_weight,
+            sample_weight=effective_weight,
         )
         self.general_available = True
         return self
