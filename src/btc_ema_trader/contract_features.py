@@ -37,7 +37,7 @@ def build_feature_set(
 ) -> FeatureSet:
     model_candles = apply_model_calendar(candles)
     if model_candles.empty:
-        raise ValueError("No Monday-Friday UTC candles are available")
+        raise ValueError("No UTC candles are available")
 
     base = base_features.build_feature_set(
         model_candles,
@@ -103,6 +103,7 @@ def build_feature_set(
         "aligned_regime",
         "aligned_rsi",
         "aligned_ema168_slope",
+        "model_sample_weight_multiplier",
     ):
         if (
             column in frame
