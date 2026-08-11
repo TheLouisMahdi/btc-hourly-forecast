@@ -72,6 +72,16 @@ class RuntimeEngine:
     def run_once(self, force: bool = False) -> dict[str, Any]:
         try:
             bundle = latest_bundle(self.settings)
+            required_policy = self.settings.section("sample_policy")
+            trained_policy = getattr(bundle, "config_snapshot", {}).get(
+                "sample_policy"
+            )
+            if required_policy and trained_policy != required_policy:
+                raise RuntimeError(
+                    "Active model predates the weekday/liquidity sample policy. "
+                    "Run a full retraining cycle before creating new forecasts."
+                )
+
             provider = bundle.provider
             recent = self.market.refresh_recent(provider, days=10)
             self.database.upsert_candles(recent)

@@ -11,6 +11,7 @@ import pandas as pd
 from btc_ema_trader.contract_training import (
     build_segmented_feature_set,
     enrich_interval_metrics,
+    stamp_model_sample_policy,
 )
 from btc_ema_trader.economic_validation import evaluate_and_patch_candidate
 from btc_ema_trader.logging_setup import configure_logging
@@ -126,6 +127,7 @@ def main() -> int:
         provider=provider,
         symbol=symbol,
     )
+    training = stamp_model_sample_policy(settings, training)
     training["market_data_segmentation"] = segmentation
     training = enrich_interval_metrics(settings, training)
 

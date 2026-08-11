@@ -10,6 +10,7 @@ import pandas as pd
 from .config import Settings
 from .contract_features import build_feature_set
 from .features import FeatureSet
+from .model import load_bundle
 from .storage import Database
 from .structure_training import train_feature_set
 
@@ -64,8 +65,37 @@ def train_from_database(
         provider=provider,
         symbol=symbol,
     )
+    report = stamp_model_sample_policy(settings, report)
     report["market_data_segmentation"] = segmentation
     return enrich_interval_metrics(settings, report)
+
+
+def stamp_model_sample_policy(
+    settings: Settings,
+    report: dict[str, Any],
+) -> dict[str, Any]:
+    """Bind the active sample policy to a freshly trained model artifact."""
+    model_id = str(report.get("model_id") or "")
+    if not model_id:
+        raise ValueError("Training report is missing model_id")
+    model_dir = settings.path("model_dir")
+    latest_path = model_dir / "latest.joblib"
+    if not latest_path.exists():
+        raise FileNotFoundError(
+            "Training finished without latest.joblib for sample-policy stamping"
+        )
+
+    bundle = load_bundle(latest_path)
+    policy = json.loads(
+        json.dumps(settings.section("sample_policy"), ensure_ascii=False)
+    )
+    bundle.config_snapshot["sample_policy"] = policy
+    bundle.save(latest_path)
+    model_path = model_dir / f"{model_id}.joblib"
+    if model_path.exists():
+        bundle.save(model_path)
+    report["sample_policy"] = policy
+    return report
 
 
 def build_segmented_feature_set(
