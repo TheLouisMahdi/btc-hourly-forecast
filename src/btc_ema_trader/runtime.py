@@ -76,11 +76,9 @@ class RuntimeEngine:
             trained_policy = getattr(bundle, "config_snapshot", {}).get(
                 "sample_policy"
             )
-            if required_policy and trained_policy != required_policy:
-                raise RuntimeError(
-                    "Active model predates the weekday/liquidity sample policy. "
-                    "Run a full retraining cycle before creating new forecasts."
-                )
+            policy_mismatch = bool(
+                required_policy and trained_policy != required_policy
+            )
 
             provider = bundle.provider
             recent = self.market.refresh_recent(provider, days=10)
@@ -108,12 +106,6 @@ class RuntimeEngine:
             )
             if candles.empty:
                 raise RuntimeError("No closed candle is available")
-            latest_market_open = _utc(candles["open_time"].max())
-            if latest_market_open.dayofweek > 4:
-                return self._excluded_result(
-                    latest_market_open,
-                    "WEEKEND_EXCLUDED",
-                )
 
             news = self.database.load_news(
                 start=candles["open_time"].min(),
@@ -132,19 +124,6 @@ class RuntimeEngine:
                 raise RuntimeError("No feature row is ready")
             latest_row = usable.iloc[-1]
             candle_open = _utc(latest_row["open_time"])
-            if not bool(latest_row.get("model_sample_eligible", True)):
-                return self._excluded_result(
-                    candle_open,
-                    "LOW_LIQUIDITY_EXCLUDED",
-                    {
-                        "model_dollar_volume": latest_row.get(
-                            "model_dollar_volume"
-                        ),
-                        "model_liquidity_threshold": latest_row.get(
-                            "model_liquidity_threshold"
-                        ),
-                    },
-                )
 
             candle_close = candle_open + pd.Timedelta(hours=1)
             first_eligible = _utc(self.state["first_eligible_close"])
@@ -246,6 +225,7 @@ class RuntimeEngine:
                         6,
                     )
                 ),
+                "sample_policy_mismatch": policy_mismatch,
             }
             recent_count, hours_since_last = (
                 self.database.signal_stats_today()
@@ -276,12 +256,23 @@ class RuntimeEngine:
                 "price": float(latest_row["close"]),
                 "trend_kama": float(latest_row["kama"]),
                 "donchian_mid": float(latest_row["donchian_mid"]),
-                "model_sample_eligible": True,
-                "model_low_liquidity": False,
+                "model_sample_eligible": bool(
+                    latest_row.get("model_sample_eligible", True)
+                ),
+                "model_weekend": bool(
+                    latest_row.get("model_weekend", False)
+                ),
+                "model_low_liquidity": bool(
+                    latest_row.get("model_low_liquidity", False)
+                ),
+                "model_sample_weight_multiplier": float(
+                    latest_row.get("model_sample_weight_multiplier", 1.0)
+                ),
                 "model_dollar_volume": latest_row.get("model_dollar_volume"),
                 "model_liquidity_threshold": latest_row.get(
                     "model_liquidity_threshold"
                 ),
+                "sample_policy_mismatch": policy_mismatch,
                 "event_id": event_id,
                 "event_type": str(
                     latest_row.get("event_type", "NONE")
