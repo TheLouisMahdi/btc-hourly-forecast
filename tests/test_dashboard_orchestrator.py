@@ -50,6 +50,11 @@ class DashboardOrchestratorTests(unittest.TestCase):
                 side_effect=lambda: calls.append("chart") or 0,
             ),
             patch.object(
+                render_dashboard.github_market_price_dashboard,
+                "main",
+                side_effect=lambda: calls.append("market-price") or 0,
+            ),
+            patch.object(
                 render_dashboard,
                 "_ensure_resilience_panel",
                 side_effect=lambda: calls.append("contract"),
@@ -66,6 +71,7 @@ class DashboardOrchestratorTests(unittest.TestCase):
                 "resilience",
                 "assistant",
                 "chart",
+                "market-price",
                 "contract",
             ],
         )
@@ -103,6 +109,11 @@ class DashboardOrchestratorTests(unittest.TestCase):
                 render_dashboard.github_chart_dashboard,
                 "main",
                 side_effect=lambda: calls.append("chart") or 0,
+            ),
+            patch.object(
+                render_dashboard.github_market_price_dashboard,
+                "main",
+                side_effect=lambda: calls.append("market-price") or 0,
             ),
             patch.object(
                 render_dashboard,
