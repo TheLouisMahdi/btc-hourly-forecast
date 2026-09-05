@@ -1,0 +1,20 @@
+{
+  "status": "ACTIVE",
+  "schema_version": 2,
+  "samples_seen": 1,
+  "learned_now": 0,
+  "active_trades": 0,
+  "resolved_trades": 1,
+  "target_hits": 0,
+  "stop_hits": 0,
+  "time_exits": 1,
+  "target_hit_rate": 0.0,
+  "net_pnl_usd": 8.789871486670025,
+  "average_r": 0.8789871486670024,
+  "updated_at": "2026-09-05T22:50:04.198555+00:00",
+  "source_model_ids": [
+    "directional-breakout-hourly-20260804T091016Z-fc3a2f87"
+  ],
+  "feature_count": 28,
+  "runtime_contract": "CANONICAL_GITHUB_RUNTIME_V2"
+}
