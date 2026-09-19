@@ -1,0 +1,25 @@
+{
+  "source": "BATCH_AND_ONLINE",
+  "blend_mode": "SUPPORT_ONLY",
+  "batch_probability_up": 0.47245294939755805,
+  "online_probability_up": 0.05,
+  "online_probability_used_for_blend": 0.35,
+  "fused_probability_up": 0.46633030192768016,
+  "direction_blend_weight": 0.05,
+  "batch_return": -0.0004071686288298495,
+  "online_return": -1.4779847756920563e-05,
+  "fused_return": -0.0004071686288298495,
+  "return_blend_weight": 0.0,
+  "metrics": {
+    "samples": 504,
+    "base_direction_brier": 0.24921615370236389,
+    "online_direction_brier": 0.43604628227348535,
+    "base_direction_accuracy": 0.5158730158730159,
+    "online_direction_accuracy": 0.5079365079365079,
+    "base_return_mae": 0.002357250341244023,
+    "online_return_mae": 0.002346904931702284
+  },
+  "samples_seen": 3225,
+  "last_trained_open_time": "2026-09-19T15:00:00+00:00",
+  "champion_model_id": "directional-breakout-hourly-20260804T091016Z-fc3a2f87"
+}
