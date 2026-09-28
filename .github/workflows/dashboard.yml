@@ -92,7 +92,6 @@ jobs:
               'data-uncertainty-display="range-only-v1"',
               'data-resilience-dashboard="v1"',
               'data-elegant-chart="v2"',
-              'class="health-summary',
               'Likely next-close range',
               'no exact close is published',
               'Data continuity &amp; learning safety',
