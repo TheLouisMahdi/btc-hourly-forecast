@@ -23,6 +23,7 @@ market:
     - binance_spot
     - binance_futures
     - okx_swap
+  execution_quote_provider: binance_futures
   request_timeout_seconds: 25
   max_retries: 5
   retry_backoff_seconds: 1.5
@@ -338,7 +339,7 @@ trade_lifecycle:
   breakeven_trigger_r: 1.0
   trailing_trigger_r: 1.5
   trailing_atr_multiplier: 1.0
-  same_bar_policy: NEAREST_TO_OPEN
+  same_bar_policy: STOP_FIRST
   minimum_online_samples: 20
   maximum_online_weight: 0.65
   stop_learning_weight: 1.75
@@ -361,6 +362,9 @@ qualification:
 
 strategy:
   paper_only: true
+  execution_venue: BINANCE_USDM_BTCUSDT
+  margin_mode: isolated
+  maintenance_margin_rate: 0.004
   position_policy: AGGRESSIVE_STRUCTURAL_RISK_SCALED
   policy_version: 2
   allow_short: true

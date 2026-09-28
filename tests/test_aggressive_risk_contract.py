@@ -45,6 +45,9 @@ class AggressiveRiskContractTests(unittest.TestCase):
             "adaptive_target_probability": 0.55,
             "adaptive_stop_probability": 0.35,
             "adaptive_predicted_r": 1.5,
+            "direction": "LONG",
+            "stop_price": 99.0,
+            "target_price": 105.0,
         }
 
         output = _apply_risk_scaled_economics(plan, _Settings())
@@ -61,6 +64,17 @@ class AggressiveRiskContractTests(unittest.TestCase):
         self.assertLessEqual(output["risk_budget_utilization"], 1.0 + 1e-12)
         self.assertGreater(output["target_net_profit_usd"], 0.0)
         self.assertLess(output["stop_net_loss_usd"], 0.0)
+        self.assertTrue(output["liquidation_safety_ok"])
+        self.assertEqual(output["maintenance_margin_rate"], 0.004)
+        self.assertAlmostEqual(
+            output["estimated_liquidation_price"],
+            100.0 * (1.0 - 1.0 / 40.0) / (1.0 - 0.004),
+            places=9,
+        )
+        self.assertGreater(
+            output["stop_to_liquidation_buffer_percent"],
+            0.0,
+        )
 
     def test_new_position_persists_policy_and_risk_contract(self) -> None:
         record = {

@@ -102,10 +102,31 @@ def build_active_position_plan(
         "suggested_leverage": trade.get("suggested_leverage"),
         "margin_required_usd": trade.get("margin_required_usd"),
         "risk_budget_usd": trade.get("risk_budget_usd"),
+        "entry_fee_bps": trade.get("entry_fee_bps"),
+        "exit_fee_bps": trade.get("exit_fee_bps"),
+        "entry_slippage_bps": trade.get("entry_slippage_bps"),
+        "exit_slippage_bps": trade.get("exit_slippage_bps"),
+        "funding_buffer_bps": trade.get("funding_buffer_bps"),
+        "base_execution_cost_bps": trade.get("base_execution_cost_bps"),
         "stress_execution_cost_bps": trade.get(
             "stress_execution_cost_bps"
         ),
         "gap_risk_buffer_bps": trade.get("gap_risk_buffer_bps"),
+        "execution_venue": trade.get("execution_venue"),
+        "margin_mode": trade.get("margin_mode"),
+        "maintenance_margin_rate": trade.get("maintenance_margin_rate"),
+        "estimated_liquidation_price": trade.get(
+            "estimated_liquidation_price"
+        ),
+        "liquidation_distance_percent": trade.get(
+            "liquidation_distance_percent"
+        ),
+        "stop_to_liquidation_buffer_percent": trade.get(
+            "stop_to_liquidation_buffer_percent"
+        ),
+        "liquidation_safety_ok": bool(
+            trade.get("liquidation_safety_ok", False)
+        ),
         "target_net_profit_usd": trade.get("target_net_profit_usd"),
         "stop_net_loss_usd": trade.get("stop_net_loss_usd"),
         "expected_value_usd": trade.get("expected_value_usd"),

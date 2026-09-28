@@ -125,8 +125,17 @@ class CanonicalRuntimeEngine(RuntimeEngine):
 
         observed_at = pd.Timestamp.now(tz="UTC")
         try:
-            quote = self.market.live_quote(provider_hint=provider)
-            return apply_execution_quote(
+            execution_provider = str(
+                self.settings.section("market").get(
+                    "execution_quote_provider",
+                    provider or "",
+                )
+                or ""
+            ) or None
+            quote = self.market.live_quote(
+                provider_hint=execution_provider,
+            )
+            quoted = apply_execution_quote(
                 result,
                 provider=quote.provider,
                 price=quote.price,
@@ -139,6 +148,15 @@ class CanonicalRuntimeEngine(RuntimeEngine):
                     )
                 ),
             )
+            plan = quoted.get("trade_plan")
+            if isinstance(plan, dict) and plan.get("status") == "ACTIONABLE":
+                recalculated = apply_risk_scaled_economics(
+                    plan,
+                    self.settings,
+                )
+                recalculated["execution_economics_recomputed"] = True
+                quoted["trade_plan"] = recalculated
+            return quoted
         except Exception as exc:
             result["execution_quote"] = {
                 "contract": "LIVE_QUOTE_AT_SIGNAL_RUN",
