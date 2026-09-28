@@ -46,6 +46,38 @@ class PolicyConfigurationTests(unittest.TestCase):
             strategy["leverage_risk_score_thresholds"],
             [0.35, 0.65],
         )
+        self.assertEqual(
+            config["market"]["paper_execution_provider"],
+            "binance_futures",
+        )
+        self.assertEqual(strategy["minimum_net_edge_bps"], 8.0)
+        self.assertEqual(strategy["minimum_forecast_reward_r"], 1.0)
+        self.assertEqual(strategy["maintenance_margin_rate"], 0.004)
+        self.assertEqual(strategy["margin_mode"], "ISOLATED")
+        self.assertEqual(
+            strategy["funding_rate_buffer_bps_per_interval"],
+            1.0,
+        )
+        self.assertEqual(
+            strategy["trade_direction_horizon_weights"],
+            {3: 1.0, 6: 1.0, 12: 1.0},
+        )
+        self.assertEqual(
+            config["trade_lifecycle"]["minimum_holding_hours"],
+            3,
+        )
+        self.assertEqual(
+            config["trade_lifecycle"]["maximum_holding_hours"],
+            24,
+        )
+        self.assertEqual(
+            config["trade_lifecycle"]["minimum_reward_r"],
+            1.0,
+        )
+        self.assertEqual(
+            config["trade_lifecycle"]["maximum_reward_r"],
+            5.0,
+        )
         self.assertFalse(
             config["trade_assistant"]["require_qualified_meta_for_position"]
         )
