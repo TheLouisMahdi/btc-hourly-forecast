@@ -44,7 +44,11 @@ class PolicyConfigurationTests(unittest.TestCase):
         self.assertEqual(strategy["leverage_tiers"], [10.0, 20.0, 40.0])
         self.assertEqual(
             config["market"]["execution_quote_provider"],
-            "binance_futures",
+            "okx_swap",
+        )
+        self.assertEqual(
+            config["market"]["execution_quote_provider_order"],
+            ["okx_swap", "coinbase_spot"],
         )
         self.assertEqual(
             strategy["execution_venue"],
