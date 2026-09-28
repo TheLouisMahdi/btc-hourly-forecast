@@ -64,6 +64,11 @@ class DashboardOrchestratorTests(unittest.TestCase):
                 "_ensure_resilience_panel",
                 side_effect=lambda: calls.append("contract"),
             ),
+            patch.object(
+                render_dashboard.github_product_surface,
+                "main",
+                side_effect=lambda: calls.append("product") or 0,
+            ),
         ):
             self.assertEqual(render_dashboard.main(), 0)
 
@@ -79,6 +84,7 @@ class DashboardOrchestratorTests(unittest.TestCase):
                 "market-price",
                 "crypto-logo",
                 "contract",
+                "product",
             ],
         )
 
