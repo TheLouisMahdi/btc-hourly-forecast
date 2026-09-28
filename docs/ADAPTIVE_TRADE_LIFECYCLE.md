@@ -4,7 +4,7 @@ Version 5.3 changes the primary paper-trading contract from a one-candle price r
 
 ## Primary objective
 
-A qualified structural signal can open one paper position. The position remains open across hourly candles until one of these events occurs:
+A valid model LONG or SHORT direction can open one paper position. Structural events, qualification and meta-model evidence adjust risk but do not have to approve the entry. The position remains open across hourly candles until one of these events occurs:
 
 1. the adaptive take-profit target is touched;
 2. the current stop-loss is touched;
@@ -21,7 +21,7 @@ The initial reward-to-risk ratio is `5R`:
 - SHORT target = entry − 5 × initial stop distance;
 - SHORT stop = entry + initial stop distance.
 
-The stop distance combines the structural invalidation distance and an ATR floor. It is capped between configured minimum and maximum percentages.
+When structural invalidation is available, it contributes to the stop distance; otherwise an ATR-based stop is used. The stop is capped between configured minimum and maximum percentages.
 
 ## Adaptive exits
 
@@ -51,6 +51,6 @@ The persistent files are:
 
 ## Paper-only aggressive mode
 
-The GitHub workflow enables aggressive paper mode. Model qualification, edge threshold, news shock and negative-memory warnings become soft penalties instead of automatic vetoes. Hard blockers remain for missing structural events, invalid prices, unhealthy candle data, stale quotes, provider mismatch, duplicate events and unsupported short execution.
+The GitHub workflow enables model-first aggressive paper mode. Missing structure, model qualification, edge threshold, news shock, duplicate-event context, meta-model rejection and negative-memory warnings are advisory or risk penalties instead of automatic vetoes. Hard blockers remain for unusable direction, invalid prices or ATR, unhealthy candle data, stale or unavailable execution quotes, provider mismatch and unsupported short execution. Only one paper position is managed at a time.
 
 No exchange order is submitted by this repository.
