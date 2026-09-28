@@ -384,7 +384,7 @@ def make_decision(
             "policy_name": POLICY_NAME,
             "policy_version": POLICY_VERSION,
             "risk_contract_version": RISK_CONTRACT_VERSION,
-            "entry_contract": "STRUCTURAL_EVENT_RISK_SCALED",
+            "entry_contract": "MODEL_MULTI_HORIZON_RISK_SCALED",
             "soft_risk_flags": soft_risk_flags,
             "ignored_soft_blockers": soft_risk_flags,
             "hard_blockers": hard_blockers,
@@ -412,7 +412,7 @@ def make_decision(
         returns={
             int(key): float(value)
             for key, value in prediction.get(
-                "absolute_event_returns",
+                "trade_returns",
                 prediction.get("returns", {}),
             ).items()
         },
