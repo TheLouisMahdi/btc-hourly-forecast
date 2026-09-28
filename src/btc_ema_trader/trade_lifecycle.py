@@ -869,7 +869,7 @@ def _margin_economics(
         "notional_usd": float(notional),
         "suggested_leverage": leverage,
         "margin_required_usd": float(margin),
-        "base_execution_cost_bps": float(costs["runtime_base_cost_bps"]),
+        "base_execution_cost_bps": float(costs["base_cost_bps"]),
         "stress_execution_cost_bps": stress_bps,
         "projected_funding_bps": float(costs["projected_funding_bps"]),
         "round_trip_stress_cost_usd": float(execution_cost),
