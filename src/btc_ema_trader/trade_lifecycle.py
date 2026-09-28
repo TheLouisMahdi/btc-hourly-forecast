@@ -545,8 +545,39 @@ def open_trade_from_record(record: dict[str, Any]) -> dict[str, Any] | None:
         "suggested_leverage": _finite(plan.get("suggested_leverage"), 10.0),
         "margin_required_usd": _finite(plan.get("margin_required_usd"), 0.0),
         "risk_budget_usd": _finite(plan.get("risk_budget_usd"), 0.0),
+        "entry_fee_bps": _finite(plan.get("entry_fee_bps"), 0.0),
+        "exit_fee_bps": _finite(plan.get("exit_fee_bps"), 0.0),
+        "entry_slippage_bps": _finite(
+            plan.get("entry_slippage_bps"), 0.0
+        ),
+        "exit_slippage_bps": _finite(
+            plan.get("exit_slippage_bps"), 0.0
+        ),
+        "funding_buffer_bps": _finite(
+            plan.get("funding_buffer_bps"), 0.0
+        ),
+        "base_execution_cost_bps": _finite(
+            plan.get("base_execution_cost_bps"), 0.0
+        ),
         "stress_execution_cost_bps": _finite(
             plan.get("stress_execution_cost_bps"), 0.0
+        ),
+        "execution_venue": plan.get("execution_venue"),
+        "margin_mode": plan.get("margin_mode"),
+        "maintenance_margin_rate": _finite(
+            plan.get("maintenance_margin_rate"), 0.0
+        ),
+        "estimated_liquidation_price": _finite(
+            plan.get("estimated_liquidation_price"), 0.0
+        ),
+        "liquidation_distance_percent": _finite(
+            plan.get("liquidation_distance_percent"), 0.0
+        ),
+        "stop_to_liquidation_buffer_percent": _finite(
+            plan.get("stop_to_liquidation_buffer_percent"), 0.0
+        ),
+        "liquidation_safety_ok": bool(
+            plan.get("liquidation_safety_ok", False)
         ),
         "target_net_profit_usd": _finite(plan.get("target_net_profit_usd"), 0.0),
         "stop_net_loss_usd": _finite(plan.get("stop_net_loss_usd"), 0.0),
@@ -595,6 +626,7 @@ def resolve_open_trades(
                     exit_price=event["exit_price"],
                     outcome=event["outcome"],
                     closed_at=(candle_time + pd.Timedelta(hours=1)),
+                    fill_reason=event.get("fill_reason"),
                 )
                 resolved += 1
                 break
@@ -624,16 +656,45 @@ def _evaluate_candle(
     low = float(candle["low"])
     open_price = float(candle["open"])
     risk = max(float(trade["initial_risk_price"]), 1e-9)
+
+    # A stop-market order cannot assume a fill back at the stop after price
+    # gaps through it. With hourly OHLC only, the candle open is the first
+    # observable tradable price and is the conservative paper fill.
     if direction == "LONG":
+        if open_price <= stop:
+            return {
+                "outcome": "STOP",
+                "exit_price": open_price,
+                "fill_reason": "GAP_THROUGH_STOP",
+            }
+        if open_price >= target:
+            return {
+                "outcome": "TARGET",
+                "exit_price": open_price,
+                "fill_reason": "GAP_THROUGH_TARGET",
+            }
         favorable = (high - entry) / risk
         adverse = (entry - low) / risk
         target_hit = high >= target
         stop_hit = low <= stop
     else:
+        if open_price >= stop:
+            return {
+                "outcome": "STOP",
+                "exit_price": open_price,
+                "fill_reason": "GAP_THROUGH_STOP",
+            }
+        if open_price <= target:
+            return {
+                "outcome": "TARGET",
+                "exit_price": open_price,
+                "fill_reason": "GAP_THROUGH_TARGET",
+            }
         favorable = (entry - low) / risk
         adverse = (high - entry) / risk
         target_hit = low <= target
         stop_hit = high >= stop
+
     trade["max_favorable_r"] = max(
         float(trade.get("max_favorable_r", 0.0)), favorable
     )
@@ -645,22 +706,45 @@ def _evaluate_candle(
     if target_hit and stop_hit:
         policy = str(
             settings.section("trade_lifecycle").get(
-                "same_bar_policy", "NEAREST_TO_OPEN"
+                "same_bar_policy", "STOP_FIRST"
             )
         ).upper()
         if policy == "TARGET_FIRST":
-            return {"outcome": "TARGET", "exit_price": target}
-        if policy == "STOP_FIRST":
-            return {"outcome": "STOP", "exit_price": stop}
-        target_distance = abs(open_price - target)
-        stop_distance = abs(open_price - stop)
-        if target_distance < stop_distance:
-            return {"outcome": "TARGET", "exit_price": target}
-        return {"outcome": "STOP", "exit_price": stop}
+            return {
+                "outcome": "TARGET",
+                "exit_price": target,
+                "fill_reason": "SAME_BAR_TARGET_FIRST",
+            }
+        if policy == "NEAREST_TO_OPEN":
+            target_distance = abs(open_price - target)
+            stop_distance = abs(open_price - stop)
+            if target_distance < stop_distance:
+                return {
+                    "outcome": "TARGET",
+                    "exit_price": target,
+                    "fill_reason": "SAME_BAR_NEAREST_TARGET",
+                }
+            return {
+                "outcome": "STOP",
+                "exit_price": stop,
+                "fill_reason": "SAME_BAR_NEAREST_STOP",
+            }
+        return {
+            "outcome": "STOP",
+            "exit_price": stop,
+            "fill_reason": "SAME_BAR_STOP_FIRST",
+        }
     if target_hit:
-        return {"outcome": "TARGET", "exit_price": target}
-    return {"outcome": "STOP", "exit_price": stop}
-
+        return {
+            "outcome": "TARGET",
+            "exit_price": target,
+            "fill_reason": "INTRABAR_TARGET",
+        }
+    return {
+        "outcome": "STOP",
+        "exit_price": stop,
+        "fill_reason": "INTRABAR_STOP",
+    }
 
 def _update_dynamic_stop(trade: dict[str, Any], candle: pd.Series) -> None:
     entry = float(trade["entry_price"])
@@ -697,15 +781,74 @@ def _close_trade(
     exit_price: float,
     outcome: str,
     closed_at: pd.Timestamp,
+    fill_reason: str | None = None,
 ) -> None:
     entry = float(trade["entry_price"])
     direction = str(trade["direction"])
     gross_return = exit_price / entry - 1.0
     aligned_return = gross_return if direction == "LONG" else -gross_return
-    cost_fraction = float(trade.get("stress_execution_cost_bps", 0.0)) / 10_000.0
-    net_return = aligned_return - cost_fraction
     notional = float(trade.get("notional_usd", 0.0))
-    net_pnl = notional * net_return
+    quantity = float(trade.get("quantity_btc", 0.0))
+    exit_notional = (
+        abs(quantity) * exit_price
+        if quantity
+        else notional * exit_price / max(entry, 1e-9)
+    )
+    gross_pnl = notional * aligned_return
+
+    entry_fee_bps = max(0.0, float(trade.get("entry_fee_bps", 0.0)))
+    exit_fee_bps = max(0.0, float(trade.get("exit_fee_bps", 0.0)))
+    entry_slippage_bps = max(
+        0.0, float(trade.get("entry_slippage_bps", 0.0))
+    )
+    exit_slippage_bps = max(
+        0.0, float(trade.get("exit_slippage_bps", 0.0))
+    )
+    funding_buffer_bps = max(
+        0.0, float(trade.get("funding_buffer_bps", 0.0))
+    )
+    has_components = any(
+        value > 0
+        for value in (
+            entry_fee_bps,
+            exit_fee_bps,
+            entry_slippage_bps,
+            exit_slippage_bps,
+            funding_buffer_bps,
+        )
+    )
+    if has_components:
+        entry_fee = notional * entry_fee_bps / 10_000.0
+        exit_fee = exit_notional * exit_fee_bps / 10_000.0
+        entry_slippage = notional * entry_slippage_bps / 10_000.0
+        exit_slippage = exit_notional * exit_slippage_bps / 10_000.0
+        funding_cost = notional * funding_buffer_bps / 10_000.0
+        execution_cost = (
+            entry_fee
+            + exit_fee
+            + entry_slippage
+            + exit_slippage
+            + funding_cost
+        )
+        cost_source = "BASE_COMPONENTS"
+    else:
+        base_bps = float(trade.get("base_execution_cost_bps", 0.0))
+        if base_bps <= 0:
+            base_bps = float(
+                trade.get("stress_execution_cost_bps", 0.0)
+            )
+            cost_source = "LEGACY_STRESS_FALLBACK"
+        else:
+            cost_source = "BASE_ROUND_TRIP"
+        entry_fee = 0.0
+        exit_fee = 0.0
+        entry_slippage = 0.0
+        exit_slippage = 0.0
+        funding_cost = 0.0
+        execution_cost = notional * max(0.0, base_bps) / 10_000.0
+
+    net_pnl = gross_pnl - execution_cost
+    net_return = net_pnl / max(notional, 1e-9)
     risk_budget = max(float(trade.get("risk_budget_usd", 0.0)), 1e-9)
     realized_r = net_pnl / risk_budget
     final_outcome = outcome
@@ -717,13 +860,21 @@ def _close_trade(
             "outcome": final_outcome,
             "closed_at": _utc(closed_at).isoformat(),
             "exit_price": float(exit_price),
+            "fill_reason": fill_reason,
             "gross_aligned_return": float(aligned_return),
+            "gross_pnl_usd": float(gross_pnl),
+            "simulated_entry_fee_usd": float(entry_fee),
+            "simulated_exit_fee_usd": float(exit_fee),
+            "simulated_entry_slippage_usd": float(entry_slippage),
+            "simulated_exit_slippage_usd": float(exit_slippage),
+            "simulated_funding_cost_usd": float(funding_cost),
+            "simulated_execution_cost_usd": float(execution_cost),
+            "realized_cost_source": cost_source,
             "realized_net_return": float(net_return),
             "realized_net_pnl_usd": float(net_pnl),
             "realized_r": float(realized_r),
         }
     )
-
 
 def active_trade(trades: Iterable[dict[str, Any]]) -> dict[str, Any] | None:
     for trade in reversed(list(trades)):
@@ -803,7 +954,10 @@ def _margin_economics(
     costs = execution_cost_breakdown(strategy)
     stress_bps = float(costs["stress_cost_bps"])
     cost_fraction = stress_bps / 10_000.0
-    modeled_risk_fraction = stop_pct + cost_fraction
+    gap_bps = float(strategy.get("gap_risk_buffer_bps", 0.0))
+    modeled_risk_fraction = (
+        stop_pct + cost_fraction + max(0.0, gap_bps) / 10_000.0
+    )
     leverage = select_leverage(
         strategy,
         risk_score,
@@ -838,7 +992,14 @@ def _margin_economics(
         "target_margin_roi": float(target_net / max(margin, 1e-9)),
         "stop_margin_roi": float(stop_net / max(margin, 1e-9)),
         "expected_value_usd": float(expected_value),
+        "entry_fee_bps": float(costs["entry_fee_bps"]),
+        "exit_fee_bps": float(costs["exit_fee_bps"]),
+        "entry_slippage_bps": float(costs["entry_slippage_bps"]),
+        "exit_slippage_bps": float(costs["exit_slippage_bps"]),
+        "funding_buffer_bps": float(costs["funding_buffer_bps"]),
+        "base_execution_cost_bps": float(costs["base_cost_bps"]),
         "stress_execution_cost_bps": stress_bps,
+        "gap_risk_buffer_bps": gap_bps,
         "paper_only": bool(strategy.get("paper_only", True)),
     }
 
