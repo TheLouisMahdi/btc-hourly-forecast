@@ -356,7 +356,7 @@ def _signal_confirmation(latest: dict[str, Any]) -> str:
 def _tile(label: str, value: str, note: str) -> str:
     return (
         '<div class="assistant-tile">'
-        f'<span>{html.escape(label)}</span>'
+        f'<small>{html.escape(label)}</small>'
         f'<strong>{html.escape(value)}</strong>'
         '</div>'
     )
