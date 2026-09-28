@@ -123,7 +123,6 @@ class CanonicalRuntimeEngine(RuntimeEngine):
             context.get("complete", False)
         )
 
-        observed_at = pd.Timestamp.now(tz="UTC")
         try:
             execution_provider = str(
                 self.settings.section("market").get(
@@ -135,6 +134,7 @@ class CanonicalRuntimeEngine(RuntimeEngine):
             quote = self.market.live_quote(
                 provider_hint=execution_provider,
             )
+            observed_at = pd.Timestamp.now(tz="UTC")
             quoted = apply_execution_quote(
                 result,
                 provider=quote.provider,
@@ -158,6 +158,7 @@ class CanonicalRuntimeEngine(RuntimeEngine):
                 quoted["trade_plan"] = recalculated
             return quoted
         except Exception as exc:
+            observed_at = pd.Timestamp.now(tz="UTC")
             result["execution_quote"] = {
                 "contract": "LIVE_QUOTE_AT_SIGNAL_RUN",
                 "fresh": False,

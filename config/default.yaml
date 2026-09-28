@@ -23,7 +23,10 @@ market:
     - binance_spot
     - binance_futures
     - okx_swap
-  execution_quote_provider: binance_futures
+  execution_quote_provider: okx_swap
+  execution_quote_provider_order:
+    - okx_swap
+    - coinbase_spot
   request_timeout_seconds: 25
   max_retries: 5
   retry_backoff_seconds: 1.5
