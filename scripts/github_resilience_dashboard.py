@@ -179,7 +179,7 @@ def _time_aware_chart(history: list[dict[str, Any]]) -> str:
         + '<span><i style="background:var(--bad)"></i>Wrong direction</span>'
         + '<span><i style="background:var(--wait)"></i>Pending</span>'
         + '<span><i class="gap-key"></i>Missing workflow record; not interpolated</span>'
-        + '<span><i style="background:rgba(143,138,184,.35);border-radius:3px;width:18px"></i>Calibrated range</span>'
+        + '<span><i style="background:rgba(184,137,47,.28);border-radius:3px;width:18px"></i>Calibrated range</span>'
         + "</div>"
     )
 
@@ -276,17 +276,15 @@ def _styles() -> str:
 .gap-line{stroke:var(--wait);stroke-width:1.5;stroke-dasharray:5 5;opacity:.75}
 .gap-label{fill:var(--wait);font-size:9px;font-weight:750}
 .gap-key{width:18px!important;height:2px!important;border-radius:0!important;background:repeating-linear-gradient(90deg,var(--wait) 0 5px,transparent 5px 9px)}
-.resilience-panel{margin-top:18px;background:linear-gradient(135deg,rgba(255,255,255,.88),rgba(222,236,231,.52),rgba(236,234,245,.42))}
+.resilience-panel{margin-top:16px;background:var(--paper)}
 .resilience-heading{display:flex;justify-content:space-between;align-items:flex-start;gap:16px;margin-bottom:18px}
-.resilience-state{display:inline-flex;padding:8px 12px;border-radius:999px;background:var(--mint);color:var(--sage2);font-size:11px;font-weight:850}
-.resilience-state.warn{background:var(--peach2);color:#9c625f}
-.resilience-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
-.resilience-tile{min-width:0;padding:16px;border:1px solid var(--line);border-radius:18px;background:rgba(255,255,255,.58)}
+.resilience-state{display:inline-flex;padding:7px 10px;border-radius:8px;background:var(--mint);color:#71501a;font-size:10px;font-weight:850}
+.resilience-state.warn{background:var(--peach2);color:#824c3f}
+.resilience-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+.resilience-tile{min-width:0;padding:14px;border:1px solid var(--line);border-radius:10px;background:#f8f2e9}
 .resilience-tile span{display:block;color:var(--muted);font-size:10px;text-transform:uppercase;letter-spacing:.06em}
 .resilience-tile strong{display:block;margin-top:8px;font-size:16px;line-height:1.3;overflow-wrap:anywhere}
 .resilience-tile small{display:block;margin-top:6px;color:var(--muted);font-size:10px;line-height:1.45}
-:root[data-theme="dark"] .resilience-panel{background:linear-gradient(135deg,rgba(22,37,34,.91),rgba(47,41,63,.54))}
-:root[data-theme="dark"] .resilience-tile{background:var(--surface-soft);border-color:var(--line)}
 @media(max-width:980px){.resilience-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:620px){.resilience-heading{flex-direction:column}.resilience-grid{grid-template-columns:1fr}}
 """
