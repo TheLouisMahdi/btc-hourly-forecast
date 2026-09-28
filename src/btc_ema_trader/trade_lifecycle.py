@@ -13,8 +13,8 @@ from sklearn.linear_model import SGDClassifier, SGDRegressor
 from sklearn.preprocessing import StandardScaler
 
 from .config import Settings
-from .costs import execution_cost_breakdown
-from .risk_economics import select_leverage
+from .costs import execution_cost_breakdown, projected_funding_bps, runtime_cost_breakdown
+from .risk_economics import estimate_isolated_liquidation_price, select_leverage
 
 TRADE_STATE_SCHEMA_VERSION = 1
 TRADE_FEATURES = (
@@ -249,7 +249,17 @@ class AdaptiveTradeEngine:
                 float(self.cfg.get("maximum_stop_percent", 0.025)),
             )
         )
-        base_reward_r = float(self.cfg.get("base_reward_r", 5.0))
+        forecast_reward_r = max(
+            0.0,
+            _finite(record.get("expected_return"), 0.0),
+        ) / max(base_stop_pct, 1e-9)
+        base_reward_r = float(
+            np.clip(
+                forecast_reward_r,
+                float(self.cfg.get("minimum_reward_r", 1.0)),
+                float(self.cfg.get("maximum_reward_r", 5.0)),
+            )
+        )
         vector = trade_feature_vector(
             record,
             output,
@@ -267,7 +277,8 @@ class AdaptiveTradeEngine:
         p_expiry = max(0.0, 1.0 - p_target - p_stop)
 
         minimum_samples = int(self.cfg.get("minimum_online_samples", 20))
-        if self.state.samples_seen < minimum_samples:
+        probabilities_calibrated = self.state.samples_seen >= minimum_samples
+        if not probabilities_calibrated:
             reward_r = base_reward_r
             stop_scale = 1.0
             holding_scale = 1.0
@@ -316,25 +327,32 @@ class AdaptiveTradeEngine:
         target_price = (
             entry + target_distance if direction == "LONG" else entry - target_distance
         )
-        base_holding = int(self.cfg.get("base_maximum_holding_hours", 72))
+        base_holding = int(
+            record.get("selected_horizon")
+            or output.get("maximum_holding_hours")
+            or self.cfg.get("base_maximum_holding_hours", 12)
+        )
         holding_hours = int(
             np.clip(
                 round(base_holding * holding_scale),
-                int(self.cfg.get("minimum_holding_hours", 12)),
-                int(self.cfg.get("maximum_holding_hours", 168)),
+                int(self.cfg.get("minimum_holding_hours", 3)),
+                int(self.cfg.get("maximum_holding_hours", 24)),
             )
         )
 
         economics = _margin_economics(
             settings=self.settings,
             entry=entry,
+            direction=direction,
             stop_pct=stop_pct,
             target_pct=target_distance / entry,
+            holding_hours=holding_hours,
             p_target=p_target,
             p_stop=p_stop,
             p_expiry=p_expiry,
             predicted_r=predicted_r,
             risk_score=_finite(output.get("risk_score"), 0.0),
+            probabilities_calibrated=probabilities_calibrated,
         )
         output.update(
             {
@@ -353,6 +371,7 @@ class AdaptiveTradeEngine:
                 "target_percent": target_distance / entry,
                 "risk_reward": reward_r,
                 "base_reward_r": base_reward_r,
+                "forecast_reward_r": forecast_reward_r,
                 "adaptive_reward_r": reward_r,
                 "maximum_holding_hours": holding_hours,
                 "expiry_policy": "TARGET_OR_STOP_OR_TIME_EXIT",
@@ -780,7 +799,7 @@ def _fallback_probabilities(
 
 
 def _fallback_expected_r(record: dict[str, Any], stop_pct: float) -> float:
-    move = abs(_finite(record.get("expected_return"), 0.0))
+    move = _finite(record.get("expected_return"), 0.0)
     return float(np.clip(move / max(stop_pct, 1e-6), -1.0, 5.0))
 
 
