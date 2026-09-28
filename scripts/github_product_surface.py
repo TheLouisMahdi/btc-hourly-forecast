@@ -76,6 +76,10 @@ def main() -> int:
         "Model range": "Projected range",
         "Direction result": "Signal result",
         "Interval result": "Range result",
+        "Price path and next forecast": "BTC price & outlook",
+        "Recent BTC closes with next-candle direction and calibrated range":
+            "Recent BTC closes, signal outcomes and projected 1H range",
+        "Forecast range": "Projected range",
         "<small>FORECAST CREATED</small>": "<small>SIGNAL TIME</small>",
         "<small>SOURCE CLOSED</small>": "<small>REFERENCE CLOSE</small>",
         "<small>TARGET OPEN</small>": "<small>NEXT CANDLE OPEN</small>",
@@ -107,8 +111,8 @@ def main() -> int:
         )
 
     doc = re.sub(
-        r'<div class="trade-lifecycle-tile">\s*<span>Policy</span>.*?</div>',
-        "",
+        r'<section class="panel trade-lifecycle-panel">.*?</section>',
+        _position_plan(latest),
         doc,
         count=1,
         flags=re.DOTALL,
@@ -161,11 +165,78 @@ def main() -> int:
         r"\1 closes inside \2 projected ranges",
         doc,
     )
+    doc = doc.replace(" · Forecast ", " · Signal ")
+    doc = doc.replace(" calibrated range", " confidence range")
+    doc = re.sub(
+        r'(<small>STATUS</small><strong>).*?(</strong>)',
+        r'\1ACTIVE\2',
+        doc,
+        count=1,
+        flags=re.DOTALL,
+    )
 
     if MARKER not in doc:
         doc = doc.replace("<body", f'<body {MARKER}', 1)
     index.write_text(doc, encoding="utf-8")
     return 0
+
+
+def _position_plan(latest: dict[str, Any]) -> str:
+    plan = latest.get("trade_plan")
+    plan = plan if isinstance(plan, dict) else {}
+    active = latest.get("active_trade")
+    if isinstance(active, dict) and isinstance(active.get("trade_plan"), dict):
+        plan = active["trade_plan"]
+
+    direction = str(latest.get("action") or plan.get("direction") or "WAIT").upper()
+    entry = _price(plan.get("entry_reference"))
+    target = _price(plan.get("target_price"))
+    stop = _price(plan.get("stop_price"))
+    risk_budget = _money(plan.get("risk_budget_usd"))
+    risk_fraction = _percent(plan.get("risk_fraction"))
+    setup_score = _percent(plan.get("risk_score"))
+    leverage = _multiple(plan.get("suggested_leverage"))
+    margin = _money(plan.get("margin_required_usd"))
+    expected = _money(plan.get("expected_value_usd"))
+    reward = _number(plan.get("risk_reward"))
+    holding = plan.get("maximum_holding_hours")
+    status = str(plan.get("status") or latest.get("action") or "WAIT").replace("_", " ").upper()
+
+    def tile(label: str, value: str, note: str) -> str:
+        return (
+            '<div class="trade-lifecycle-tile">'
+            f'<span>{html.escape(label)}</span>'
+            f'<strong>{html.escape(value)}</strong>'
+            f'<small>{html.escape(note)}</small></div>'
+        )
+
+    grid = (
+        tile("Status", f"{direction} · {status}", "Current 1H position stance")
+        + tile("Allocated risk", f"{risk_budget} · {risk_fraction}", "Capital allocated to this setup")
+        + tile("Setup score", setup_score, "Composite quality score for the current setup")
+        + tile("Risk / reward", "—" if reward is None else f"{reward:.2f}R", "Target reward relative to defined risk")
+        + tile("Expected P/L", expected, "Probability-weighted outcome estimate")
+        + tile("Margin / leverage", f"{margin} · {leverage}", "Position margin and leverage")
+        + tile("Max holding time", "—" if holding in (None, "") else f"{holding}h", "Maximum planned holding window")
+    )
+    return f'''<section class="panel trade-lifecycle-panel">
+  <div class="trade-lifecycle-heading">
+    <div>
+      <div class="structure-eyebrow">POSITION PLAN</div>
+      <h2>Position plan</h2>
+      <p class="sub">Entry, target and stop levels for the current BTC 1H setup.</p>
+    </div>
+    <span class="trade-lifecycle-state neutral">{html.escape(status)}</span>
+  </div>
+  <div class="trade-route">
+    <div><small>ENTRY</small><strong>{entry}</strong></div>
+    <span>→</span>
+    <div class="target"><small>TARGET</small><strong>{target}</strong></div>
+    <span>or</span>
+    <div class="stop"><small>STOP</small><strong>{stop}</strong></div>
+  </div>
+  <div class="trade-lifecycle-grid">{grid}</div>
+</section>'''
 
 
 def _market_snapshot(latest: dict[str, Any]) -> str:
@@ -276,7 +347,17 @@ def _percent(value: Any) -> str:
 
 def _price(value: Any) -> str:
     number = _number(value)
-    return "—" if number is None else f"\${number:,.2f}"
+    return "—" if number is None else "$" + f"{number:,.2f}"
+
+
+def _money(value: Any) -> str:
+    number = _number(value)
+    return "—" if number is None else "$" + f"{number:,.2f}"
+
+
+def _multiple(value: Any) -> str:
+    number = _number(value)
+    return "—" if number is None else f"{number:.0f}×"
 
 
 def _label(value: Any) -> str:
