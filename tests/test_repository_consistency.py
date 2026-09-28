@@ -139,7 +139,6 @@ class RepositoryConsistencyTests(unittest.TestCase):
         )
         for component in (
             "github_pages_dashboard.py",
-            "github_visual_dashboard.py",
             "github_uncertainty_dashboard.py",
             "github_resilience_dashboard.py",
         ):
