@@ -13,7 +13,7 @@ from sklearn.preprocessing import StandardScaler
 
 from .config import Settings
 from .costs import execution_cost_breakdown
-from .model import HourlyModelBundle
+from .model import HourlyModelBundle, build_trade_direction_context
 
 ADAPTIVE_SCHEMA_VERSION = 1
 ADAPTIVE_FEATURES = (
@@ -1012,13 +1012,14 @@ def _recalculate_prediction(
             ]
         )
     )
-    trade_direction = (
-        "UP"
-        if event_direction > 0
-        else "DOWN"
-        if event_direction < 0
-        else direction
+    trade_context = build_trade_direction_context(
+        probabilities,
+        general_returns,
+        [int(horizon) for horizon in bundle.trade_horizons],
+        settings.section("strategy"),
     )
+    trade_direction = str(trade_context["trade_direction"])
+    selected_horizon = int(trade_context["trade_selected_horizon"])
     absolute_event_returns = {
         int(horizon): (
             float(event_returns[int(horizon)] * event_direction)
@@ -1034,6 +1035,22 @@ def _recalculate_prediction(
             "agreement": float(agreement),
             "event_agreement": event_agreement,
             "trade_direction": trade_direction,
+            "trade_direction_score": trade_context["trade_direction_score"],
+            "trade_direction_confidence": trade_context[
+                "trade_direction_confidence"
+            ],
+            "trade_direction_source": trade_context[
+                "trade_direction_source"
+            ],
+            "trade_direction_horizon_weights": trade_context[
+                "trade_direction_horizon_weights"
+            ],
+            "trade_direction_probabilities": trade_context[
+                "trade_direction_probabilities"
+            ],
+            "trade_returns": trade_context["trade_returns"],
+            "trade_horizon_scores": trade_context["trade_horizon_scores"],
+            "trade_selected_horizon": selected_horizon,
             "probabilities": probabilities,
             "returns": general_returns,
             "continuation": continuation,
@@ -1042,7 +1059,9 @@ def _recalculate_prediction(
             "absolute_event_returns": absolute_event_returns,
             "horizon_scores": scores,
             "selected_horizon": int(selected_horizon),
-            "expected_return": absolute_event_returns[selected_horizon],
+            "expected_return": float(
+                trade_context["trade_returns"][selected_horizon]
+            ),
             "expected_event_aligned_return": event_returns[
                 selected_horizon
             ],
