@@ -298,24 +298,14 @@ def _segments(points: list[dict[str, Any]]) -> tuple[list[list[dict[str, Any]]],
 def _styles() -> str:
     return r'''
 :root{
-  --chart-price:#5f8f86;
-  --chart-grid:rgba(41,56,52,.075);
-  --chart-label:rgba(54,70,66,.58);
-  --chart-correct:#5f9e87;
-  --chart-wrong:#c57d78;
-  --chart-range:rgba(130,120,170,.15);
-  --chart-range-border:rgba(130,120,170,.32);
-  --chart-range-text:#716a91;
-}
-:root[data-theme="dark"]{
-  --chart-price:#8fc9bb;
-  --chart-grid:rgba(230,240,236,.085);
-  --chart-label:rgba(226,239,234,.58);
-  --chart-correct:#86cbb4;
-  --chart-wrong:#e59a94;
-  --chart-range:rgba(158,145,205,.18);
-  --chart-range-border:rgba(177,164,220,.38);
-  --chart-range-text:#c5bbe8;
+  --chart-price:#6f5138;
+  --chart-grid:rgba(91,68,48,.08);
+  --chart-label:rgba(91,68,48,.60);
+  --chart-correct:#6f7a50;
+  --chart-wrong:#a2554e;
+  --chart-range:rgba(184,137,47,.14);
+  --chart-range-border:rgba(184,137,47,.30);
+  --chart-range-text:#8a6421;
 }
 .price-chart-shell{margin-top:10px}
 .price-chart-v2{display:block;width:100%;height:auto;overflow:visible}
