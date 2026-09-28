@@ -55,6 +55,11 @@ class DashboardOrchestratorTests(unittest.TestCase):
                 side_effect=lambda: calls.append("market-price") or 0,
             ),
             patch.object(
+                render_dashboard.github_crypto_logo_dashboard,
+                "main",
+                side_effect=lambda: calls.append("crypto-logo") or 0,
+            ),
+            patch.object(
                 render_dashboard,
                 "_ensure_resilience_panel",
                 side_effect=lambda: calls.append("contract"),
@@ -72,6 +77,7 @@ class DashboardOrchestratorTests(unittest.TestCase):
                 "assistant",
                 "chart",
                 "market-price",
+                "crypto-logo",
                 "contract",
             ],
         )
