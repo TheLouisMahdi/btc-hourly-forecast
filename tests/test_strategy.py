@@ -167,7 +167,7 @@ class StrategyRiskPolicyTests(unittest.TestCase):
         )
         strong = make_decision(
             _row(event_score=0.95, volume_z_24=2.0, adx=34.0),
-            _prediction(success=0.78, tradeability=0.76, event_return=0.003),
+            _prediction(success=0.78, tradeability=0.76, event_return=0.005),
             _qualified_bundle(),
             self.settings,
         )
