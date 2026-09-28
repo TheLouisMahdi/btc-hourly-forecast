@@ -119,6 +119,9 @@ jobs:
               'Mahdi Ghahremani',
               'TheLouisMahdi',
               '<h2>Adaptive learning</h2>',
+              '<p class="sub"',
+              '<p class="copy"',
+              '<footer>',
           )
           present_forbidden = [marker for marker in forbidden if marker in document]
           if missing or present_forbidden:
