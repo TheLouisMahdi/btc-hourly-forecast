@@ -13,7 +13,7 @@ def select_leverage(
     tiers = sorted(
         {
             float(value)
-            for value in strategy.get("leverage_tiers", [10.0, 20.0, 40.0])
+            for value in strategy.get("leverage_tiers", [20.0, 30.0, 40.0])
             if float(value) > 0
         }
     )
@@ -26,8 +26,8 @@ def select_leverage(
         "leverage_risk_score_thresholds",
         [0.35, 0.65],
     )
-    low = float(thresholds[0]) if len(thresholds) > 0 else 0.35
-    high = float(thresholds[1]) if len(thresholds) > 1 else 0.65
+    low = float(thresholds[0]) if len(thresholds) > 0 else 0.20
+    high = float(thresholds[1]) if len(thresholds) > 1 else 0.50
     score = float(np.clip(risk_score, 0.0, 1.0))
 
     if score < low:
@@ -39,10 +39,10 @@ def select_leverage(
 
     if modeled_risk_fraction > 0:
         safety = float(
-            strategy.get("leverage_liquidation_safety_factor", 0.70)
+            strategy.get("leverage_liquidation_safety_factor", 0.60)
         )
         maintenance_margin_rate = float(
-            strategy.get("maintenance_margin_rate", 0.004)
+            strategy.get("maintenance_margin_rate", 0.005)
         )
         safe = [
             tier
@@ -96,6 +96,20 @@ def apply_risk_scaled_economics(
             maximum_fraction,
             minimum_fraction,
         )
+    configured_loss_cap = float(
+        strategy.get(
+            "maximum_modeled_loss_fraction_per_trade",
+            maximum_fraction,
+        )
+    )
+    loss_cap_fraction = float(
+        np.clip(
+            configured_loss_cap,
+            minimum_fraction,
+            maximum_fraction,
+        )
+    )
+    effective_maximum_fraction = min(maximum_fraction, loss_cap_fraction)
     risk_fraction = float(
         np.clip(
             float(
@@ -105,7 +119,7 @@ def apply_risk_scaled_economics(
                 )
             ),
             minimum_fraction,
-            maximum_fraction,
+            effective_maximum_fraction,
         )
     )
     risk_budget = account * risk_fraction
@@ -179,6 +193,12 @@ def apply_risk_scaled_economics(
         {
             "risk_fraction": risk_fraction,
             "risk_budget_usd": float(risk_budget),
+            "maximum_modeled_loss_fraction_per_trade": float(
+                effective_maximum_fraction
+            ),
+            "maximum_modeled_loss_usd": float(
+                account * effective_maximum_fraction
+            ),
             "modeled_risk_fraction": float(modeled_risk_fraction),
             "modeled_total_risk_usd": float(modeled_total_risk),
             "risk_budget_utilization": float(
@@ -199,7 +219,7 @@ def apply_risk_scaled_economics(
             "stop_margin_roi": float(stop_net / max(margin, 1e-12)),
             "expected_value_usd": float(expected_value),
             "execution_venue": str(
-                strategy.get("execution_venue", "BINANCE_USDM_BTCUSDT")
+                strategy.get("execution_venue", "OKX_BTC_USDT_SWAP")
             ),
             "margin_mode": str(strategy.get("margin_mode", "isolated")).upper(),
             "maintenance_margin_rate": float(maintenance_margin_rate),
