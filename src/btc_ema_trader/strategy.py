@@ -193,11 +193,14 @@ def make_decision(
         + float(base_costs["projected_funding_bps"])
     )
     net_edge_bps = expected_return * 10_000.0 - stress_cost_bps
-    minimum_edge_bps = float(
-        policy.get(
-            "minimum_predicted_stress_edge_bps",
-            cfg.get("minimum_net_edge_bps", 0.0),
-        )
+    minimum_edge_bps = max(
+        float(cfg.get("minimum_net_edge_bps", 0.0)),
+        float(
+            policy.get(
+                "minimum_predicted_stress_edge_bps",
+                0.0,
+            )
+        ),
     )
     minimum_event_score = float(
         policy.get(
