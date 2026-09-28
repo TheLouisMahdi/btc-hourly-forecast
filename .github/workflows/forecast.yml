@@ -4,7 +4,7 @@ run-name: Hourly BTC forecast · ${{ github.event_name }}
 on:
   workflow_dispatch:
   schedule:
-    - cron: "12 * * * *"
+    - cron: "17,47 * * * *"
 
 permissions:
   contents: write
