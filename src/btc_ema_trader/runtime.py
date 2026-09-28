@@ -310,6 +310,21 @@ class RuntimeEngine:
                     latest_row.get("event_score", 0.0)
                 ),
                 "forecast_direction": decision.forecast_direction,
+                "trade_direction": prediction.get("trade_direction"),
+                "trade_direction_source": prediction.get(
+                    "trade_direction_source"
+                ),
+                "trade_direction_confidence": prediction.get(
+                    "trade_direction_confidence"
+                ),
+                "trade_direction_score": prediction.get(
+                    "trade_direction_score"
+                ),
+                "trade_direction_probabilities": prediction.get(
+                    "trade_direction_probabilities",
+                    {},
+                ),
+                "trade_returns": prediction.get("trade_returns", {}),
                 "action": decision.action,
                 "confidence": decision.confidence,
                 "tradeability_probability": (
