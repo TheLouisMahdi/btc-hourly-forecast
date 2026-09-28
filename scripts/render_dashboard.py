@@ -11,7 +11,6 @@ import github_market_price_dashboard
 import github_pages_dashboard
 import github_resilience_dashboard
 import github_uncertainty_dashboard
-import github_visual_dashboard
 
 RESILIENCE_HEADING = "Data continuity &amp; learning safety"
 
@@ -23,7 +22,6 @@ def main() -> int:
         return status
 
     for component in (
-        github_visual_dashboard,
         github_uncertainty_dashboard,
         github_resilience_dashboard,
         github_assistant_dashboard,
