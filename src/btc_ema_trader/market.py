@@ -78,9 +78,17 @@ class MarketDataClient:
         provider_hint: str | None = None,
     ) -> Quote:
         order = [provider_hint] if provider_hint else []
+        configured_order = list(
+            self.cfg.get("execution_quote_provider_order", [])
+        )
+        fallback_order = (
+            configured_order
+            if configured_order
+            else list(self.cfg.get("provider_order", []))
+        )
         order += [
             provider
-            for provider in self.cfg.get("provider_order", [])
+            for provider in fallback_order
             if provider not in order
         ]
         errors: dict[str, str] = {}
