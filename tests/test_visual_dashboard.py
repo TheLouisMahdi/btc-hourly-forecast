@@ -13,26 +13,27 @@ import github_visual_dashboard
 
 
 class VisualDashboardTests(unittest.TestCase):
-    def test_background_contains_all_market_assets(self) -> None:
+    def test_background_is_subtle_and_has_no_market_clutter(self) -> None:
         background = github_visual_dashboard._background()
-        self.assertIn('data-market-ambience="v2"', background)
-        for coin in ("btc", "eth", "sol", "xrp", "bnb", "ada", "doge"):
-            self.assertIn(f"coin-{coin}", background)
-        self.assertIn("ambient-heart", background)
+        self.assertIn('data-luxury-theme="v1"', background)
+        self.assertIn("luxury-backdrop", background)
+        self.assertNotIn("ambient-coin", background)
+        self.assertNotIn("ambient-heart", background)
 
-    def test_styles_are_visible_compatible_and_accessible(self) -> None:
+    def test_styles_use_formal_cream_brown_gold_palette(self) -> None:
         styles = github_visual_dashboard._styles()
-        self.assertIn("@keyframes coin-drift", styles)
-        self.assertIn("@media(prefers-reduced-motion:reduce)", styles)
-        self.assertIn("z-index:1", styles)
+        for token in ("#f2eadf", "#352820", "#b89243", "#6f4d25"):
+            self.assertIn(token, styles)
+        self.assertNotIn('data-theme="dark"', styles)
+        self.assertNotIn("@keyframes coin-drift", styles)
+        self.assertNotIn("text-shadow", styles)
         self.assertNotIn("color-mix", styles)
-        self.assertNotIn("contain:strict", styles)
 
-    def test_theme_control_persists_user_choice(self) -> None:
-        script = github_visual_dashboard._script()
-        self.assertIn("btc-dashboard-theme", script)
-        self.assertIn("localStorage.setItem", script)
-        self.assertIn('data-theme', script)
+    def test_visual_layer_has_no_theme_toggle_or_persistent_theme_script(self) -> None:
+        source = Path(github_visual_dashboard.__file__).read_text(encoding="utf-8")
+        self.assertNotIn("theme-toggle", source)
+        self.assertNotIn("localStorage", source)
+        self.assertNotIn("btc-dashboard-theme", source)
 
 
 if __name__ == "__main__":
