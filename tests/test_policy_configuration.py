@@ -26,11 +26,11 @@ class PolicyConfigurationTests(unittest.TestCase):
         self.assertEqual(strategy["policy_version"], 2)
         self.assertEqual(
             strategy["minimum_risk_per_trade_fraction"],
-            0.005,
+            0.003,
         )
         self.assertEqual(
             strategy["maximum_risk_per_trade_fraction"],
-            0.03,
+            0.015,
         )
         self.assertLess(
             strategy["minimum_risk_per_trade_fraction"],
@@ -40,6 +40,17 @@ class PolicyConfigurationTests(unittest.TestCase):
             strategy["risk_per_trade_fraction"],
             strategy["maximum_risk_per_trade_fraction"],
         )
+        self.assertEqual(strategy["maximum_leverage"], 40.0)
+        self.assertEqual(strategy["leverage_tiers"], [10.0, 20.0, 40.0])
+        self.assertEqual(
+            strategy["leverage_risk_score_thresholds"],
+            [0.35, 0.65],
+        )
+        self.assertFalse(
+            config["trade_assistant"]["require_qualified_meta_for_position"]
+        )
+        self.assertEqual(config["trade_lifecycle"]["breakeven_trigger_r"], 1.0)
+        self.assertEqual(config["trade_lifecycle"]["trailing_trigger_r"], 1.5)
         self.assertFalse(config["adaptive"]["enabled"])
         self.assertTrue(config["trade_lifecycle"]["enabled"])
         self.assertEqual(
