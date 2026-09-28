@@ -320,6 +320,7 @@ class RuntimeEngine:
                 "trade_direction_score": prediction.get(
                     "trade_direction_score"
                 ),
+                "trade_selected_horizon": decision.selected_horizon,
                 "trade_direction_probabilities": prediction.get(
                     "trade_direction_probabilities",
                     {},
