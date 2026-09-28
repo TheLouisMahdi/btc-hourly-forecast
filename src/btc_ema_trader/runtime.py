@@ -167,10 +167,18 @@ class RuntimeEngine:
                 base_prediction,
             )
 
+            execution_provider = str(
+                self.settings.section("market").get(
+                    "paper_execution_provider",
+                    provider,
+                )
+            )
             quote_ok = True
             quote_provider: str | None = None
             try:
-                quote = self.market.live_quote(provider_hint=provider)
+                quote = self.market.live_quote(
+                    provider_hint=execution_provider
+                )
                 quote_provider = quote.provider
                 quote_age = (
                     pd.Timestamp.now(tz="UTC") - quote.timestamp
@@ -206,10 +214,12 @@ class RuntimeEngine:
             data_health = {
                 "candles_ok": candles_ok,
                 "quote_ok": quote_ok,
-                "provider_mismatch": provider != bundle.provider
-                or (
+                "provider_mismatch": provider != bundle.provider,
+                "execution_provider": execution_provider,
+                "execution_quote_provider": quote_provider,
+                "execution_provider_mismatch": (
                     quote_provider is not None
-                    and quote_provider != bundle.provider
+                    and quote_provider != execution_provider
                 ),
                 "model_stale": model_age_days
                 > float(
