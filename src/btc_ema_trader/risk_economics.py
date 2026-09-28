@@ -42,7 +42,7 @@ def select_leverage(
             strategy.get("leverage_liquidation_safety_factor", 0.60)
         )
         maintenance_margin_rate = float(
-            strategy.get("maintenance_margin_rate", 0.005)
+            strategy.get("maintenance_margin_rate", 0.004)
         )
         safe = [
             tier
