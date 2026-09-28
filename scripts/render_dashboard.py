@@ -9,6 +9,7 @@ import github_assistant_dashboard
 import github_chart_dashboard
 import github_crypto_logo_dashboard
 import github_market_price_dashboard
+import github_product_surface
 import github_pages_dashboard
 import github_resilience_dashboard
 import github_uncertainty_dashboard
@@ -37,6 +38,9 @@ def main() -> int:
             return status
 
     _ensure_resilience_panel()
+    status = github_product_surface.main()
+    if status != 0:
+        return status
     return 0
 
 
