@@ -111,12 +111,12 @@ def _tile(title: str, value: str, note: str) -> str:
 
 def _styles() -> str:
     return r'''
-.boundary-memory-panel{position:relative;margin-top:18px;overflow:hidden;background:linear-gradient(135deg,rgba(255,255,255,.9),rgba(236,234,245,.58))}
-.boundary-memory-panel:before{content:"";position:absolute;inset:-40% auto auto -15%;width:320px;height:320px;border-radius:50%;background:radial-gradient(circle,rgba(111,155,145,.12),transparent 68%);pointer-events:none}
+.boundary-memory-panel{position:relative;margin-top:16px;overflow:hidden;background:var(--paper)}
+.boundary-memory-panel:before{display:none}
 .boundary-memory-heading{position:relative;display:flex;align-items:flex-start;justify-content:space-between;gap:20px;margin-bottom:20px}.boundary-memory-heading h2{margin:5px 0 8px;font-size:clamp(1.35rem,3vw,2rem)}
-.boundary-memory-state{display:inline-flex;align-items:center;justify-content:center;min-width:112px;padding:10px 14px;border-radius:999px;font-size:.78rem;font-weight:850;letter-spacing:.08em;border:1px solid var(--line)}
-.boundary-memory-state.safe{background:rgba(77,139,118,.12);color:var(--ok)}.boundary-memory-state.veto{background:rgba(189,114,110,.12);color:var(--bad)}.boundary-memory-state.shadow{background:rgba(154,134,93,.12);color:var(--wait)}.boundary-memory-state.unavailable{background:rgba(116,131,127,.09);color:var(--muted)}
-.boundary-memory-grid{position:relative;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}.boundary-memory-tile{padding:16px;border:1px solid var(--line);border-radius:18px;background:rgba(255,255,255,.58);min-height:118px;display:flex;flex-direction:column;gap:8px}.boundary-memory-tile span{font-size:.68rem;color:var(--muted);text-transform:uppercase;letter-spacing:.07em}.boundary-memory-tile strong{font-size:1rem;overflow-wrap:anywhere}.boundary-memory-tile small{color:var(--muted);font-size:.68rem;line-height:1.45}
+.boundary-memory-state{display:inline-flex;align-items:center;justify-content:center;min-width:100px;padding:8px 10px;border-radius:8px;font-size:.72rem;font-weight:850;letter-spacing:.07em;border:1px solid var(--line)}
+.boundary-memory-state.safe{background:rgba(111,122,80,.11);color:var(--ok)}.boundary-memory-state.veto{background:rgba(162,85,78,.10);color:var(--bad)}.boundary-memory-state.shadow{background:rgba(184,138,52,.11);color:var(--wait)}.boundary-memory-state.unavailable{background:rgba(122,105,91,.08);color:var(--muted)}
+.boundary-memory-grid{position:relative;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}.boundary-memory-tile{padding:14px;border:1px solid var(--line);border-radius:10px;background:#f8f2e9;min-height:108px;display:flex;flex-direction:column;gap:7px}.boundary-memory-tile span{font-size:.68rem;color:var(--muted);text-transform:uppercase;letter-spacing:.07em}.boundary-memory-tile strong{font-size:1rem;overflow-wrap:anywhere}.boundary-memory-tile small{color:var(--muted);font-size:.68rem;line-height:1.45}
 @media(max-width:850px){.boundary-memory-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}@media(max-width:520px){.boundary-memory-heading{flex-direction:column}.boundary-memory-grid{grid-template-columns:1fr}.boundary-memory-state{align-self:flex-start}}
 '''
 
