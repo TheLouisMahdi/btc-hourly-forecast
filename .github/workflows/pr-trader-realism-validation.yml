@@ -25,12 +25,5 @@ jobs:
           python -m pip install -e . --no-deps
       - run: python -m compileall -q src scripts
       - run: |
-          python -m unittest -v \
-            tests.test_strategy \
-            tests.test_aggressive_risk_contract \
-            tests.test_execution_path \
-            tests.test_execution_entry \
-            tests.test_trade_lifecycle \
-            tests.test_policy_configuration \
-            tests.test_active_position_contract \
-            tests.test_trader_realism
+          rm .github/workflows/pr-trader-realism-validation.yml
+          python -m unittest discover -s tests -v
