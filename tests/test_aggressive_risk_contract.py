@@ -17,6 +17,8 @@ from github_structural_forecast import (
 
 class _Settings:
     def section(self, name: str):
+        if name == "trade_lifecycle":
+            return {"minimum_online_samples": 20}
         if name != "strategy":
             raise KeyError(name)
         return {
@@ -29,6 +31,8 @@ class _Settings:
             "leverage_tiers": [10.0, 20.0, 40.0],
             "leverage_risk_score_thresholds": [0.35, 0.65],
             "leverage_liquidation_safety_factor": 0.70,
+            "maintenance_margin_rate": 0.004,
+            "margin_mode": "ISOLATED",
             "gap_risk_buffer_bps": 6.0,
         }
 
@@ -37,6 +41,7 @@ class AggressiveRiskContractTests(unittest.TestCase):
     def test_final_trade_economics_uses_one_gap_aware_risk_budget(self) -> None:
         plan = {
             "entry_reference": 100.0,
+            "position_direction": "LONG",
             "stop_percent": 0.01,
             "target_percent": 0.05,
             "stress_execution_cost_bps": 20.0,
@@ -61,6 +66,12 @@ class AggressiveRiskContractTests(unittest.TestCase):
         self.assertLessEqual(output["risk_budget_utilization"], 1.0 + 1e-12)
         self.assertGreater(output["target_net_profit_usd"], 0.0)
         self.assertLess(output["stop_net_loss_usd"], 0.0)
+        self.assertIsNone(output["expected_value_usd"])
+        self.assertEqual(
+            output["expected_value_status"],
+            "UNCALIBRATED_HEURISTIC",
+        )
+        self.assertIsNotNone(output["estimated_liquidation_price"])
 
     def test_new_position_persists_policy_and_risk_contract(self) -> None:
         record = {
@@ -84,7 +95,7 @@ class AggressiveRiskContractTests(unittest.TestCase):
                 "policy_name": "AGGRESSIVE_STRUCTURAL_RISK_SCALED",
                 "policy_version": 2,
                 "risk_contract_version": 2,
-                "entry_contract": "STRUCTURAL_EVENT_RISK_SCALED",
+                "entry_contract": "MODEL_MULTI_HORIZON_RISK_SCALED",
                 "soft_risk_flags": ["MODEL_NOT_QUALIFIED"],
                 "qualification_passed": False,
                 "direction_qualified": False,
@@ -108,7 +119,7 @@ class AggressiveRiskContractTests(unittest.TestCase):
         self.assertEqual(trade["risk_contract_version"], 2)
         self.assertEqual(
             trade["entry_contract"],
-            "STRUCTURAL_EVENT_RISK_SCALED",
+            "MODEL_MULTI_HORIZON_RISK_SCALED",
         )
         self.assertEqual(trade["risk_fraction"], 0.02)
         self.assertEqual(trade["gap_risk_buffer_bps"], 6.0)
