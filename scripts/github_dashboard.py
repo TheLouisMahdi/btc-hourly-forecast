@@ -269,7 +269,7 @@ def render(latest: dict[str, Any], history: list[dict[str, Any]]) -> str:
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta http-equiv="refresh" content="300">
-<meta name="theme-color" content="#f3f7f5">
+<meta name="theme-color" content="#f2eadf">
 <meta name="description" content="Adaptive next-candle BTC direction and price forecast">
 <title>BTC Next-Candle Forecast</title>
 <style>{css}</style>
