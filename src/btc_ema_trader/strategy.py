@@ -106,11 +106,9 @@ def make_decision(
     policy_by_direction = qualification.get("economic_policy", {})
     direction_policies = policy_by_direction.get(direction_name, {})
 
-    selected_horizon = int(
-        prediction.get(
-            "trade_selected_horizon",
-            prediction.get("selected_horizon", 1),
-        )
+    selected_horizon = _select_model_trade_horizon(
+        prediction,
+        cfg,
     )
     policy = direction_policies.get(
         str(selected_horizon),
@@ -422,6 +420,57 @@ def make_decision(
         blockers=hard_blockers,
         trade_plan=trade_plan,
     )
+
+
+def _select_model_trade_horizon(
+    prediction: dict[str, Any],
+    cfg: dict[str, Any],
+) -> int:
+    trade_returns = prediction.get("trade_returns", {})
+    direction_probabilities = prediction.get(
+        "trade_direction_probabilities",
+        {},
+    )
+    candidates: list[int] = []
+    if isinstance(trade_returns, dict):
+        for key in trade_returns:
+            try:
+                horizon = int(key)
+            except (TypeError, ValueError):
+                continue
+            if horizon > 1:
+                candidates.append(horizon)
+    if not candidates:
+        return int(
+            prediction.get(
+                "trade_selected_horizon",
+                prediction.get("selected_horizon", 1),
+            )
+        )
+
+    def score(horizon: int) -> tuple[float, float, int]:
+        aligned_return = _mapping_value(
+            trade_returns,
+            horizon,
+            0.0,
+        )
+        probability = _mapping_value(
+            direction_probabilities,
+            horizon,
+            float(prediction.get("trade_direction_confidence", 0.5)),
+        )
+        costs = runtime_cost_breakdown(cfg, horizon)
+        net_edge_bps = (
+            aligned_return * 10_000.0
+            - float(costs["runtime_stress_cost_bps"])
+        )
+        return (
+            probability * net_edge_bps,
+            net_edge_bps,
+            -horizon,
+        )
+
+    return max(sorted(set(candidates)), key=score)
 
 
 def _select_economic_horizon(
