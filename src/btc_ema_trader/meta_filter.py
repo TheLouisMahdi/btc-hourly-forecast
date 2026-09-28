@@ -307,21 +307,28 @@ def apply_precision_gate(
         cfg.get("require_qualified_meta_for_position", True)
     )
     blockers: list[str] = []
-    if assessment.get("status") != "READY":
-        if require_qualified:
+    if require_qualified:
+        if assessment.get("status") != "READY":
             blockers.append("POSITION_META_FILTER_UNAVAILABLE")
-    elif not assessment.get("qualified", False):
-        if require_qualified:
+        elif not assessment.get("qualified", False):
             blockers.append("POSITION_META_NOT_QUALIFIED")
-    elif not assessment.get("selected", False):
-        blockers.append(str(
-            assessment.get("reason") or "META_PRECISION_GATE_REJECTED"
-        ))
+        elif not assessment.get("selected", False):
+            blockers.append(str(
+                assessment.get("reason") or "META_PRECISION_GATE_REJECTED"
+            ))
 
     if blockers:
         output["status"] = "BLOCKED"
         output["position_quality_status"] = "EXPERIMENTAL_BLOCKED"
         return output, blockers
+
+    if not require_qualified and (
+        assessment.get("status") != "READY"
+        or not assessment.get("qualified", False)
+        or not assessment.get("selected", False)
+    ):
+        output["position_quality_status"] = "META_ADVISORY"
+        return output, []
 
     profile = assessment.get("exit_profile")
     if isinstance(profile, dict):
