@@ -807,26 +807,35 @@ def _margin_economics(
     *,
     settings: Settings,
     entry: float,
+    direction: str,
     stop_pct: float,
     target_pct: float,
+    holding_hours: float,
     p_target: float,
     p_stop: float,
     p_expiry: float,
     predicted_r: float,
     risk_score: float,
+    probabilities_calibrated: bool,
 ) -> dict[str, Any]:
     strategy = settings.section("strategy")
     account = float(strategy.get("account_equity_usd", 1000.0))
     risk_fraction = float(strategy.get("risk_per_trade_fraction", 0.01))
     risk_budget = account * risk_fraction
-    costs = execution_cost_breakdown(strategy)
-    stress_bps = float(costs["stress_cost_bps"])
+    costs = runtime_cost_breakdown(strategy, holding_hours)
+    stress_bps = float(costs["runtime_stress_cost_bps"])
     cost_fraction = stress_bps / 10_000.0
-    modeled_risk_fraction = stop_pct + cost_fraction
+    gap_fraction = (
+        max(0.0, float(strategy.get("gap_risk_buffer_bps", 0.0)))
+        / 10_000.0
+    )
+    modeled_risk_fraction = stop_pct + cost_fraction + gap_fraction
     leverage = select_leverage(
         strategy,
         risk_score,
         modeled_risk_fraction,
+        entry=entry,
+        direction=direction,
     )
     unit_risk = entry * modeled_risk_fraction
     quantity = risk_budget / max(unit_risk, 1e-9)
@@ -839,8 +848,20 @@ def _margin_economics(
     target_net = target_gross - execution_cost
     stop_net = -(stop_gross + execution_cost)
     expiry_net = notional * predicted_r * stop_pct - execution_cost
-    expected_value = (
+    heuristic_expected_value = (
         p_target * target_net + p_stop * stop_net + p_expiry * expiry_net
+    )
+    liquidation_price = estimate_isolated_liquidation_price(
+        strategy,
+        entry=entry,
+        direction=direction,
+        leverage=leverage,
+        quantity=max(quantity, 1e-12),
+    )
+    liquidation_distance = (
+        None
+        if liquidation_price is None
+        else abs(liquidation_price - entry) / entry
     )
     return {
         "risk_budget_usd": float(risk_budget),
@@ -848,6 +869,9 @@ def _margin_economics(
         "notional_usd": float(notional),
         "suggested_leverage": leverage,
         "margin_required_usd": float(margin),
+        "base_execution_cost_bps": float(costs["runtime_base_cost_bps"]),
+        "stress_execution_cost_bps": stress_bps,
+        "projected_funding_bps": float(costs["projected_funding_bps"]),
         "round_trip_stress_cost_usd": float(execution_cost),
         "target_gross_profit_usd": float(target_gross),
         "target_net_profit_usd": float(target_net),
@@ -856,11 +880,27 @@ def _margin_economics(
         "profit_margin_usd": float(target_net),
         "target_margin_roi": float(target_net / max(margin, 1e-9)),
         "stop_margin_roi": float(stop_net / max(margin, 1e-9)),
-        "expected_value_usd": float(expected_value),
-        "stress_execution_cost_bps": stress_bps,
+        "heuristic_expected_value_usd": float(heuristic_expected_value),
+        "expected_value_usd": (
+            float(heuristic_expected_value)
+            if probabilities_calibrated
+            else None
+        ),
+        "expected_value_status": (
+            "CALIBRATED"
+            if probabilities_calibrated
+            else "UNCALIBRATED_HEURISTIC"
+        ),
+        "estimated_liquidation_price": liquidation_price,
+        "liquidation_distance_percent": liquidation_distance,
+        "maintenance_margin_rate": float(
+            strategy.get("maintenance_margin_rate", 0.004)
+        ),
+        "margin_mode": str(
+            strategy.get("margin_mode", "ISOLATED")
+        ).upper(),
         "paper_only": bool(strategy.get("paper_only", True)),
     }
-
 
 def _finite(value: Any, default: float = 0.0) -> float:
     try:
