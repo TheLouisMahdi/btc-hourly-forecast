@@ -3,6 +3,14 @@ name: Deploy BTC dashboard
 run-name: Deploy BTC dashboard · ${{ github.event_name }}
 
 on:
+  push:
+    branches:
+      - main
+    paths:
+      - "assets/crypto/**"
+      - "scripts/github_crypto_logo_dashboard.py"
+      - "scripts/render_dashboard.py"
+      - ".github/workflows/dashboard.yml"
   workflow_dispatch:
   workflow_run:
     workflows:
@@ -72,6 +80,15 @@ jobs:
           document = Path("site/index.html").read_text(encoding="utf-8")
           required = (
               'data-luxury-theme="v1"',
+              'data-crypto-logo-strip="v1"',
+              'assets/crypto/btc.svg',
+              'assets/crypto/eth.svg',
+              'assets/crypto/usdt.svg',
+              'assets/crypto/bnb.svg',
+              'assets/crypto/sol.svg',
+              'assets/crypto/xrp.svg',
+              'assets/crypto/ada.svg',
+              'assets/crypto/doge.svg',
               'data-uncertainty-display="range-only-v1"',
               'data-resilience-dashboard="v1"',
               'data-elegant-chart="v2"',
@@ -94,6 +111,7 @@ jobs:
               '@keyframes coin-drift',
               'btc-dashboard-theme',
               'Position entries are precision-gated',
+              'class="brand"',
           )
           present_forbidden = [marker for marker in forbidden if marker in document]
           if missing or present_forbidden:
