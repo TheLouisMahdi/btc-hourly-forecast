@@ -124,8 +124,21 @@ class CanonicalRuntimeEngine(RuntimeEngine):
         )
 
         observed_at = pd.Timestamp.now(tz="UTC")
+        execution_provider = str(
+            self.settings.section("market").get(
+                "paper_execution_provider",
+                provider or "binance_futures",
+            )
+        )
         try:
-            quote = self.market.live_quote(provider_hint=provider)
+            quote = self.market.live_quote(
+                provider_hint=execution_provider
+            )
+            if quote.provider != execution_provider:
+                raise RuntimeError(
+                    "Paper execution quote provider mismatch: "
+                    f"{quote.provider} != {execution_provider}"
+                )
             return apply_execution_quote(
                 result,
                 provider=quote.provider,
