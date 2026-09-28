@@ -25,7 +25,10 @@ class _Settings:
             "risk_per_trade_fraction": 0.0125,
             "minimum_risk_per_trade_fraction": 0.005,
             "maximum_risk_per_trade_fraction": 0.03,
-            "maximum_leverage": 5.0,
+            "maximum_leverage": 40.0,
+            "leverage_tiers": [10.0, 20.0, 40.0],
+            "leverage_risk_score_thresholds": [0.35, 0.65],
+            "leverage_liquidation_safety_factor": 0.70,
             "gap_risk_buffer_bps": 6.0,
         }
 
@@ -38,6 +41,7 @@ class AggressiveRiskContractTests(unittest.TestCase):
             "target_percent": 0.05,
             "stress_execution_cost_bps": 20.0,
             "risk_fraction": 0.025,
+            "risk_score": 0.80,
             "adaptive_target_probability": 0.55,
             "adaptive_stop_probability": 0.35,
             "adaptive_predicted_r": 1.5,
@@ -49,6 +53,7 @@ class AggressiveRiskContractTests(unittest.TestCase):
         self.assertEqual(output["risk_budget_usd"], 25.0)
         self.assertEqual(output["gap_risk_buffer_bps"], 6.0)
         self.assertGreater(output["notional_usd"], 0.0)
+        self.assertEqual(output["suggested_leverage"], 40.0)
         self.assertLessEqual(
             output["modeled_total_risk_usd"],
             output["risk_budget_usd"] + 1e-9,
