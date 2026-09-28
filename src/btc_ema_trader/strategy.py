@@ -261,7 +261,13 @@ def make_decision(
         direction_qualified=direction_qualified,
         economic_policy_available=bool(policy),
         regime=str(latest_row.get("regime", "UNKNOWN")),
-        event_direction=1 if trade_direction == "UP" else -1,
+        event_direction=(
+            1
+            if trade_direction == "UP"
+            else -1
+            if trade_direction == "DOWN"
+            else 0
+        ),
         soft_risk_flags=soft_risk_flags,
     )
 
