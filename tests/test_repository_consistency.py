@@ -127,7 +127,7 @@ class RepositoryConsistencyTests(unittest.TestCase):
         self.assertNotIn("python scripts/github_structural_forecast.py", workflow)
         self.assertNotIn("gh workflow run retrain.yml", workflow)
         self.assertNotIn("inputs.allow_retrain", workflow)
-        self.assertIn('cron: "12 * * * *"', workflow)
+        self.assertIn('cron: "17,47 * * * *"', workflow)
 
     def test_dashboard_workflow_has_one_render_entry_point(self) -> None:
         workflow = (
