@@ -188,6 +188,163 @@ class MarketDataClient:
                 errors[str(provider)] = str(exc)
         raise RuntimeError(f"Live quote unavailable: {errors}")
 
+    def fetch_execution_candles(
+        self,
+        provider: str,
+        start: Any,
+        end: Any | None = None,
+    ) -> pd.DataFrame:
+        """Fetch closed one-minute candles for post-entry paper execution."""
+        start_time = pd.Timestamp(start)
+        start_time = (
+            start_time.tz_localize("UTC")
+            if start_time.tzinfo is None
+            else start_time.tz_convert("UTC")
+        )
+        end_time = pd.Timestamp(
+            end if end is not None else pd.Timestamp.now(tz="UTC")
+        )
+        end_time = (
+            end_time.tz_localize("UTC")
+            if end_time.tzinfo is None
+            else end_time.tz_convert("UTC")
+        )
+        if end_time <= start_time:
+            return pd.DataFrame()
+        if provider in {"binance_futures", "binance_spot"}:
+            return self._fetch_binance_execution_minutes(
+                provider,
+                start_time,
+                end_time,
+            )
+        if provider == "coinbase_spot":
+            return self._fetch_coinbase_execution_minutes(
+                start_time,
+                end_time,
+            )
+        raise ValueError(
+            f"Minute execution candles are unsupported for {provider}"
+        )
+
+    def _fetch_binance_execution_minutes(
+        self,
+        provider: str,
+        start: pd.Timestamp,
+        end: pd.Timestamp,
+    ) -> pd.DataFrame:
+        futures = provider == "binance_futures"
+        url = (
+            self.cfg["binance_futures_base_url"].rstrip("/")
+            + "/fapi/v1/klines"
+            if futures
+            else self.cfg["binance_spot_base_url"].rstrip("/")
+            + "/api/v3/klines"
+        )
+        cursor_ms = int(start.floor("min").timestamp() * 1000)
+        end_ms = int(end.timestamp() * 1000)
+        rows: list[list[Any]] = []
+        limit = 1500 if futures else 1000
+        while cursor_ms < end_ms:
+            batch = self._get_json(
+                url,
+                {
+                    "symbol": self.cfg.get("symbol", "BTCUSDT"),
+                    "interval": "1m",
+                    "startTime": cursor_ms,
+                    "endTime": end_ms,
+                    "limit": limit,
+                },
+            )
+            if not batch:
+                break
+            rows.extend(batch)
+            next_ms = int(batch[-1][0]) + 60_000
+            if next_ms <= cursor_ms:
+                break
+            cursor_ms = next_ms
+            time.sleep(0.03)
+
+        now = end
+        data: list[dict[str, Any]] = []
+        for row in rows:
+            open_time = pd.to_datetime(int(row[0]), unit="ms", utc=True)
+            close_time = pd.to_datetime(int(row[6]), unit="ms", utc=True)
+            if open_time < start.floor("min") or close_time >= now:
+                continue
+            data.append(
+                {
+                    "provider": provider,
+                    "symbol": self.cfg.get("symbol", "BTCUSDT"),
+                    "open_time": open_time,
+                    "open": float(row[1]),
+                    "high": float(row[2]),
+                    "low": float(row[3]),
+                    "close": float(row[4]),
+                    "volume": float(row[5]),
+                    "quote_volume": float(row[7]),
+                    "trades": float(row[8]),
+                    "closed": True,
+                    "fetched_at": pd.Timestamp.now(tz="UTC"),
+                }
+            )
+        return self._normalize(data)
+
+    def _fetch_coinbase_execution_minutes(
+        self,
+        start: pd.Timestamp,
+        end: pd.Timestamp,
+    ) -> pd.DataFrame:
+        product = self.cfg.get("coinbase_product", "BTC-USD")
+        url = (
+            self.cfg["coinbase_base_url"].rstrip("/")
+            + f"/products/{product}/candles"
+        )
+        cursor = start.floor("min")
+        closed_end = end.floor("min")
+        rows: list[list[Any]] = []
+        window = pd.Timedelta(minutes=290)
+        while cursor < closed_end:
+            batch_end = min(cursor + window, closed_end)
+            batch = self._get_json(
+                url,
+                {
+                    "granularity": 60,
+                    "start": cursor.isoformat(),
+                    "end": batch_end.isoformat(),
+                },
+            )
+            if isinstance(batch, list):
+                rows.extend(batch)
+            if batch_end <= cursor:
+                break
+            cursor = batch_end
+            time.sleep(0.10)
+
+        data: list[dict[str, Any]] = []
+        for row in rows:
+            if len(row) < 6:
+                continue
+            open_time = pd.to_datetime(int(row[0]), unit="s", utc=True)
+            if not (start.floor("min") <= open_time < closed_end):
+                continue
+            data.append(
+                {
+                    "provider": "coinbase_spot",
+                    "symbol": self.cfg.get("symbol", "BTCUSDT"),
+                    "open_time": open_time,
+                    "open": float(row[3]),
+                    "high": float(row[2]),
+                    "low": float(row[1]),
+                    "close": float(row[4]),
+                    "volume": float(row[5]),
+                    "quote_volume": None,
+                    "trades": None,
+                    "closed": True,
+                    "fetched_at": pd.Timestamp.now(tz="UTC"),
+                }
+            )
+        return self._normalize(data)
+
     def _fetch_provider(
         self,
         provider: str,
