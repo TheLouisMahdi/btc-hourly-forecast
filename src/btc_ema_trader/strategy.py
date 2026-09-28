@@ -724,6 +724,8 @@ def build_trade_plan(
         cfg,
         float(assessment.get("risk_score", 0.0)),
         effective_risk_pct,
+        entry=price,
+        direction=direction,
     )
     notional = min(
         quantity_btc * price,
@@ -749,6 +751,9 @@ def build_trade_plan(
                 "trade_direction_source",
                 "MULTI_HORIZON_GENERAL_MODEL",
             )
+        ),
+        "position_direction": (
+            "LONG" if direction == "UP" else "SHORT"
         ),
         "entry_reference": price,
         "entry_reference_kind": "CURRENT_CLOSE_PROXY",
