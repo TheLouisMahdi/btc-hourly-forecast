@@ -534,14 +534,15 @@ def open_trade_from_record(record: dict[str, Any]) -> dict[str, Any] | None:
         "risk_reward": _finite(plan.get("risk_reward"), 5.0),
         "maximum_holding_hours": maximum_holding,
         "expires_at": (opened_at + pd.Timedelta(hours=maximum_holding)).isoformat(),
-        "breakeven_trigger_r": _finite(plan.get("breakeven_trigger_r"), 2.0),
-        "trailing_trigger_r": _finite(plan.get("trailing_trigger_r"), 3.0),
+        "breakeven_trigger_r": _finite(plan.get("breakeven_trigger_r"), 1.0),
+        "trailing_trigger_r": _finite(plan.get("trailing_trigger_r"), 1.5),
         "trailing_atr_multiplier": _finite(
             plan.get("trailing_atr_multiplier"), 1.0
         ),
         "entry_atr": _finite(plan.get("entry_atr"), initial_risk_price),
         "quantity_btc": _finite(plan.get("quantity_btc"), 0.0),
         "notional_usd": _finite(plan.get("notional_usd"), 0.0),
+        "suggested_leverage": _finite(plan.get("suggested_leverage"), 10.0),
         "margin_required_usd": _finite(plan.get("margin_required_usd"), 0.0),
         "risk_budget_usd": _finite(plan.get("risk_budget_usd"), 0.0),
         "stress_execution_cost_bps": _finite(
