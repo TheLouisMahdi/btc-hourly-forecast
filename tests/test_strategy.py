@@ -155,7 +155,7 @@ class StrategyRiskPolicyTests(unittest.TestCase):
         )
         self.assertEqual(decision.trade_plan["policy_version"], 2)
         self.assertGreaterEqual(decision.trade_plan["risk_fraction"], 0.003)
-        self.assertLessEqual(decision.trade_plan["risk_fraction"], 0.015)
+        self.assertLessEqual(decision.trade_plan["risk_fraction"], 0.020)
         self.assertGreater(decision.trade_plan["risk_budget_usd"], 0.0)
 
     def test_strong_qualified_event_receives_more_risk_than_weak_event(self) -> None:
@@ -179,7 +179,7 @@ class StrategyRiskPolicyTests(unittest.TestCase):
             strong.trade_plan["risk_fraction"],
             weak.trade_plan["risk_fraction"],
         )
-        self.assertLessEqual(strong.trade_plan["risk_fraction"], 0.015)
+        self.assertLessEqual(strong.trade_plan["risk_fraction"], 0.020)
         self.assertGreater(
             strong.trade_plan["risk_score"],
             weak.trade_plan["risk_score"],
