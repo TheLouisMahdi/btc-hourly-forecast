@@ -318,6 +318,105 @@ class HorizonModel:
         }
 
 
+def build_trade_direction_context(
+    probabilities: dict[int, float],
+    general_returns: dict[int, float],
+    trade_horizons: list[int],
+    strategy_cfg: dict[str, Any],
+) -> dict[str, Any]:
+    """Build a model-only multi-horizon trading direction.
+
+    The one-hour forecast remains a separate forecast product. Position
+    direction is derived only from the configured trade horizons and never
+    from the structural event direction.
+    """
+    horizons = [
+        int(horizon)
+        for horizon in trade_horizons
+        if int(horizon) in probabilities
+    ]
+    if not horizons:
+        horizons = sorted(int(horizon) for horizon in probabilities)
+    if not horizons:
+        raise ValueError("No model horizon is available for trade direction")
+
+    configured = strategy_cfg.get("trade_direction_horizon_weights", {})
+    if not isinstance(configured, dict):
+        configured = {}
+    weights = {
+        horizon: max(
+            0.0,
+            float(
+                configured.get(
+                    horizon,
+                    configured.get(str(horizon), 1.0),
+                )
+            ),
+        )
+        for horizon in horizons
+    }
+    total_weight = sum(weights.values())
+    if total_weight <= 0:
+        weights = {horizon: 1.0 for horizon in horizons}
+        total_weight = float(len(horizons))
+
+    direction_score = sum(
+        weights[horizon] * (2.0 * float(probabilities[horizon]) - 1.0)
+        for horizon in horizons
+    ) / total_weight
+    direction = "UP" if direction_score >= 0.0 else "DOWN"
+    confidence = float(0.5 + abs(direction_score) / 2.0)
+
+    aligned_returns = {
+        horizon: (
+            float(general_returns.get(horizon, 0.0))
+            if direction == "UP"
+            else -float(general_returns.get(horizon, 0.0))
+        )
+        for horizon in horizons
+    }
+    directional_probabilities = {
+        horizon: (
+            float(probabilities[horizon])
+            if direction == "UP"
+            else 1.0 - float(probabilities[horizon])
+        )
+        for horizon in horizons
+    }
+    stress_cost = (
+        execution_cost_breakdown(strategy_cfg)["stress_cost_bps"] / 10_000.0
+    )
+    horizon_scores = {
+        horizon: (
+            directional_probabilities[horizon]
+            * (aligned_returns[horizon] - stress_cost)
+        )
+        for horizon in horizons
+    }
+    selected_horizon = max(
+        horizons,
+        key=lambda horizon: (
+            horizon_scores[horizon],
+            directional_probabilities[horizon],
+            -horizon,
+        ),
+    )
+    return {
+        "trade_direction": direction,
+        "trade_direction_score": float(direction_score),
+        "trade_direction_confidence": confidence,
+        "trade_direction_source": "MULTI_HORIZON_GENERAL_MODEL",
+        "trade_direction_horizon_weights": {
+            horizon: float(weights[horizon] / total_weight)
+            for horizon in horizons
+        },
+        "trade_direction_probabilities": directional_probabilities,
+        "trade_returns": aligned_returns,
+        "trade_horizon_scores": horizon_scores,
+        "trade_selected_horizon": int(selected_horizon),
+    }
+
+
 @dataclass
 class HourlyModelBundle:
     model_id: str
@@ -456,13 +555,14 @@ class HourlyModelBundle:
             if horizon in continuation
         ]
         event_agreement = float(np.mean(event_votes)) if event_votes else 0.0
-        trade_direction = (
-            "UP"
-            if event_direction == LONG
-            else "DOWN"
-            if event_direction == SHORT
-            else direction
+        trade_context = build_trade_direction_context(
+            probabilities,
+            general_returns,
+            self.trade_horizons,
+            strategy_cfg,
         )
+        trade_direction = str(trade_context["trade_direction"])
+        selected_horizon = int(trade_context["trade_selected_horizon"])
         selected_event_return = float(event_returns[selected_horizon])
         signed_event_returns = {
             horizon: (
@@ -478,6 +578,22 @@ class HourlyModelBundle:
             "agreement": float(agreement),
             "event_agreement": event_agreement,
             "trade_direction": trade_direction,
+            "trade_direction_score": trade_context["trade_direction_score"],
+            "trade_direction_confidence": trade_context[
+                "trade_direction_confidence"
+            ],
+            "trade_direction_source": trade_context[
+                "trade_direction_source"
+            ],
+            "trade_direction_horizon_weights": trade_context[
+                "trade_direction_horizon_weights"
+            ],
+            "trade_direction_probabilities": trade_context[
+                "trade_direction_probabilities"
+            ],
+            "trade_returns": trade_context["trade_returns"],
+            "trade_horizon_scores": trade_context["trade_horizon_scores"],
+            "trade_selected_horizon": selected_horizon,
             "direction_qualified": selected_horizon in qualified,
             "qualified_trade_horizons": qualified,
             "probabilities": probabilities,
@@ -490,7 +606,9 @@ class HourlyModelBundle:
             "short_outputs": short_outputs,
             "horizon_scores": horizon_scores,
             "selected_horizon": int(selected_horizon),
-            "expected_return": signed_event_returns[selected_horizon],
+            "expected_return": float(
+                trade_context["trade_returns"][selected_horizon]
+            ),
             "expected_event_aligned_return": selected_event_return,
             "event_id": latest.get("event_id"),
             "event_type": str(latest.get("event_type", "NONE")),
