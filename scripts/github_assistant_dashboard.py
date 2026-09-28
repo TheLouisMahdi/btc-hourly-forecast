@@ -22,19 +22,19 @@ def main() -> int:
     )
     document = document.replace(
         "Aggressive structural entries with risk-scaled sizing and adaptive exits",
-        "Direction-first forecasting with precision-gated paper positions",
+        "Model-first entries with advisory precision evidence",
     )
     document = document.replace(
         "Primary contract · aggressive entry, scaled capital risk",
-        "Secondary contract · precision-gated paper position",
+        "Secondary contract · risk-scaled paper position",
     )
     document = document.replace(
         "A valid structural event seeks a LONG or SHORT paper position. Qualification, economic edge and warnings change position size rather than silently vetoing the setup; hard data and structure failures still block entry.",
-        "The one-hour forecast remains primary. A LONG or SHORT paper position is secondary and opens only when its locked precision meta gate accepts the structural setup.",
+        "The model direction can open a paper position directly. Precision-meta and pattern evidence remain advisory and adjust risk or exits.",
     )
     document = document.replace(
         "Qualification adjusts size; it does not veto a valid structure",
-        "Position entry requires qualified precision-meta evidence",
+        "Meta evidence adjusts risk; it does not veto model direction",
     )
     document = document.replace(
         "Starts at 5R and adapts only from resolved trade outcomes",
@@ -118,25 +118,25 @@ def _panel(latest: dict[str, Any]) -> str:
         position_class = "preserved"
         position_note = (
             "The existing open position keeps its original target, stop and expiry. "
-            "The new precision architecture applies only to future entries."
+            "New advisory evidence applies only to future entries."
         )
     elif qualified and selected:
         position_state = "META QUALIFIED"
         position_class = "qualified"
         position_note = (
-            "The current structural candidate passed the locked precision gate."
+            "The current model direction also has qualified precision-meta support."
         )
     elif status == "UNAVAILABLE" or not qualified:
-        position_state = "EXPERIMENTAL / BLOCKED"
+        position_state = "META ADVISORY"
         position_class = "experimental"
         position_note = (
-            "New positions stay blocked until a challenger produces a qualified "
-            "precision meta head on locked chronological holdout data."
+            "The model-directed paper entry remains available; missing or weak "
+            "meta evidence only reduces confidence or risk allocation."
         )
     else:
         position_state = "SCANNING"
         position_class = "neutral"
-        position_note = "No meta-qualified position candidate is active."
+        position_note = "No additional meta support is active for this model direction."
 
     return f'''
 <section class="panel trade-assistant-panel">
@@ -144,19 +144,15 @@ def _panel(latest: dict[str, Any]) -> str:
     <div>
       <div class="structure-eyebrow">Primary forecast · secondary position contract</div>
       <h2>Trade assistant</h2>
-      <p class="sub">The next closed 1-hour candle remains the primary forecast. Position entries are precision-gated, fake-breakout-aware and paper-only until their locked holdout evidence qualifies.</p>
+      <p class="sub">Model direction drives paper entries. Meta and pattern evidence stay visible as advisory risk context rather than entry vetoes.</p>
     </div>
     <span class="assistant-state {position_class}">{_escape(position_state)}</span>
   </div>
   <div class="assistant-grid">
-    {_tile("1h forecast role", "PRIMARY", f"Pattern-memory confidence adjustment: {_percent(memory_shrink)}")}
-    {_tile("Position role", "SECONDARY", position_note)}
-    {_tile("Meta take probability", _percent(p_take), f"Status: {status.replace('_', ' ')}")}
-    {_tile("Fake-breakout probability", _percent(p_false), reason.replace('_', ' '))}
-    {_tile("Selected horizon", f"{_escape(horizon)}h" if horizon else "—", "Future exits align to the selected training horizon")}
-    {_tile("Static fake memory", _memory_value(static), "Bloom membership is accepted only with exact repeated-count statistics")}
-    {_tile("Live candle memory", _memory_value(live), "Resolved wrong next-candle contexts reduce future confidence without flipping direction")}
-    {_tile("Position gate", "PASS" if qualified and selected else "HOLD", "Precision and positive net expectancy are required before a new paper entry")}
+    {_tile("Entry source", "MODEL DIRECTION", "LONG / SHORT comes from the directional model")}
+    {_tile("Meta role", "SUPPORT" if qualified and selected else "ADVISORY", position_note)}
+    {_tile("Meta evidence", f"TAKE {_percent(p_take)} · FALSE {_percent(p_false)}", f"Status: {status.replace('_', ' ')} · {reason.replace('_', ' ')}")}
+    {_tile("Pattern memory", f"STATIC {_memory_value(static)} · LIVE {_memory_value(live)}", f"Confidence adjustment: {_percent(memory_shrink)} · horizon {_escape(horizon) + 'h' if horizon else '—'}")}
   </div>
 </section>'''
 

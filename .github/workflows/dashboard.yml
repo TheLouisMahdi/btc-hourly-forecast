@@ -71,21 +71,16 @@ jobs:
 
           document = Path("site/index.html").read_text(encoding="utf-8")
           required = (
-              'data-market-ambience="v2"',
+              'data-luxury-theme="v1"',
               'data-uncertainty-display="range-only-v1"',
               'data-resilience-dashboard="v1"',
               'data-elegant-chart="v2"',
-              'id="themeToggle"',
-              'class="ambient-coin coin-btc"',
-              'class="ambient-coin coin-eth"',
-              '@keyframes coin-drift',
-              'btc-dashboard-theme',
+              'class="health-summary',
               'Likely next-close range',
               'no exact close is published',
               'Data continuity &amp; learning safety',
               'class="panel trade-assistant-panel"',
-              'Primary forecast · secondary position contract',
-              'Position entries are precision-gated',
+              'Model direction drives paper entries',
               'class="price-line"',
               'Forecast range',
           )
@@ -93,6 +88,12 @@ jobs:
           forbidden = (
               'Model-estimated next close',
               '<th>Expected close</th>',
+              'data-market-ambience="v2"',
+              'id="themeToggle"',
+              'ambient-coin',
+              '@keyframes coin-drift',
+              'btc-dashboard-theme',
+              'Position entries are precision-gated',
           )
           present_forbidden = [marker for marker in forbidden if marker in document]
           if missing or present_forbidden:
