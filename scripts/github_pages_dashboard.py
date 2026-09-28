@@ -65,7 +65,6 @@ def _health_badges(latest: dict[str, Any]) -> str:
     health = latest.get("data_health")
     health = health if isinstance(health, dict) else {}
     data_ok = bool(health.get("candles_ok", False) and health.get("quote_ok", False))
-    qualification_ok = bool(latest.get("qualification_passed", False))
     paper_only = bool(
         str(latest.get("paper_trade_mode") or "").upper()
         or _plan(latest).get("paper_only", True)
@@ -74,11 +73,6 @@ def _health_badges(latest: dict[str, Any]) -> str:
         '<div class="health-stack">'
         + _badge("Pipeline", "HEALTHY" if pipeline_ok else "FAIL-SAFE", pipeline_ok)
         + _badge("Market data", "FRESH" if data_ok else "WARNING", data_ok)
-        + _badge(
-            "Economic qualification",
-            "QUALIFIED" if qualification_ok else "UNQUALIFIED",
-            qualification_ok,
-        )
         + _badge("Execution", "PAPER ONLY" if paper_only else "UNKNOWN", paper_only)
         + "</div>"
     )
@@ -137,14 +131,14 @@ def _economic_panel(latest: dict[str, Any], history: list[Any]) -> str:
         and item.get("direction_result")
         in {"DIRECTION_CORRECT", "DIRECTION_WRONG"}
     )
-    qualification = bool(latest.get("qualification_passed", False))
+    leverage = _number(candidate.get("suggested_leverage"))
+    risk_fraction = _number(candidate.get("risk_fraction"))
     explanation = (
-        "The active position is managed from its frozen entry contract. "
-        "This panel describes the newest candidate decision separately."
+        "The active position keeps its frozen entry contract. "
+        "The newest model decision is shown separately."
         if active
-        else "The candidate is evaluated after stress execution costs. "
-        "Aggressive paper mode may explore selected soft-gate failures, but "
-        "hard timing, data, structure and duplication checks remain enforced."
+        else "Model direction can open a paper position. Context and quality "
+        "signals scale risk instead of acting as entry vetoes."
     )
     return f'''
 <section class="panel economic-panel">
@@ -157,14 +151,12 @@ def _economic_panel(latest: dict[str, Any], history: list[Any]) -> str:
     <span class="economic-action">{_escape(candidate_action)}</span>
   </div>
   <div class="economic-grid">
-    {_tile("Decision mode", _label(mode), "Economic-gated or aggressive paper exploration")}
-    {_tile("Predicted gross move", _bps(expected_gross), "Candidate move before execution costs")}
-    {_tile("Stress execution cost", _bps(stress_cost), "Fees, slippage and uncertainty buffer")}
-    {_tile("Predicted net edge", _bps(net_edge), "Candidate gross move minus stress cost")}
+    {_tile("Decision mode", _label(mode), "Model-first paper decision")}
+    {_tile("Net edge", _bps(net_edge), "After stress execution cost")}
     {_tile("Expected value", _money(expected_value), "Probability-weighted paper value")}
-    {_tile("Ignored soft gates", str(len(ignored)), _list_text(ignored, "None"))}
+    {_tile("Leverage", f"{leverage:.0f}x" if leverage is not None else "—", "Risk-tier leverage")}
+    {_tile("Risk", _percent(risk_fraction), "Account equity budget")}
     {_tile("Hard blockers", str(len(hard)), _list_text(hard, "None"))}
-    {_tile("Qualification", "QUALIFIED" if qualification else "UNQUALIFIED", f"{int(resolved_positions or 0)} resolved positions · {resolved_forecasts} resolved secondary forecasts")}
   </div>
 </section>'''
 
@@ -210,9 +202,9 @@ def _structure_panel(latest: dict[str, Any]) -> str:
         )
     )
     state = (
-        "Managing the frozen structure that opened the active position"
+        "Managing the frozen context of the active position"
         if active
-        else "Waiting for or evaluating a fresh close-to-close structural crossing"
+        else "Structure is context for the model decision, not a required entry gate"
     )
     return f'''
 <section class="panel structure-panel">
@@ -220,20 +212,17 @@ def _structure_panel(latest: dict[str, Any]) -> str:
     <div>
       <div class="structure-eyebrow">Causal market structure</div>
       <h2>Breakout context</h2>
-      <p class="sub">{_escape(state)}. New positions require a real crossing; an existing position may remain open without a new hourly event.</p>
+      <p class="sub">{_escape(state)}.</p>
     </div>
     <span class="structure-action">{_escape(action)}</span>
   </div>
   <div class="structure-grid">
-    {_tile("Event", _label(event_type), "Structural setup classification")}
-    {_tile("Source", _label(breakout_source), "Static, dynamic or triangle boundary")}
-    {_tile("Breakout level", _price(breakout_level), "Confirmed crossed structure")}
-    {_tile("Invalidation", _price(invalidation_level), "Structural risk reference")}
-    {_tile("Triangle", _label(triangle_type), "Causal converging-boundary pattern")}
-    {_tile("Event score", _percent(event_score), "Body, volume, close and structure quality")}
-    {_tile("Signal horizon", f"{_escape(selected_horizon)}h" if selected_horizon else "—", "Direction-specific event horizon")}
-    {_tile("Candle context", "COMPLETE" if context_complete else "UNAVAILABLE", "Event candle plus two previous closed candles")}
-    {_tile("Regime", _label(source.get("regime", latest.get("regime"))), "Long-term structural environment")}
+    {_tile("Event", _label(event_type), "Current structural context")}
+    {_tile("Source", _label(breakout_source), "Detected boundary source")}
+    {_tile("Breakout level", _price(breakout_level), "Observed structure")}
+    {_tile("Invalidation", _price(invalidation_level), "Optional structural risk reference")}
+    {_tile("Event score", _percent(event_score), "Structure quality")}
+    {_tile("Regime", _label(source.get("regime", latest.get("regime"))), "Market environment")}
   </div>
 </section>'''
 
@@ -254,26 +243,26 @@ def _tile(title: str, value: str, note: str) -> str:
 
 def _extra_styles() -> str:
     return """
-.health-stack{display:flex;flex-wrap:wrap;justify-content:flex-end;gap:7px}
-.health-badge{display:grid;grid-template-columns:8px auto;column-gap:7px;align-items:center;padding:8px 10px;border:1px solid var(--line);border-radius:14px;background:rgba(255,255,255,.72)}
-.health-badge i{grid-row:1/3;width:8px;height:8px;border-radius:50%;background:var(--ok)}
+.health-stack{display:flex;flex-wrap:wrap;justify-content:flex-end;gap:6px}
+.health-badge{display:grid;grid-template-columns:7px auto;column-gap:7px;align-items:center;padding:7px 9px;border:1px solid var(--line);border-radius:9px;background:var(--paper)}
+.health-badge i{grid-row:1/3;width:7px;height:7px;border-radius:50%;background:var(--ok)}
 .health-badge.warn i{background:var(--wait)}
-.health-badge small{font-size:8px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em}
-.health-badge strong{font-size:10px}
-.structure-panel,.economic-panel{margin-top:18px;background:linear-gradient(135deg,rgba(255,255,255,.84),rgba(222,236,231,.54))}
-.economic-panel{background:linear-gradient(135deg,rgba(255,255,255,.88),rgba(245,230,223,.52))}
-.structure-heading,.economic-heading{display:flex;justify-content:space-between;align-items:flex-start;gap:16px;margin-bottom:18px}
-.structure-eyebrow{color:var(--sage2);font-size:10px;font-weight:850;letter-spacing:.12em;text-transform:uppercase;margin-bottom:7px}
-.structure-action,.economic-action{display:inline-flex;padding:8px 12px;border-radius:999px;background:var(--mint);color:var(--sage2);font-size:11px;font-weight:850}
-.economic-action{background:var(--peach2);color:#8f5f59}
-.structure-grid,.economic-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}
-.structure-tile{min-width:0;padding:16px;border:1px solid var(--line);border-radius:18px;background:rgba(255,255,255,.58)}
-.structure-tile span{display:block;color:var(--muted);font-size:10px;text-transform:uppercase;letter-spacing:.06em}
-.structure-tile strong{display:block;margin-top:8px;font-size:16px;line-height:1.3;overflow-wrap:anywhere}
-.structure-tile small{display:block;margin-top:6px;color:var(--muted);font-size:10px;line-height:1.45}
-@media(max-width:980px){.structure-grid,.economic-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.health-badge small{font-size:7px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em}
+.health-badge strong{font-size:9px}
+.structure-panel,.economic-panel{margin-top:16px;background:var(--paper)}
+.structure-heading,.economic-heading{display:flex;justify-content:space-between;align-items:flex-start;gap:16px;margin-bottom:15px}
+.structure-eyebrow{color:var(--sage2);font-size:9px;font-weight:850;letter-spacing:.12em;text-transform:uppercase;margin-bottom:6px}
+.structure-action,.economic-action{display:inline-flex;padding:7px 10px;border-radius:8px;background:var(--mint);color:#71501a;font-size:10px;font-weight:850}
+.economic-action{background:#eadccd;color:#694b36}
+.structure-grid,.economic-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+.structure-tile{min-width:0;padding:14px;border:1px solid var(--line);border-radius:10px;background:#f8f2e9}
+.structure-tile span{display:block;color:var(--muted);font-size:9px;text-transform:uppercase;letter-spacing:.06em}
+.structure-tile strong{display:block;margin-top:7px;font-size:15px;line-height:1.3;overflow-wrap:anywhere}
+.structure-tile small{display:block;margin-top:5px;color:var(--muted);font-size:9px;line-height:1.45}
+@media(max-width:900px){.structure-grid,.economic-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:620px){.health-stack{justify-content:flex-start}.structure-heading,.economic-heading{flex-direction:column}.structure-grid,.economic-grid{grid-template-columns:1fr}}
 """
+
 
 
 def _load_json(path: Path, default: Any) -> Any:
