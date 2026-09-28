@@ -90,7 +90,7 @@ def _styles() -> str:
   display:flex;
   align-items:center;
   justify-content:center;
-  min-width:max-content;
+  width:100%;
   overflow-x:auto;
   padding:2px 3px;
   scrollbar-width:none;
