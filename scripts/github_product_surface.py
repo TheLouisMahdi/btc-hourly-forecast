@@ -22,13 +22,13 @@ def main() -> int:
     replacements = {
         "BTC Adaptive Model Trader": "BTC Signal Desk",
         "Adaptive BTC paper positions with a calibrated secondary next-close range":
-            "Real-time BTC direction, range and position intelligence for the 1-hour market.",
+            "BTC 1H market dashboard",
         "Adaptive BTC paper positions with an exact secondary next-close forecast":
             "Real-time BTC direction, range and position intelligence for the 1-hour market.",
         "Adaptive BTC paper positions with a secondary next-close forecast":
             "Real-time BTC direction, range and position intelligence for the 1-hour market.",
         "Adaptive next-candle BTC direction and price forecast":
-            "BTC 1H market direction, projected range and position intelligence.",
+            "BTC 1H market dashboard",
         "Next closed 1-hour candle": "BTC · 1H MARKET OUTLOOK",
         "Likely next-close range": "Projected 1H range",
         "Range-only forecast · no exact close is published":
@@ -167,6 +167,43 @@ def main() -> int:
     )
     doc = doc.replace(" · Forecast ", " · Signal ")
     doc = doc.replace(" calibrated range", " confidence range")
+    doc = re.sub(
+        r'<p class="sub"[^>]*>.*?</p>',
+        "",
+        doc,
+        flags=re.DOTALL,
+    )
+    doc = re.sub(
+        r'<p class="copy"[^>]*>.*?</p>',
+        "",
+        doc,
+        flags=re.DOTALL,
+    )
+    doc = re.sub(
+        r'<div class="label" style="margin-top:6px">.*?</div>',
+        "",
+        doc,
+        flags=re.DOTALL,
+    )
+    doc = re.sub(
+        r'(<article class="metric">.*?<strong>.*?</strong>)<small>.*?</small>(</article>)',
+        r'\1\2',
+        doc,
+        flags=re.DOTALL,
+    )
+    doc = re.sub(
+        r'(<div class="trade-lifecycle-tile">.*?<strong>.*?</strong>)<small>.*?</small>(</div>)',
+        r'\1\2',
+        doc,
+        flags=re.DOTALL,
+    )
+    doc = re.sub(
+        r'<footer>.*?</footer>',
+        "",
+        doc,
+        count=1,
+        flags=re.DOTALL,
+    )
     doc = re.sub(
         r'(<small>STATUS</small><strong>).*?(</strong>)',
         r'\1ACTIVE\2',
@@ -319,9 +356,9 @@ def _signal_confirmation(latest: dict[str, Any]) -> str:
 def _tile(label: str, value: str, note: str) -> str:
     return (
         '<div class="assistant-tile">'
-        f'<small>{html.escape(label)}</small>'
+        f'<span>{html.escape(label)}</span>'
         f'<strong>{html.escape(value)}</strong>'
-        f'<p>{html.escape(note)}</p></div>'
+        '</div>'
     )
 
 
