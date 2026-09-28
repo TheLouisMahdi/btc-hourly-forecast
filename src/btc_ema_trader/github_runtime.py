@@ -85,6 +85,7 @@ POSITION_PLAN_FIELDS = (
     "modeled_risk_fraction",
     "modeled_total_risk_usd",
     "risk_budget_utilization",
+    "suggested_leverage",
     "gap_risk_buffer_bps",
     "label_execution_aligned",
     "label_entry_definition",

@@ -154,8 +154,8 @@ class StrategyRiskPolicyTests(unittest.TestCase):
             "AGGRESSIVE_STRUCTURAL_RISK_SCALED",
         )
         self.assertEqual(decision.trade_plan["policy_version"], 2)
-        self.assertGreaterEqual(decision.trade_plan["risk_fraction"], 0.005)
-        self.assertLessEqual(decision.trade_plan["risk_fraction"], 0.03)
+        self.assertGreaterEqual(decision.trade_plan["risk_fraction"], 0.003)
+        self.assertLessEqual(decision.trade_plan["risk_fraction"], 0.015)
         self.assertGreater(decision.trade_plan["risk_budget_usd"], 0.0)
 
     def test_strong_qualified_event_receives_more_risk_than_weak_event(self) -> None:
@@ -179,13 +179,13 @@ class StrategyRiskPolicyTests(unittest.TestCase):
             strong.trade_plan["risk_fraction"],
             weak.trade_plan["risk_fraction"],
         )
-        self.assertLessEqual(strong.trade_plan["risk_fraction"], 0.03)
+        self.assertLessEqual(strong.trade_plan["risk_fraction"], 0.015)
         self.assertGreater(
             strong.trade_plan["risk_score"],
             weak.trade_plan["risk_score"],
         )
 
-    def test_no_event_remains_a_hard_blocker(self) -> None:
+    def test_no_event_uses_model_direction_with_scaled_risk(self) -> None:
         decision = make_decision(
             _row(
                 is_event=0,
@@ -200,10 +200,22 @@ class StrategyRiskPolicyTests(unittest.TestCase):
             self.settings,
         )
 
-        self.assertEqual(decision.action, "WAIT")
-        self.assertIn("NO_NEW_STRUCTURE_BREAKOUT", decision.blockers)
+        self.assertEqual(decision.action, "LONG")
+        self.assertEqual(decision.blockers, [])
+        self.assertIn(
+            "MODEL_DIRECTION_ONLY",
+            decision.trade_plan["soft_risk_flags"],
+        )
+        self.assertEqual(
+            decision.trade_plan["trade_direction_source"],
+            "MODEL_DIRECTION_WITH_STRUCTURE_CONTEXT",
+        )
+        self.assertIn(
+            decision.trade_plan["suggested_leverage"],
+            {10.0, 20.0, 40.0},
+        )
 
-    def test_missing_invalidation_remains_a_hard_blocker(self) -> None:
+    def test_missing_invalidation_uses_atr_stop_with_risk_penalty(self) -> None:
         decision = make_decision(
             _row(breakout_invalidation_level=None),
             _prediction(success=0.80, tradeability=0.80, event_return=0.01),
@@ -211,8 +223,13 @@ class StrategyRiskPolicyTests(unittest.TestCase):
             self.settings,
         )
 
-        self.assertEqual(decision.action, "WAIT")
-        self.assertIn("INVALIDATION_LEVEL_UNAVAILABLE", decision.blockers)
+        self.assertEqual(decision.action, "LONG")
+        self.assertEqual(decision.blockers, [])
+        self.assertIn(
+            "STRUCTURE_METADATA_INCOMPLETE",
+            decision.trade_plan["soft_risk_flags"],
+        )
+        self.assertGreater(decision.trade_plan["stop_percent"], 0.0)
 
     def test_unhealthy_market_data_remains_a_hard_blocker(self) -> None:
         decision = make_decision(

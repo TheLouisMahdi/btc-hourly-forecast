@@ -10,6 +10,7 @@ from .config import Settings
 from .costs import execution_cost_breakdown
 from .economic_validation import apply_calibration
 from .model import HourlyModelBundle
+from .risk_economics import select_leverage
 
 POLICY_NAME = "AGGRESSIVE_STRUCTURAL_RISK_SCALED"
 POLICY_VERSION = 2
@@ -37,6 +38,10 @@ SOFT_RISK_FLAGS = {
     "MODEL_STALE",
     "NEWS_STALE",
     "REGIME_UNKNOWN",
+    "MODEL_DIRECTION_ONLY",
+    "STRUCTURE_METADATA_INCOMPLETE",
+    "EVENT_ALREADY_TRADED",
+    "EVENT_DIRECTION_MISMATCH",
 }
 
 
@@ -75,11 +80,13 @@ def make_decision(
 
     is_event = int(latest_row.get("is_event", 0)) == 1
     event_direction = int(latest_row.get("event_direction", 0))
+    if trade_direction not in {"UP", "DOWN"}:
+        trade_direction = forecast_direction
     direction_name = (
         "LONG"
-        if event_direction > 0
+        if trade_direction == "UP"
         else "SHORT"
-        if event_direction < 0
+        if trade_direction == "DOWN"
         else "NONE"
     )
     event_type = str(latest_row.get("event_type", "NONE"))
@@ -114,7 +121,7 @@ def make_decision(
     )
     expected_return = (
         event_aligned_return
-        if event_direction >= 0
+        if trade_direction == "UP"
         else -event_aligned_return
     )
     base_costs = execution_cost_breakdown(cfg)
@@ -150,18 +157,18 @@ def make_decision(
     if is_event and not policy:
         soft_risk_flags.append("ECONOMIC_POLICY_UNAVAILABLE")
 
+    if trade_direction not in {"UP", "DOWN"}:
+        hard_blockers.append("DIRECTION_UNAVAILABLE")
     if not is_event or event_direction == 0:
-        hard_blockers.append("NO_NEW_STRUCTURE_BREAKOUT")
+        soft_risk_flags.append("MODEL_DIRECTION_ONLY")
     elif event_type not in STRUCTURAL_EVENTS:
-        hard_blockers.append("UNSUPPORTED_STRUCTURE_EVENT")
+        soft_risk_flags.append("STRUCTURE_METADATA_INCOMPLETE")
     if is_event and event_score < minimum_event_score:
         soft_risk_flags.append("WEAK_BREAKOUT_STRUCTURE")
-    if is_event and breakout_level is None:
-        hard_blockers.append("BREAKOUT_LEVEL_UNAVAILABLE")
-    if is_event and invalidation_level is None:
-        hard_blockers.append("INVALIDATION_LEVEL_UNAVAILABLE")
+    if is_event and (breakout_level is None or invalidation_level is None):
+        soft_risk_flags.append("STRUCTURE_METADATA_INCOMPLETE")
     if event_already_traded:
-        hard_blockers.append("EVENT_ALREADY_TRADED")
+        soft_risk_flags.append("EVENT_ALREADY_TRADED")
     if str(latest_row.get("regime", "UNKNOWN")) == "UNKNOWN":
         soft_risk_flags.append("REGIME_UNKNOWN")
 
@@ -172,9 +179,13 @@ def make_decision(
         if event_direction < 0
         else trade_direction
     )
-    if is_event and trade_direction != expected_trade_direction:
-        hard_blockers.append("EVENT_DIRECTION_MISMATCH")
-    if event_direction < 0 and not bool(cfg.get("allow_short", False)):
+    if (
+        is_event
+        and event_direction != 0
+        and trade_direction != expected_trade_direction
+    ):
+        soft_risk_flags.append("EVENT_DIRECTION_MISMATCH")
+    if trade_direction == "DOWN" and not bool(cfg.get("allow_short", False)):
         hard_blockers.append("SHORT_EXECUTION_VENUE_NOT_ENABLED")
 
     minimum_confidence = float(
@@ -250,22 +261,28 @@ def make_decision(
         direction_qualified=direction_qualified,
         economic_policy_available=bool(policy),
         regime=str(latest_row.get("regime", "UNKNOWN")),
-        event_direction=event_direction,
+        event_direction=(
+            1
+            if trade_direction == "UP"
+            else -1
+            if trade_direction == "DOWN"
+            else 0
+        ),
         soft_risk_flags=soft_risk_flags,
     )
 
     action = (
         "LONG"
-        if event_direction > 0
+        if trade_direction == "UP"
         else "SHORT"
-        if event_direction < 0
+        if trade_direction == "DOWN"
         else "WAIT"
     )
     if hard_blockers:
         action = "WAIT"
     trade_plan = build_trade_plan(
         latest_row,
-        expected_trade_direction,
+        trade_direction,
         prediction,
         settings,
         action,
@@ -471,6 +488,10 @@ def _risk_assessment(
         "MODEL_STALE": 0.85,
         "NEWS_STALE": 0.96,
         "REGIME_UNKNOWN": 0.92,
+        "MODEL_DIRECTION_ONLY": 0.85,
+        "STRUCTURE_METADATA_INCOMPLETE": 0.90,
+        "EVENT_ALREADY_TRADED": 0.90,
+        "EVENT_DIRECTION_MISMATCH": 0.75,
     }
     penalty_multiplier = 1.0
     applied_penalties: dict[str, float] = {}
@@ -606,15 +627,16 @@ def build_trade_plan(
     gap_buffer = float(cfg.get("gap_risk_buffer_bps", 6.0)) / 10_000.0
     effective_risk_pct = stop_pct + cost_buffer + gap_buffer
     quantity_btc = risk_budget / max(price * effective_risk_pct, 1e-9)
+    leverage = select_leverage(
+        cfg,
+        float(assessment.get("risk_score", 0.0)),
+        effective_risk_pct,
+    )
     notional = min(
         quantity_btc * price,
-        account * float(cfg.get("maximum_leverage", 5.0)),
+        account * leverage,
     )
     quantity_btc = notional / price
-    leverage = min(
-        float(cfg.get("maximum_leverage", 5.0)),
-        max(1.0, notional / max(account, 1e-9)),
-    )
     predicted_gross_bps = predicted_move * 10_000.0
     predicted_net_bps = predicted_gross_bps - effective_stress_bps
     return {
@@ -629,7 +651,7 @@ def build_trade_plan(
         "triangle_type": row.get("triangle_type", "NONE"),
         "regime": row.get("regime", "UNKNOWN"),
         "regime_code": float(row.get("regime_code", 0.0)),
-        "trade_direction_source": "AGGRESSIVE_STRUCTURAL_BREAKOUT",
+        "trade_direction_source": "MODEL_DIRECTION_WITH_STRUCTURE_CONTEXT",
         "entry_reference": price,
         "entry_reference_kind": "CURRENT_CLOSE_PROXY",
         "entry_definition": "PAPER_MARKET_ORDER_AT_SIGNAL_RUN",

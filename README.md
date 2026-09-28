@@ -38,7 +38,7 @@
 
 ### Structural intelligence. Adaptive risk. Verifiable outcomes.
 
-An always-on Bitcoin market intelligence platform that converts confirmed market-structure events into auditable paper positions and continuously evaluated one-hour forecasts.
+An always-on Bitcoin market intelligence platform that converts the model's hourly directional decision into auditable risk-scaled paper positions while using market structure as decision context.
 
 </div>
 
@@ -46,7 +46,7 @@ An always-on Bitcoin market intelligence platform that converts confirmed market
 
 BTC Adaptive Directional Breakout Trader is a research-grade decision platform built to identify meaningful resistance breakouts and support breakdowns while filtering weak, duplicated, stale, or operationally unsafe signals.
 
-The system combines structural market analysis, separate Long and Short predictive models, adaptive target-and-stop planning, execution-aware risk controls, and continuous outcome tracking in one automated research environment.
+The system combines hourly directional prediction, structural market context, adaptive target-and-stop planning, execution-aware risk controls, and continuous outcome tracking in one automated research environment. Structural confirmation and meta-model evidence adjust risk but are not mandatory entry gates.
 
 Its primary product is a persistent paper position with a frozen entry reference, target, stop-loss, risk allocation, holding window, and immutable final outcome. A secondary public forecast tracks the direction and likely closing range of the next completed one-hour candle.
 
@@ -83,7 +83,7 @@ The live indicators above are sourced from the latest public forecast snapshot a
 
 | Capability | Business value |
 |---|---|
-| **Structural Signal Engine** | Detects confirmed resistance breakouts and support breakdowns across multiple market scales instead of reacting to isolated indicator crosses. |
+| **Structural Context Engine** | Detects resistance breakouts and support breakdowns across multiple market scales and uses them to adjust risk around the model's directional decision. |
 | **Independent Long and Short Intelligence** | Models upside and downside events separately, allowing each direction to learn its own market behavior and risk profile. |
 | **Adaptive Position Lifecycle** | Maintains one auditable paper position from entry through target, stop-loss, breakeven, trailing management, or time exit. |
 | **Risk-Scaled Decisioning** | Adjusts paper risk according to event quality, confidence, tradeability, economic edge, volatility, data health, and negative-pattern evidence. |
@@ -98,7 +98,7 @@ GitHub Actions workflows are currently manual-only. This prevents overlapping sc
 
 The platform is designed around causal inputs and auditable decisions. Future candles are never used as predictors, historical validation remains chronological, synthetic event duplication is prohibited, and model challengers cannot replace the active champion unless they pass locked economic and negative-memory validation gates.
 
-Operational safeguards can prevent a new position when market data is incomplete, the execution quote is stale, providers are inconsistent, the event has already been traded, or another position is still active.
+Operational safeguards can prevent a new position when candle data is unhealthy, the execution quote is stale or unavailable, providers are inconsistent, the direction is unavailable, short execution is disabled, or another position is still active. Structural, qualification, meta-model and duplicate-event concerns reduce risk instead of vetoing an otherwise valid model direction.
 
 Every published position and forecast remains attributable to the model, event, market timestamp, data provider, execution assumptions, and risk contract that created it.
 

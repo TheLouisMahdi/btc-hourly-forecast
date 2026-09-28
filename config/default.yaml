@@ -297,7 +297,7 @@ negative_memory:
 trade_assistant:
   enabled: true
   mode: PRECISION_FIRST_META_LABELING
-  require_qualified_meta_for_position: true
+  require_qualified_meta_for_position: false
   minimum_meta_samples: 600
   minimum_meta_calibration_selected: 20
   minimum_meta_holdout_selected: 12
@@ -335,8 +335,8 @@ trade_lifecycle:
   base_maximum_holding_hours: 72
   minimum_holding_hours: 12
   maximum_holding_hours: 168
-  breakeven_trigger_r: 2.0
-  trailing_trigger_r: 3.0
+  breakeven_trigger_r: 1.0
+  trailing_trigger_r: 1.5
   trailing_atr_multiplier: 1.0
   same_bar_policy: NEAREST_TO_OPEN
   minimum_online_samples: 20
@@ -389,13 +389,16 @@ strategy:
   maximum_atr_percent: 6.0
   block_during_news_shock: false
   require_fresh_news: false
-  risk_per_trade_fraction: 0.0125
-  minimum_risk_per_trade_fraction: 0.005
-  maximum_risk_per_trade_fraction: 0.03
+  risk_per_trade_fraction: 0.0075
+  minimum_risk_per_trade_fraction: 0.003
+  maximum_risk_per_trade_fraction: 0.015
   risk_edge_lower_bps: -20.0
   risk_edge_upper_bps: 20.0
   account_equity_usd: 1000.0
-  maximum_leverage: 5.0
+  maximum_leverage: 40.0
+  leverage_tiers: [10.0, 20.0, 40.0]
+  leverage_risk_score_thresholds: [0.35, 0.65]
+  leverage_liquidation_safety_factor: 0.70
   stop_atr_multiplier: 0.75
   minimum_stop_percent: 0.0025
   maximum_stop_percent: 0.025

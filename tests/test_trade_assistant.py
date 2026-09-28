@@ -20,11 +20,11 @@ from btc_ema_trader.pattern_memory import (
 
 
 class FakeSettings:
-    def __init__(self) -> None:
+    def __init__(self, require_qualified: bool = True) -> None:
         self.values = {
             "model": {"trade_horizons_hours": [3, 6, 12]},
             "trade_assistant": {
-                "require_qualified_meta_for_position": True,
+                "require_qualified_meta_for_position": require_qualified,
                 "static_pattern_minimum_count": 2,
                 "static_pattern_bad_rate": 0.75,
                 "live_pattern_minimum_count": 3,
@@ -176,6 +176,24 @@ class TradeAssistantTests(unittest.TestCase):
         )
         self.assertEqual(plan["status"], "BLOCKED")
         self.assertIn("POSITION_META_NOT_QUALIFIED", blockers)
+
+    def test_advisory_meta_does_not_block_model_position(self) -> None:
+        settings = FakeSettings(require_qualified=False)
+        record = {"action": "LONG"}
+        plan, blockers = apply_precision_gate(
+            record,
+            {"status": "ACTIONABLE"},
+            {
+                "status": "UNAVAILABLE",
+                "qualified": False,
+                "selected": False,
+                "reason": "ARTIFACT_MISSING",
+            },
+            settings,
+        )
+        self.assertEqual(blockers, [])
+        self.assertEqual(plan["status"], "ACTIONABLE")
+        self.assertEqual(plan["position_quality_status"], "META_ADVISORY")
 
     def test_qualified_gate_applies_horizon_aligned_exit(self) -> None:
         settings = FakeSettings()
