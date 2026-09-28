@@ -101,7 +101,7 @@ class RepositoryConsistencyTests(unittest.TestCase):
 
         forecast = workflows["forecast.yml"]
         self.assertIn("\n  schedule:\n", forecast)
-        self.assertIn('cron: "12 * * * *"', forecast)
+        self.assertIn('cron: "17,47 * * * *"', forecast)
         self.assertNotIn("\n  push:\n", forecast)
         self.assertNotIn("\n  workflow_run:\n", forecast)
         self.assertNotIn("gh workflow run retrain.yml", forecast)
