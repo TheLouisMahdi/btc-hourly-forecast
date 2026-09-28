@@ -478,20 +478,20 @@ def _risk_assessment(
     )
 
     penalties = {
-        "WEAK_BREAKOUT_STRUCTURE": 0.92,
-        "LOW_BREAKOUT_SUCCESS_PROBABILITY": 0.95,
-        "LOW_TRADEABILITY_PROBABILITY": 0.95,
-        "VOLATILITY_SHOCK": 0.88,
-        "NEWS_SHOCK": 0.92,
-        "DAILY_SIGNAL_LIMIT": 0.90,
-        "SIGNAL_COOLDOWN": 0.92,
-        "MODEL_STALE": 0.85,
-        "NEWS_STALE": 0.96,
-        "REGIME_UNKNOWN": 0.92,
-        "MODEL_DIRECTION_ONLY": 0.85,
-        "STRUCTURE_METADATA_INCOMPLETE": 0.90,
-        "EVENT_ALREADY_TRADED": 0.90,
-        "EVENT_DIRECTION_MISMATCH": 0.75,
+        "WEAK_BREAKOUT_STRUCTURE": 0.97,
+        "LOW_BREAKOUT_SUCCESS_PROBABILITY": 0.98,
+        "LOW_TRADEABILITY_PROBABILITY": 0.98,
+        "VOLATILITY_SHOCK": 0.94,
+        "NEWS_SHOCK": 0.98,
+        "DAILY_SIGNAL_LIMIT": 0.98,
+        "SIGNAL_COOLDOWN": 0.99,
+        "MODEL_STALE": 0.93,
+        "NEWS_STALE": 1.00,
+        "REGIME_UNKNOWN": 0.97,
+        "MODEL_DIRECTION_ONLY": 0.95,
+        "STRUCTURE_METADATA_INCOMPLETE": 0.96,
+        "EVENT_ALREADY_TRADED": 0.98,
+        "EVENT_DIRECTION_MISMATCH": 0.90,
     }
     penalty_multiplier = 1.0
     applied_penalties: dict[str, float] = {}

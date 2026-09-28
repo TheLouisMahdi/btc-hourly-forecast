@@ -329,19 +329,19 @@ trade_assistant:
 trade_lifecycle:
   enabled: true
   mode: AGGRESSIVE_STRUCTURAL_RISK_SCALED
-  base_reward_r: 5.0
-  minimum_reward_r: 3.0
-  maximum_reward_r: 8.0
-  base_stop_atr_multiplier: 0.75
+  base_reward_r: 4.0
+  minimum_reward_r: 2.5
+  maximum_reward_r: 6.0
+  base_stop_atr_multiplier: 0.60
   fallback_atr_percent: 0.008
-  minimum_stop_percent: 0.0025
-  maximum_stop_percent: 0.025
-  base_maximum_holding_hours: 72
-  minimum_holding_hours: 12
-  maximum_holding_hours: 168
-  breakeven_trigger_r: 1.0
-  trailing_trigger_r: 1.5
-  trailing_atr_multiplier: 1.0
+  minimum_stop_percent: 0.0030
+  maximum_stop_percent: 0.015
+  base_maximum_holding_hours: 48
+  minimum_holding_hours: 6
+  maximum_holding_hours: 96
+  breakeven_trigger_r: 0.75
+  trailing_trigger_r: 1.25
+  trailing_atr_multiplier: 0.80
   same_bar_policy: STOP_FIRST
   minimum_online_samples: 20
   maximum_online_weight: 0.65
@@ -365,9 +365,9 @@ qualification:
 
 strategy:
   paper_only: true
-  execution_venue: BINANCE_USDM_BTCUSDT
+  execution_venue: OKX_BTC_USDT_SWAP
   margin_mode: isolated
-  maintenance_margin_rate: 0.004
+  maintenance_margin_rate: 0.005
   position_policy: AGGRESSIVE_STRUCTURAL_RISK_SCALED
   policy_version: 2
   allow_short: true
@@ -382,38 +382,39 @@ strategy:
   stress_cost_multiplier: 1.50
   economic_execution_uncertainty_bps: 4.0
   minimum_profit_buffer_bps: 8.0
-  minimum_net_edge_bps: 0.0
-  minimum_event_score: 0.10
+  minimum_net_edge_bps: -10.0
+  minimum_event_score: 0.0
   minimum_confidence:
-    3: 0.50
-    6: 0.50
-    12: 0.50
+    3: 0.48
+    6: 0.48
+    12: 0.48
   minimum_tradeability_probability:
-    3: 0.50
-    6: 0.50
-    12: 0.50
-  minimum_horizon_agreement: 0.50
-  maximum_atr_percent: 6.0
+    3: 0.48
+    6: 0.48
+    12: 0.48
+  minimum_horizon_agreement: 0.34
+  maximum_atr_percent: 10.0
   block_during_news_shock: false
   require_fresh_news: false
-  risk_per_trade_fraction: 0.0075
-  minimum_risk_per_trade_fraction: 0.003
-  maximum_risk_per_trade_fraction: 0.015
+  risk_per_trade_fraction: 0.0125
+  minimum_risk_per_trade_fraction: 0.0075
+  maximum_risk_per_trade_fraction: 0.020
+  maximum_modeled_loss_fraction_per_trade: 0.020
   risk_edge_lower_bps: -20.0
   risk_edge_upper_bps: 20.0
   account_equity_usd: 1000.0
   maximum_leverage: 40.0
-  leverage_tiers: [10.0, 20.0, 40.0]
-  leverage_risk_score_thresholds: [0.35, 0.65]
-  leverage_liquidation_safety_factor: 0.70
-  stop_atr_multiplier: 0.75
-  minimum_stop_percent: 0.0025
-  maximum_stop_percent: 0.025
-  target_r_multiple: 5.0
+  leverage_tiers: [20.0, 30.0, 40.0]
+  leverage_risk_score_thresholds: [0.20, 0.50]
+  leverage_liquidation_safety_factor: 0.60
+  stop_atr_multiplier: 0.60
+  minimum_stop_percent: 0.0030
+  maximum_stop_percent: 0.015
+  target_r_multiple: 4.0
   label_target_atr_multiplier: 5.0
   label_stop_atr_multiplier: 1.0
   gap_risk_buffer_bps: 6.0
-  maximum_daily_signals: 12
+  maximum_daily_signals: 48
   cooldown_hours_after_signal: 0
 
 live:

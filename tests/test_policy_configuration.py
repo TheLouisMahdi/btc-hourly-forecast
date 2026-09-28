@@ -26,11 +26,11 @@ class PolicyConfigurationTests(unittest.TestCase):
         self.assertEqual(strategy["policy_version"], 2)
         self.assertEqual(
             strategy["minimum_risk_per_trade_fraction"],
-            0.003,
+            0.0075,
         )
         self.assertEqual(
             strategy["maximum_risk_per_trade_fraction"],
-            0.015,
+            0.020,
         )
         self.assertLess(
             strategy["minimum_risk_per_trade_fraction"],
@@ -40,8 +40,12 @@ class PolicyConfigurationTests(unittest.TestCase):
             strategy["risk_per_trade_fraction"],
             strategy["maximum_risk_per_trade_fraction"],
         )
+        self.assertEqual(
+            strategy["maximum_modeled_loss_fraction_per_trade"],
+            0.020,
+        )
         self.assertEqual(strategy["maximum_leverage"], 40.0)
-        self.assertEqual(strategy["leverage_tiers"], [10.0, 20.0, 40.0])
+        self.assertEqual(strategy["leverage_tiers"], [20.0, 30.0, 40.0])
         self.assertEqual(
             config["market"]["execution_quote_provider"],
             "okx_swap",
@@ -52,13 +56,13 @@ class PolicyConfigurationTests(unittest.TestCase):
         )
         self.assertEqual(
             strategy["execution_venue"],
-            "BINANCE_USDM_BTCUSDT",
+            "OKX_BTC_USDT_SWAP",
         )
         self.assertEqual(strategy["margin_mode"], "isolated")
-        self.assertEqual(strategy["maintenance_margin_rate"], 0.004)
+        self.assertEqual(strategy["maintenance_margin_rate"], 0.005)
         self.assertEqual(
             strategy["leverage_risk_score_thresholds"],
-            [0.35, 0.65],
+            [0.20, 0.50],
         )
         self.assertFalse(
             config["trade_assistant"]["require_qualified_meta_for_position"]
@@ -67,8 +71,8 @@ class PolicyConfigurationTests(unittest.TestCase):
             config["trade_lifecycle"]["same_bar_policy"],
             "STOP_FIRST",
         )
-        self.assertEqual(config["trade_lifecycle"]["breakeven_trigger_r"], 1.0)
-        self.assertEqual(config["trade_lifecycle"]["trailing_trigger_r"], 1.5)
+        self.assertEqual(config["trade_lifecycle"]["breakeven_trigger_r"], 0.75)
+        self.assertEqual(config["trade_lifecycle"]["trailing_trigger_r"], 1.25)
         self.assertFalse(config["adaptive"]["enabled"])
         self.assertTrue(config["trade_lifecycle"]["enabled"])
         self.assertEqual(
