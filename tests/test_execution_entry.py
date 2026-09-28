@@ -13,9 +13,14 @@ class ExecutionEntryTests(unittest.TestCase):
     def test_fresh_quote_rebases_trade_entry_but_not_source_close(self) -> None:
         record = {
             "price": 100.0,
+            "action": "LONG",
             "trade_plan": {
                 "entry_reference": 100.0,
                 "entry_reference_kind": "CURRENT_CLOSE_PROXY",
+                "stop_price": 99.0,
+                "target_price": 105.0,
+                "stop_percent": 0.01,
+                "target_percent": 0.05,
                 "label_execution_aligned": True,
             },
         }
@@ -32,6 +37,10 @@ class ExecutionEntryTests(unittest.TestCase):
         self.assertEqual(plan["source_candle_close"], 100.0)
         self.assertEqual(plan["entry_reference"], 101.25)
         self.assertEqual(plan["entry_reference_kind"], EXECUTION_ENTRY_CONTRACT)
+        self.assertAlmostEqual(plan["stop_price"], 100.2375)
+        self.assertAlmostEqual(plan["target_price"], 106.3125)
+        self.assertTrue(plan["execution_barriers_rebased"])
+        self.assertAlmostEqual(plan["execution_price_drift_bps"], 125.0)
         self.assertFalse(plan["label_execution_aligned"])
         self.assertEqual(
             plan["label_entry_definition"],
