@@ -652,6 +652,7 @@ def build_trade_plan(
         "regime": row.get("regime", "UNKNOWN"),
         "regime_code": float(row.get("regime_code", 0.0)),
         "trade_direction_source": "MODEL_DIRECTION_WITH_STRUCTURE_CONTEXT",
+        "direction": "LONG" if direction == "UP" else "SHORT",
         "entry_reference": price,
         "entry_reference_kind": "CURRENT_CLOSE_PROXY",
         "entry_definition": "PAPER_MARKET_ORDER_AT_SIGNAL_RUN",
@@ -681,6 +682,11 @@ def build_trade_plan(
                 "base_maximum_holding_hours", 72
             )
         ),
+        "entry_fee_bps": costs["entry_fee_bps"],
+        "exit_fee_bps": costs["exit_fee_bps"],
+        "entry_slippage_bps": costs["entry_slippage_bps"],
+        "exit_slippage_bps": costs["exit_slippage_bps"],
+        "funding_buffer_bps": costs["funding_buffer_bps"],
         "base_execution_cost_bps": costs["base_cost_bps"],
         "stress_execution_cost_bps": effective_stress_bps,
         "minimum_required_net_edge_bps": minimum_edge_bps,
