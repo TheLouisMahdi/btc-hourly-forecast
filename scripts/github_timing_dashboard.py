@@ -59,7 +59,7 @@ def _timing_strip(contract: dict[str, Any]) -> str:
 def _styles() -> str:
     return r'''
 .exact-candle-timing{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin-top:14px;padding-top:12px;border-top:1px solid var(--line)}
-.exact-candle-timing div{min-width:0;padding:8px 9px;border-radius:11px;background:rgba(255,255,255,.56);border:1px solid var(--line)}
+.exact-candle-timing div{min-width:0;padding:8px 9px;border-radius:8px;background:#f8f2e9;border:1px solid var(--line)}
 .exact-candle-timing small{display:block;color:var(--muted);font-size:7px;letter-spacing:.07em}.exact-candle-timing strong{display:block;margin-top:3px;font-size:9px;line-height:1.35;overflow-wrap:anywhere}
 @media(max-width:720px){.exact-candle-timing{grid-template-columns:repeat(2,minmax(0,1fr))}}
 '''

@@ -15,12 +15,12 @@ Only the following files are workflow entry points:
 
 - `github_common.py`: GitHub-specific paths, state restoration helpers, JSON serialization and installation of the runtime-only trade-assistant overlay.
 - `github_dashboard.py`: resolve immutable next-candle outcomes and build the base HTML surface.
-- `github_assistant_dashboard.py`: display the primary 1h / secondary precision-gated position contract and fake-pattern memory state.
+- `github_assistant_dashboard.py`: display advisory meta-model and pattern-memory context for model-first paper positions.
 - `push_snapshot_branch.sh`: publish generated state to dedicated branches.
 
 ## Dashboard components
 
-`github_pages_dashboard.py`, `github_boundary_dashboard.py`, `github_trade_dashboard.py`, `github_timing_dashboard.py`, `github_visual_dashboard.py`, `github_uncertainty_dashboard.py`, `github_resilience_dashboard.py`, `github_assistant_dashboard.py` and `github_chart_dashboard.py` are deterministic rendering stages. Workflows must call only `render_dashboard.py`.
+`github_pages_dashboard.py`, `github_boundary_dashboard.py`, `github_trade_dashboard.py`, `github_timing_dashboard.py`, `github_uncertainty_dashboard.py`, `github_resilience_dashboard.py`, `github_assistant_dashboard.py`, `github_chart_dashboard.py` and `github_market_price_dashboard.py` are deterministic rendering stages. Workflows must call only `render_dashboard.py`.
 
 ## Compatibility
 

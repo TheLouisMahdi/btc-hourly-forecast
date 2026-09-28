@@ -11,7 +11,7 @@ sys.path.insert(
     str(Path(__file__).resolve().parents[1] / "scripts"),
 )
 
-from github_dashboard import resolve_outcomes
+from github_dashboard import render, resolve_outcomes
 
 
 def contract() -> dict[str, object]:
@@ -73,6 +73,16 @@ def candles(close: float = 102.0) -> pd.DataFrame:
 
 
 class DashboardOutcomeTests(unittest.TestCase):
+    def test_render_uses_restrained_cream_brown_gold_palette(self) -> None:
+        document = render({"run_status": "OK"}, [])
+
+        self.assertIn("--bg:#f3ede3", document)
+        self.assertIn("--ink:#2f241c", document)
+        self.assertIn("--sage:#b8892f", document)
+        self.assertNotIn("#6f9b91", document)
+        self.assertNotIn("ambient-market", document)
+        self.assertNotIn("theme-toggle", document)
+
     def test_target_stays_pending_before_candle_close(self) -> None:
         history = [
             {

@@ -80,11 +80,10 @@ def _card(value: float | None, timestamp: str | None) -> str:
 
 def _styles() -> str:
     return """
-.market-price-card{margin-bottom:16px;padding:14px 16px;border:1px solid var(--line);border-radius:18px;background:linear-gradient(135deg,var(--mint),rgba(255,255,255,.62))}
+.market-price-card{margin-bottom:14px;padding:13px 15px;border:1px solid var(--line);border-radius:10px;background:#f1e4c6}
 .market-price-card span{display:block;color:var(--muted);font-size:10px;font-weight:800;letter-spacing:.08em;text-transform:uppercase}
 .market-price-card strong{display:block;margin-top:5px;font-size:28px;line-height:1.1;letter-spacing:-.04em}
 .market-price-card small{display:block;margin-top:5px;color:var(--muted);font-size:10px}
-:root[data-theme="dark"] .market-price-card{background:linear-gradient(135deg,rgba(69,116,105,.28),rgba(24,39,36,.72))}
 """
 
 

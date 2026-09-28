@@ -298,24 +298,14 @@ def _segments(points: list[dict[str, Any]]) -> tuple[list[list[dict[str, Any]]],
 def _styles() -> str:
     return r'''
 :root{
-  --chart-price:#5f8f86;
-  --chart-grid:rgba(41,56,52,.075);
-  --chart-label:rgba(54,70,66,.58);
-  --chart-correct:#5f9e87;
-  --chart-wrong:#c57d78;
-  --chart-range:rgba(130,120,170,.15);
-  --chart-range-border:rgba(130,120,170,.32);
-  --chart-range-text:#716a91;
-}
-:root[data-theme="dark"]{
-  --chart-price:#8fc9bb;
-  --chart-grid:rgba(230,240,236,.085);
-  --chart-label:rgba(226,239,234,.58);
-  --chart-correct:#86cbb4;
-  --chart-wrong:#e59a94;
-  --chart-range:rgba(158,145,205,.18);
-  --chart-range-border:rgba(177,164,220,.38);
-  --chart-range-text:#c5bbe8;
+  --chart-price:#6f5138;
+  --chart-grid:rgba(91,68,48,.08);
+  --chart-label:rgba(91,68,48,.60);
+  --chart-correct:#6f7a50;
+  --chart-wrong:#a2554e;
+  --chart-range:rgba(184,137,47,.14);
+  --chart-range-border:rgba(184,137,47,.30);
+  --chart-range-text:#8a6421;
 }
 .price-chart-shell{margin-top:10px}
 .price-chart-v2{display:block;width:100%;height:auto;overflow:visible}
@@ -329,9 +319,8 @@ def _styles() -> str:
 .latest-ring{fill:none;stroke:var(--chart-price);stroke-width:1.5;opacity:.28;vector-effect:non-scaling-stroke}.latest-dot{fill:var(--chart-price);stroke:var(--paper);stroke-width:2;vector-effect:non-scaling-stroke}.direction-arrow{fill:var(--chart-price);font-size:17px;font-weight:900}
 .forecast-band{fill:var(--chart-range);stroke:var(--chart-range-border);stroke-width:1.2;vector-effect:non-scaling-stroke}.forecast-band-label{fill:var(--chart-range-text);font-size:9px;font-weight:800;letter-spacing:.04em}.forecast-price-label{fill:var(--chart-range-text);font-size:9px;font-weight:700}
 .chart-legend{display:flex;align-items:center;flex-wrap:wrap;gap:10px 18px;margin-top:8px;color:var(--muted);font-size:12px}.chart-legend span{display:inline-flex;align-items:center;gap:7px}.legend-dot{width:8px!important;height:8px!important;border-radius:50%!important}.legend-dot.correct{background:var(--chart-correct)!important}.legend-dot.wrong{background:var(--chart-wrong)!important}.legend-range{width:18px!important;height:8px!important;border-radius:4px!important;background:var(--chart-range)!important;border:1px solid var(--chart-range-border)}.legend-gap{letter-spacing:.01em}
-.price-chart-empty{padding:54px 16px;text-align:center;color:var(--muted);border:1px dashed var(--line);border-radius:18px}
-.health-badge{padding:10px 12px!important}
-.theme-toggle{padding:9px 13px 9px 10px!important;min-height:46px!important}
+.price-chart-empty{padding:50px 16px;text-align:center;color:var(--muted);border:1px dashed var(--line);border-radius:10px}
+.health-badge{padding:7px 9px!important}
 @media(max-width:620px){
   .price-chart-shell{margin-top:6px}
   .chart-x-label.x-mobile-hide{display:none}
@@ -339,8 +328,7 @@ def _styles() -> str:
   .forecast-price-label{display:none}
   .forecast-band-label{font-size:8px}
   .chart-legend{gap:8px 12px;font-size:11px;margin-top:4px}
-  .health-badge{padding:10px 12px!important}
-  .theme-toggle{padding:9px 12px!important}
+  .health-badge{padding:7px 9px!important}
 }
 '''
 

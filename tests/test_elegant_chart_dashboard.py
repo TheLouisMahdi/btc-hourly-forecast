@@ -59,15 +59,14 @@ class ElegantChartDashboardTests(unittest.TestCase):
         self.assertNotIn("not published</text>", chart)
         self.assertLessEqual(chart.count('class="outcome-marker'), 6)
 
-    def test_theme_tokens_cover_light_dark_and_control_spacing(self) -> None:
+    def test_theme_tokens_use_formal_brown_gold_palette(self) -> None:
         styles = github_chart_dashboard._styles()
 
         self.assertIn(":root{", styles)
-        self.assertIn(':root[data-theme="dark"]', styles)
-        self.assertIn("--chart-price", styles)
-        self.assertIn("--chart-range", styles)
-        self.assertIn(".health-badge{padding:10px 12px!important}", styles)
-        self.assertIn(".theme-toggle{padding:9px 13px 9px 10px!important", styles)
+        self.assertNotIn('data-theme="dark"', styles)
+        self.assertIn("--chart-price:#6f5138", styles)
+        self.assertIn("--chart-range:rgba(184,137,47,.14)", styles)
+        self.assertNotIn(".theme-toggle", styles)
 
     def test_mobile_chart_reduces_labels_without_hiding_price_path(self) -> None:
         styles = github_chart_dashboard._styles()

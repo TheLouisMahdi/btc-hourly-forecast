@@ -25,11 +25,6 @@ class DashboardOrchestratorTests(unittest.TestCase):
                 side_effect=lambda: calls.append("base") or 0,
             ),
             patch.object(
-                render_dashboard.github_visual_dashboard,
-                "main",
-                side_effect=lambda: calls.append("visual") or 0,
-            ),
-            patch.object(
                 render_dashboard.github_uncertainty_dashboard,
                 "main",
                 side_effect=lambda: calls.append("uncertainty") or 0,
@@ -66,7 +61,6 @@ class DashboardOrchestratorTests(unittest.TestCase):
             calls,
             [
                 "base",
-                "visual",
                 "uncertainty",
                 "resilience",
                 "assistant",
@@ -86,14 +80,9 @@ class DashboardOrchestratorTests(unittest.TestCase):
                 side_effect=lambda: calls.append("base") or 0,
             ),
             patch.object(
-                render_dashboard.github_visual_dashboard,
-                "main",
-                side_effect=lambda: calls.append("visual") or 7,
-            ),
-            patch.object(
                 render_dashboard.github_uncertainty_dashboard,
                 "main",
-                side_effect=lambda: calls.append("uncertainty") or 0,
+                side_effect=lambda: calls.append("uncertainty") or 7,
             ),
             patch.object(
                 render_dashboard.github_resilience_dashboard,
@@ -123,7 +112,7 @@ class DashboardOrchestratorTests(unittest.TestCase):
         ):
             self.assertEqual(render_dashboard.main(), 7)
 
-        self.assertEqual(calls, ["base", "visual"])
+        self.assertEqual(calls, ["base", "uncertainty"])
 
     def test_resilience_panel_uses_position_ledger_anchor(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
