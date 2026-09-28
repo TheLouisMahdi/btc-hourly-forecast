@@ -5,6 +5,56 @@ from typing import Any
 import numpy as np
 
 
+def select_leverage(
+    strategy: dict[str, Any],
+    risk_score: float,
+    modeled_risk_fraction: float = 0.0,
+) -> float:
+    tiers = sorted(
+        {
+            float(value)
+            for value in strategy.get("leverage_tiers", [10.0, 20.0, 40.0])
+            if float(value) > 0
+        }
+    )
+    maximum = max(1.0, float(strategy.get("maximum_leverage", 40.0)))
+    tiers = [tier for tier in tiers if tier <= maximum]
+    if not tiers:
+        return maximum
+
+    thresholds = strategy.get(
+        "leverage_risk_score_thresholds",
+        [0.35, 0.65],
+    )
+    low = float(thresholds[0]) if len(thresholds) > 0 else 0.35
+    high = float(thresholds[1]) if len(thresholds) > 1 else 0.65
+    score = float(np.clip(risk_score, 0.0, 1.0))
+
+    if score < low:
+        candidate = tiers[0]
+    elif score < high:
+        candidate = tiers[min(1, len(tiers) - 1)]
+    else:
+        candidate = tiers[-1]
+
+    if modeled_risk_fraction > 0:
+        safety = float(
+            strategy.get("leverage_liquidation_safety_factor", 0.70)
+        )
+        safe = [
+            tier
+            for tier in tiers
+            if tier <= candidate
+            and modeled_risk_fraction <= safety / tier
+        ]
+        if safe:
+            candidate = safe[-1]
+        else:
+            candidate = tiers[0]
+
+    return float(candidate)
+
+
 def apply_risk_scaled_economics(
     plan: dict[str, Any],
     settings: Any,
@@ -58,17 +108,14 @@ def apply_risk_scaled_economics(
     gap_fraction = max(0.0, gap_bps) / 10_000.0
     modeled_risk_fraction = stop_pct + cost_fraction + gap_fraction
 
-    maximum_leverage = float(strategy.get("maximum_leverage", 5.0))
-    quantity = risk_budget / max(entry * modeled_risk_fraction, 1e-12)
-    notional = min(quantity * entry, account * maximum_leverage)
-    quantity = notional / entry
-    leverage = float(
-        np.clip(
-            notional / max(account, 1e-12),
-            1.0,
-            maximum_leverage,
-        )
+    leverage = select_leverage(
+        strategy,
+        float(output.get("risk_score", 0.0)),
+        modeled_risk_fraction,
     )
+    quantity = risk_budget / max(entry * modeled_risk_fraction, 1e-12)
+    notional = min(quantity * entry, account * leverage)
+    quantity = notional / entry
     margin = notional / leverage
 
     execution_cost = notional * cost_fraction
