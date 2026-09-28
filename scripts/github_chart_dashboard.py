@@ -298,24 +298,24 @@ def _segments(points: list[dict[str, Any]]) -> tuple[list[list[dict[str, Any]]],
 def _styles() -> str:
     return r'''
 :root{
-  --chart-price:#5f8f86;
-  --chart-grid:rgba(41,56,52,.075);
-  --chart-label:rgba(54,70,66,.58);
-  --chart-correct:#5f9e87;
-  --chart-wrong:#c57d78;
-  --chart-range:rgba(130,120,170,.15);
-  --chart-range-border:rgba(130,120,170,.32);
-  --chart-range-text:#716a91;
+  --chart-price:#7b582f;
+  --chart-grid:rgba(74,51,34,.08);
+  --chart-label:rgba(86,65,50,.62);
+  --chart-correct:#7b7650;
+  --chart-wrong:#9b5d50;
+  --chart-range:rgba(190,151,73,.14);
+  --chart-range-border:rgba(160,119,48,.30);
+  --chart-range-text:#7f6029;
 }
 :root[data-theme="dark"]{
-  --chart-price:#8fc9bb;
-  --chart-grid:rgba(230,240,236,.085);
-  --chart-label:rgba(226,239,234,.58);
-  --chart-correct:#86cbb4;
-  --chart-wrong:#e59a94;
-  --chart-range:rgba(158,145,205,.18);
-  --chart-range-border:rgba(177,164,220,.38);
-  --chart-range-text:#c5bbe8;
+  --chart-price:#7b582f;
+  --chart-grid:rgba(74,51,34,.08);
+  --chart-label:rgba(86,65,50,.62);
+  --chart-correct:#7b7650;
+  --chart-wrong:#9b5d50;
+  --chart-range:rgba(190,151,73,.14);
+  --chart-range-border:rgba(160,119,48,.30);
+  --chart-range-text:#7f6029;
 }
 .price-chart-shell{margin-top:10px}
 .price-chart-v2{display:block;width:100%;height:auto;overflow:visible}
