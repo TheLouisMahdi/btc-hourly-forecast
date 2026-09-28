@@ -283,7 +283,7 @@ def apply_risk_scaled_economics(
             "notional_usd": float(notional),
             "suggested_leverage": leverage,
             "margin_required_usd": float(margin),
-            "base_execution_cost_bps": float(base_cost_bps),
+            "base_execution_cost_bps": float(runtime_costs["base_cost_bps"]),
             "stress_execution_cost_bps": float(stress_bps),
             "projected_funding_bps": float(
                 runtime_costs["projected_funding_bps"]
