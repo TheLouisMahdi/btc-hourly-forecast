@@ -26,10 +26,11 @@ jobs:
       - run: python -m compileall -q src scripts
       - run: |
           mkdir -p .github_state
-          printf '{}\n' > .github_state/latest.json
-          printf '[]\n' > .github_state/history.json
-          printf '[]\n' > .github_state/trades.json
-          printf '[]\n' > .github_state/chart_candles.json
+          git fetch origin forecast-state --depth=1
+          git show origin/forecast-state:latest.json > .github_state/latest.json
+          git show origin/forecast-state:history.json > .github_state/history.json
+          git show origin/forecast-state:trades.json > .github_state/trades.json
+          git show origin/forecast-state:chart_candles.json > .github_state/chart_candles.json
           python scripts/render_dashboard.py --runtime-dir .dashboard_runtime
       - run: |
           python - <<'PY'
