@@ -563,6 +563,16 @@ class HourlyModelBundle:
         )
         trade_direction = str(trade_context["trade_direction"])
         selected_horizon = int(trade_context["trade_selected_horizon"])
+        trade_direction_name = (
+            "LONG" if trade_direction == "UP" else "SHORT"
+        )
+        trade_qualified = [
+            int(horizon)
+            for horizon in qualified_by_direction.get(
+                trade_direction_name,
+                [],
+            )
+        ]
         selected_event_return = float(event_returns[selected_horizon])
         signed_event_returns = {
             horizon: (
@@ -594,8 +604,8 @@ class HourlyModelBundle:
             "trade_returns": trade_context["trade_returns"],
             "trade_horizon_scores": trade_context["trade_horizon_scores"],
             "trade_selected_horizon": selected_horizon,
-            "direction_qualified": selected_horizon in qualified,
-            "qualified_trade_horizons": qualified,
+            "direction_qualified": selected_horizon in trade_qualified,
+            "qualified_trade_horizons": trade_qualified,
             "probabilities": probabilities,
             "returns": general_returns,
             "continuation": continuation,
