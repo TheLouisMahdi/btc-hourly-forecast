@@ -564,12 +564,40 @@ def open_trade_from_record(record: dict[str, Any]) -> dict[str, Any] | None:
         "suggested_leverage": _finite(plan.get("suggested_leverage"), 10.0),
         "margin_required_usd": _finite(plan.get("margin_required_usd"), 0.0),
         "risk_budget_usd": _finite(plan.get("risk_budget_usd"), 0.0),
+        "base_execution_cost_bps": _finite(
+            plan.get("base_execution_cost_bps"), 0.0
+        ),
         "stress_execution_cost_bps": _finite(
             plan.get("stress_execution_cost_bps"), 0.0
         ),
+        "projected_funding_bps": _finite(
+            plan.get("projected_funding_bps"), 0.0
+        ),
+        "funding_interval_hours": _finite(
+            plan.get("funding_interval_hours"), 8.0
+        ),
+        "funding_rate_buffer_bps_per_interval": _finite(
+            plan.get("funding_rate_buffer_bps_per_interval"), 0.0
+        ),
         "target_net_profit_usd": _finite(plan.get("target_net_profit_usd"), 0.0),
         "stop_net_loss_usd": _finite(plan.get("stop_net_loss_usd"), 0.0),
-        "expected_value_usd": _finite(plan.get("expected_value_usd"), 0.0),
+        "heuristic_expected_value_usd": _finite(
+            plan.get("heuristic_expected_value_usd"), 0.0
+        ),
+        "expected_value_usd": plan.get("expected_value_usd"),
+        "expected_value_status": str(
+            plan.get("expected_value_status") or "UNAVAILABLE"
+        ),
+        "estimated_liquidation_price": plan.get(
+            "estimated_liquidation_price"
+        ),
+        "liquidation_distance_percent": plan.get(
+            "liquidation_distance_percent"
+        ),
+        "maintenance_margin_rate": _finite(
+            plan.get("maintenance_margin_rate"), 0.0
+        ),
+        "margin_mode": str(plan.get("margin_mode") or "ISOLATED"),
         "target_margin_roi": _finite(plan.get("target_margin_roi"), 0.0),
         "adaptive_target_probability": _finite(
             plan.get("adaptive_target_probability"), 0.5
@@ -721,7 +749,41 @@ def _close_trade(
     direction = str(trade["direction"])
     gross_return = exit_price / entry - 1.0
     aligned_return = gross_return if direction == "LONG" else -gross_return
-    cost_fraction = float(trade.get("stress_execution_cost_bps", 0.0)) / 10_000.0
+
+    close_time = _utc(closed_at)
+    opened_at = _utc(trade.get("opened_at") or close_time)
+    holding_hours = max(
+        0.0,
+        (close_time - opened_at).total_seconds() / 3600.0,
+    )
+    base_cost_bps = float(
+        trade.get(
+            "base_execution_cost_bps",
+            trade.get("stress_execution_cost_bps", 0.0),
+        )
+    )
+    funding_interval = max(
+        1.0,
+        float(trade.get("funding_interval_hours", 8.0)),
+    )
+    funding_rate = max(
+        0.0,
+        float(
+            trade.get(
+                "funding_rate_buffer_bps_per_interval",
+                0.0,
+            )
+        ),
+    )
+    funding_intervals = (
+        int(math.ceil(holding_hours / funding_interval))
+        if holding_hours > 0.0 and funding_rate > 0.0
+        else 0
+    )
+    funding_cost_bps = funding_intervals * funding_rate
+    realized_cost_bps = base_cost_bps + funding_cost_bps
+    cost_fraction = realized_cost_bps / 10_000.0
+
     net_return = aligned_return - cost_fraction
     notional = float(trade.get("notional_usd", 0.0))
     net_pnl = notional * net_return
@@ -734,15 +796,17 @@ def _close_trade(
         {
             "status": "CLOSED",
             "outcome": final_outcome,
-            "closed_at": _utc(closed_at).isoformat(),
+            "closed_at": close_time.isoformat(),
             "exit_price": float(exit_price),
+            "holding_hours": float(holding_hours),
             "gross_aligned_return": float(aligned_return),
+            "estimated_funding_cost_bps": float(funding_cost_bps),
+            "estimated_realized_cost_bps": float(realized_cost_bps),
             "realized_net_return": float(net_return),
             "realized_net_pnl_usd": float(net_pnl),
             "realized_r": float(realized_r),
         }
     )
-
 
 def active_trade(trades: Iterable[dict[str, Any]]) -> dict[str, Any] | None:
     for trade in reversed(list(trades)):
