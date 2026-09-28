@@ -168,6 +168,43 @@ def main() -> int:
     doc = doc.replace(" · Forecast ", " · Signal ")
     doc = doc.replace(" calibrated range", " confidence range")
     doc = re.sub(
+        r'<p class="sub"[^>]*>.*?</p>',
+        "",
+        doc,
+        flags=re.DOTALL,
+    )
+    doc = re.sub(
+        r'<p class="copy"[^>]*>.*?</p>',
+        "",
+        doc,
+        flags=re.DOTALL,
+    )
+    doc = re.sub(
+        r'<div class="label" style="margin-top:6px">.*?</div>',
+        "",
+        doc,
+        flags=re.DOTALL,
+    )
+    doc = re.sub(
+        r'(<article class="metric">.*?<strong>.*?</strong>)<small>.*?</small>(</article>)',
+        r'\1\2',
+        doc,
+        flags=re.DOTALL,
+    )
+    doc = re.sub(
+        r'(<div class="trade-lifecycle-tile">.*?<strong>.*?</strong>)<small>.*?</small>(</div>)',
+        r'\1\2',
+        doc,
+        flags=re.DOTALL,
+    )
+    doc = re.sub(
+        r'<footer>.*?</footer>',
+        "",
+        doc,
+        count=1,
+        flags=re.DOTALL,
+    )
+    doc = re.sub(
         r'(<small>STATUS</small><strong>).*?(</strong>)',
         r'\1ACTIVE\2',
         doc,
@@ -321,7 +358,7 @@ def _tile(label: str, value: str, note: str) -> str:
         '<div class="assistant-tile">'
         f'<small>{html.escape(label)}</small>'
         f'<strong>{html.escape(value)}</strong>'
-        f'<p>{html.escape(note)}</p></div>'
+        '</div>'
     )
 
 
