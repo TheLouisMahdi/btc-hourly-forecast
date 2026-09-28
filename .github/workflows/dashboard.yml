@@ -92,7 +92,7 @@ jobs:
               'Position plan',
               'class="panel trade-assistant-panel"',
               'class="price-line"',
-              'Forecast range',
+              'Projected range',
           )
           missing = [marker for marker in required if marker not in document]
           forbidden = (
@@ -107,6 +107,8 @@ jobs:
               'class="brand"',
               'secondary',
               'paper trading',
+              'paper position',
+              'paper positions',
               'paper-trade',
               'Primary contract',
               'Secondary contract',
