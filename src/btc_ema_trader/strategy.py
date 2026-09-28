@@ -307,6 +307,8 @@ def make_decision(
             hard_blockers.append("QUOTE_STALE")
         if data_health.get("provider_mismatch", False):
             hard_blockers.append("PROVIDER_MISMATCH")
+        if data_health.get("execution_provider_mismatch", False):
+            hard_blockers.append("EXECUTION_PROVIDER_MISMATCH")
         if data_health.get("model_stale", False):
             soft_risk_flags.append("MODEL_STALE")
         if data_health.get("news_stale", False):
