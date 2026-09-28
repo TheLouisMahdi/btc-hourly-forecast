@@ -47,11 +47,25 @@ def _prediction(
     return {
         "direction": "UP",
         "trade_direction": "UP",
+        "trade_direction_source": "MULTI_HORIZON_GENERAL_MODEL",
+        "trade_direction_confidence": success,
+        "trade_direction_score": 2.0 * success - 1.0,
+        "trade_direction_probabilities": {
+            3: success,
+            6: max(0.5, success - 0.02),
+            12: max(0.5, success - 0.04),
+        },
+        "trade_returns": {
+            3: event_return,
+            6: event_return * 0.9,
+            12: event_return * 0.8,
+        },
         "confidence": success,
         "agreement": 1.0,
         "expected_return": event_return,
         "expected_event_aligned_return": event_return,
         "selected_horizon": 3,
+        "trade_selected_horizon": 3,
         "qualified_trade_horizons": [],
         "probabilities": {1: 0.52, 3: 0.55, 6: 0.53, 12: 0.51},
         "continuation": {1: 0.50, 3: success, 6: 0.48, 12: 0.46},
@@ -127,7 +141,7 @@ class StrategyRiskPolicyTests(unittest.TestCase):
     def tearDown(self) -> None:
         self.temp.cleanup()
 
-    def test_unqualified_negative_edge_event_still_opens_with_scaled_risk(self) -> None:
+    def test_unqualified_non_positive_edge_is_hard_blocked(self) -> None:
         decision = make_decision(
             _row(),
             _prediction(success=0.50, tradeability=0.50, event_return=0.0),
@@ -135,8 +149,8 @@ class StrategyRiskPolicyTests(unittest.TestCase):
             self.settings,
         )
 
-        self.assertEqual(decision.action, "LONG")
-        self.assertEqual(decision.blockers, [])
+        self.assertEqual(decision.action, "WAIT")
+        self.assertIn("NON_POSITIVE_STRESS_NET_EDGE", decision.blockers)
         self.assertIn(
             "MODEL_NOT_QUALIFIED",
             decision.trade_plan["soft_risk_flags"],
@@ -167,7 +181,7 @@ class StrategyRiskPolicyTests(unittest.TestCase):
         )
         strong = make_decision(
             _row(event_score=0.95, volume_z_24=2.0, adx=34.0),
-            _prediction(success=0.78, tradeability=0.76, event_return=0.005),
+            _prediction(success=0.78, tradeability=0.76, event_return=0.02),
             _qualified_bundle(),
             self.settings,
         )
@@ -208,7 +222,7 @@ class StrategyRiskPolicyTests(unittest.TestCase):
         )
         self.assertEqual(
             decision.trade_plan["trade_direction_source"],
-            "MODEL_DIRECTION_WITH_STRUCTURE_CONTEXT",
+            "MULTI_HORIZON_GENERAL_MODEL",
         )
         self.assertIn(
             decision.trade_plan["suggested_leverage"],

@@ -150,22 +150,59 @@ def main() -> int:
             symbol=bundle.symbol,
         )
 
-        # Rebuild path-dependent stop state from its immutable entry values
+        # Rebuild path-dependent stop state from immutable entry values
         # before deterministic post-entry replay.
-        for trade in trades:
-            if trade.get("status") == "OPEN":
-                trade["current_stop_price"] = trade.get(
-                    "initial_stop_price",
-                    trade.get("current_stop_price"),
+        open_positions = [
+            trade for trade in trades if trade.get("status") == "OPEN"
+        ]
+        for trade in open_positions:
+            trade["current_stop_price"] = trade.get(
+                "initial_stop_price",
+                trade.get("current_stop_price"),
+            )
+            trade["max_favorable_r"] = 0.0
+            trade["max_adverse_r"] = 0.0
+            trade["breakeven_armed"] = False
+            trade["trailing_armed"] = False
+
+        execution_candles = candles
+        execution_bar_minutes: int | None = None
+        if open_positions:
+            current = open_positions[-1]
+            execution_provider = str(
+                current.get("entry_quote_provider")
+                or settings.section("market").get(
+                    "paper_execution_provider",
+                    bundle.provider,
                 )
-                trade["max_favorable_r"] = 0.0
-                trade["max_adverse_r"] = 0.0
-                trade["breakeven_armed"] = False
-                trade["trailing_armed"] = False
+            )
+            try:
+                execution_candles = MarketDataClient(
+                    settings
+                ).fetch_execution_candles(
+                    execution_provider,
+                    start=current.get("opened_at"),
+                    end=pd.Timestamp.now(tz="UTC"),
+                )
+                if execution_candles.empty:
+                    raise RuntimeError(
+                        "No closed minute execution candles are available"
+                    )
+                execution_bar_minutes = 1
+            except Exception as exc:
+                LOGGER.warning(
+                    "Minute execution replay unavailable; "
+                    "falling back to closed hourly candles: %s",
+                    exc,
+                )
+                execution_candles = candles
+                execution_bar_minutes = None
+
         resolved_trades_now = resolve_open_trades_after_entry(
             trades,
-            candles,
+            execution_candles,
             settings,
+            bar_minutes=execution_bar_minutes,
         )
 
         trade_engine = CanonicalAdaptiveTradeEngine(

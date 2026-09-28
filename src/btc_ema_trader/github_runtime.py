@@ -86,6 +86,19 @@ POSITION_PLAN_FIELDS = (
     "modeled_total_risk_usd",
     "risk_budget_utilization",
     "suggested_leverage",
+    "paper_account_equity_usd",
+    "base_execution_cost_bps",
+    "projected_funding_bps",
+    "funding_interval_hours",
+    "funding_rate_buffer_bps_per_interval",
+    "heuristic_expected_value_usd",
+    "expected_value_status",
+    "estimated_liquidation_price",
+    "liquidation_distance_percent",
+    "stop_to_liquidation_ratio",
+    "liquidation_estimate_status",
+    "maintenance_margin_rate",
+    "margin_mode",
     "gap_risk_buffer_bps",
     "label_execution_aligned",
     "label_entry_definition",
@@ -124,8 +137,21 @@ class CanonicalRuntimeEngine(RuntimeEngine):
         )
 
         observed_at = pd.Timestamp.now(tz="UTC")
+        execution_provider = str(
+            self.settings.section("market").get(
+                "paper_execution_provider",
+                provider or "binance_futures",
+            )
+        )
         try:
-            quote = self.market.live_quote(provider_hint=provider)
+            quote = self.market.live_quote(
+                provider_hint=execution_provider
+            )
+            if quote.provider != execution_provider:
+                raise RuntimeError(
+                    "Paper execution quote provider mismatch: "
+                    f"{quote.provider} != {execution_provider}"
+                )
             return apply_execution_quote(
                 result,
                 provider=quote.provider,
@@ -175,6 +201,7 @@ class CanonicalAdaptiveTradeEngine(AdaptiveTradeEngine):
         self._feature_record: dict[str, Any] | None = None
         self._last_extended_vector: np.ndarray | None = None
         self._active_position: dict[str, Any] | None = None
+        self._paper_account_equity_usd: float | None = None
         super().__init__(*args, **kwargs)
 
     def _load_or_create(self) -> TradeAdaptiveState:
@@ -199,6 +226,21 @@ class CanonicalAdaptiveTradeEngine(AdaptiveTradeEngine):
         """Migrate old vectors and learn exactly once from resolved positions."""
         migrate_trade_feature_vectors(trades)
         self._active_position = active_trade(trades)
+        base_equity = float(
+            self.settings.section("strategy").get(
+                "account_equity_usd",
+                1000.0,
+            )
+        )
+        realized_pnl = sum(
+            _finite(trade.get("realized_net_pnl_usd"), 0.0)
+            for trade in trades
+            if trade.get("status") == "CLOSED"
+        )
+        self._paper_account_equity_usd = max(
+            0.0,
+            base_equity + realized_pnl,
+        )
         learned = 0
         if not self.enabled:
             return self.summary(trades, learned_now=0)
@@ -303,6 +345,10 @@ class CanonicalAdaptiveTradeEngine(AdaptiveTradeEngine):
             candidate["entry_feature_vector"] = (
                 self._last_extended_vector.tolist()
             )
+        if self._paper_account_equity_usd is not None:
+            candidate["paper_account_equity_usd"] = float(
+                self._paper_account_equity_usd
+            )
         candidate = apply_risk_scaled_economics(
             candidate,
             self.settings,
@@ -351,6 +397,9 @@ class CanonicalAdaptiveTradeEngine(AdaptiveTradeEngine):
         summary["schema_version"] = TRADE_STATE_SCHEMA_VERSION
         summary["feature_count"] = len(EXTENDED_TRADE_FEATURES)
         summary["runtime_contract"] = RUNTIME_CONTRACT
+        summary["paper_account_equity_usd"] = (
+            self._paper_account_equity_usd
+        )
         return summary
 
 

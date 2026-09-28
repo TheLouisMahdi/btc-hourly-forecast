@@ -46,15 +46,15 @@ class TradeLifecycleTests(unittest.TestCase):
                 },
                 "trade_lifecycle": {
                     "enabled": True,
-                    "base_reward_r": 5.0,
-                    "minimum_reward_r": 3.0,
-                    "maximum_reward_r": 8.0,
+                    "base_reward_r": 2.0,
+                    "minimum_reward_r": 1.0,
+                    "maximum_reward_r": 5.0,
                     "base_stop_atr_multiplier": 0.75,
                     "minimum_stop_percent": 0.0025,
                     "maximum_stop_percent": 0.025,
-                    "base_maximum_holding_hours": 72,
-                    "minimum_holding_hours": 12,
-                    "maximum_holding_hours": 168,
+                    "base_maximum_holding_hours": 12,
+                    "minimum_holding_hours": 3,
+                    "maximum_holding_hours": 24,
                     "minimum_online_samples": 2,
                     "maximum_online_weight": 0.65,
                     "same_bar_policy": "NEAREST_TO_OPEN",
@@ -99,13 +99,14 @@ class TradeLifecycleTests(unittest.TestCase):
             "stress_execution_cost_bps": 15.0,
         }
 
-    def test_initial_plan_uses_five_r_target(self) -> None:
+    def test_initial_plan_uses_forecast_backed_target(self) -> None:
         engine = AdaptiveTradeEngine(self.settings, "model-1")
         plan = engine.enrich_trade_plan(self._record(), self._plan())
         risk = plan["entry_reference"] - plan["stop_price"]
         reward = plan["target_price"] - plan["entry_reference"]
-        self.assertAlmostEqual(plan["risk_reward"], 5.0, places=6)
-        self.assertAlmostEqual(reward / risk, 5.0, places=6)
+        self.assertAlmostEqual(plan["risk_reward"], 1.0, places=6)
+        self.assertAlmostEqual(reward / risk, 1.0, places=6)
+        self.assertAlmostEqual(plan["forecast_reward_r"], 1.0, places=6)
         self.assertGreater(plan["target_net_profit_usd"], 0.0)
         self.assertLess(plan["stop_net_loss_usd"], 0.0)
 

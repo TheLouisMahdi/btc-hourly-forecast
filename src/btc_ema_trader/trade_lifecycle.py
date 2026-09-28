@@ -13,8 +13,8 @@ from sklearn.linear_model import SGDClassifier, SGDRegressor
 from sklearn.preprocessing import StandardScaler
 
 from .config import Settings
-from .costs import execution_cost_breakdown
-from .risk_economics import select_leverage
+from .costs import execution_cost_breakdown, projected_funding_bps, runtime_cost_breakdown
+from .risk_economics import estimate_isolated_liquidation_price, select_leverage
 
 TRADE_STATE_SCHEMA_VERSION = 1
 TRADE_FEATURES = (
@@ -217,7 +217,11 @@ class AdaptiveTradeEngine:
         if direction not in {"LONG", "SHORT"}:
             direction = (
                 "LONG"
-                if str(record.get("trade_forecast_direction") or record.get("forecast_direction"))
+                if str(
+                    record.get("trade_direction")
+                    or record.get("trade_forecast_direction")
+                    or record.get("forecast_direction")
+                )
                 == "UP"
                 else "SHORT"
             )
@@ -249,7 +253,17 @@ class AdaptiveTradeEngine:
                 float(self.cfg.get("maximum_stop_percent", 0.025)),
             )
         )
-        base_reward_r = float(self.cfg.get("base_reward_r", 5.0))
+        forecast_reward_r = max(
+            0.0,
+            _finite(record.get("expected_return"), 0.0),
+        ) / max(base_stop_pct, 1e-9)
+        base_reward_r = float(
+            np.clip(
+                forecast_reward_r,
+                float(self.cfg.get("minimum_reward_r", 1.0)),
+                float(self.cfg.get("maximum_reward_r", 5.0)),
+            )
+        )
         vector = trade_feature_vector(
             record,
             output,
@@ -267,7 +281,8 @@ class AdaptiveTradeEngine:
         p_expiry = max(0.0, 1.0 - p_target - p_stop)
 
         minimum_samples = int(self.cfg.get("minimum_online_samples", 20))
-        if self.state.samples_seen < minimum_samples:
+        probabilities_calibrated = self.state.samples_seen >= minimum_samples
+        if not probabilities_calibrated:
             reward_r = base_reward_r
             stop_scale = 1.0
             holding_scale = 1.0
@@ -297,8 +312,8 @@ class AdaptiveTradeEngine:
         reward_r = float(
             np.clip(
                 reward_r,
-                float(self.cfg.get("minimum_reward_r", 3.0)),
-                float(self.cfg.get("maximum_reward_r", 8.0)),
+                float(self.cfg.get("minimum_reward_r", 1.0)),
+                float(self.cfg.get("maximum_reward_r", 5.0)),
             )
         )
         stop_pct = float(
@@ -316,25 +331,32 @@ class AdaptiveTradeEngine:
         target_price = (
             entry + target_distance if direction == "LONG" else entry - target_distance
         )
-        base_holding = int(self.cfg.get("base_maximum_holding_hours", 72))
+        base_holding = int(
+            record.get("selected_horizon")
+            or output.get("maximum_holding_hours")
+            or self.cfg.get("base_maximum_holding_hours", 12)
+        )
         holding_hours = int(
             np.clip(
                 round(base_holding * holding_scale),
-                int(self.cfg.get("minimum_holding_hours", 12)),
-                int(self.cfg.get("maximum_holding_hours", 168)),
+                int(self.cfg.get("minimum_holding_hours", 3)),
+                int(self.cfg.get("maximum_holding_hours", 24)),
             )
         )
 
         economics = _margin_economics(
             settings=self.settings,
             entry=entry,
+            direction=direction,
             stop_pct=stop_pct,
             target_pct=target_distance / entry,
+            holding_hours=holding_hours,
             p_target=p_target,
             p_stop=p_stop,
             p_expiry=p_expiry,
             predicted_r=predicted_r,
             risk_score=_finite(output.get("risk_score"), 0.0),
+            probabilities_calibrated=probabilities_calibrated,
         )
         output.update(
             {
@@ -353,6 +375,7 @@ class AdaptiveTradeEngine:
                 "target_percent": target_distance / entry,
                 "risk_reward": reward_r,
                 "base_reward_r": base_reward_r,
+                "forecast_reward_r": forecast_reward_r,
                 "adaptive_reward_r": reward_r,
                 "maximum_holding_hours": holding_hours,
                 "expiry_policy": "TARGET_OR_STOP_OR_TIME_EXIT",
@@ -545,12 +568,40 @@ def open_trade_from_record(record: dict[str, Any]) -> dict[str, Any] | None:
         "suggested_leverage": _finite(plan.get("suggested_leverage"), 10.0),
         "margin_required_usd": _finite(plan.get("margin_required_usd"), 0.0),
         "risk_budget_usd": _finite(plan.get("risk_budget_usd"), 0.0),
+        "base_execution_cost_bps": _finite(
+            plan.get("base_execution_cost_bps"), 0.0
+        ),
         "stress_execution_cost_bps": _finite(
             plan.get("stress_execution_cost_bps"), 0.0
         ),
+        "projected_funding_bps": _finite(
+            plan.get("projected_funding_bps"), 0.0
+        ),
+        "funding_interval_hours": _finite(
+            plan.get("funding_interval_hours"), 8.0
+        ),
+        "funding_rate_buffer_bps_per_interval": _finite(
+            plan.get("funding_rate_buffer_bps_per_interval"), 0.0
+        ),
         "target_net_profit_usd": _finite(plan.get("target_net_profit_usd"), 0.0),
         "stop_net_loss_usd": _finite(plan.get("stop_net_loss_usd"), 0.0),
-        "expected_value_usd": _finite(plan.get("expected_value_usd"), 0.0),
+        "heuristic_expected_value_usd": _finite(
+            plan.get("heuristic_expected_value_usd"), 0.0
+        ),
+        "expected_value_usd": plan.get("expected_value_usd"),
+        "expected_value_status": str(
+            plan.get("expected_value_status") or "UNAVAILABLE"
+        ),
+        "estimated_liquidation_price": plan.get(
+            "estimated_liquidation_price"
+        ),
+        "liquidation_distance_percent": plan.get(
+            "liquidation_distance_percent"
+        ),
+        "maintenance_margin_rate": _finite(
+            plan.get("maintenance_margin_rate"), 0.0
+        ),
+        "margin_mode": str(plan.get("margin_mode") or "ISOLATED"),
         "target_margin_roi": _finite(plan.get("target_margin_roi"), 0.0),
         "adaptive_target_probability": _finite(
             plan.get("adaptive_target_probability"), 0.5
@@ -702,7 +753,41 @@ def _close_trade(
     direction = str(trade["direction"])
     gross_return = exit_price / entry - 1.0
     aligned_return = gross_return if direction == "LONG" else -gross_return
-    cost_fraction = float(trade.get("stress_execution_cost_bps", 0.0)) / 10_000.0
+
+    close_time = _utc(closed_at)
+    opened_at = _utc(trade.get("opened_at") or close_time)
+    holding_hours = max(
+        0.0,
+        (close_time - opened_at).total_seconds() / 3600.0,
+    )
+    base_cost_bps = float(
+        trade.get(
+            "base_execution_cost_bps",
+            trade.get("stress_execution_cost_bps", 0.0),
+        )
+    )
+    funding_interval = max(
+        1.0,
+        float(trade.get("funding_interval_hours", 8.0)),
+    )
+    funding_rate = max(
+        0.0,
+        float(
+            trade.get(
+                "funding_rate_buffer_bps_per_interval",
+                0.0,
+            )
+        ),
+    )
+    funding_intervals = (
+        int(math.ceil(holding_hours / funding_interval))
+        if holding_hours > 0.0 and funding_rate > 0.0
+        else 0
+    )
+    funding_cost_bps = funding_intervals * funding_rate
+    realized_cost_bps = base_cost_bps + funding_cost_bps
+    cost_fraction = realized_cost_bps / 10_000.0
+
     net_return = aligned_return - cost_fraction
     notional = float(trade.get("notional_usd", 0.0))
     net_pnl = notional * net_return
@@ -715,15 +800,17 @@ def _close_trade(
         {
             "status": "CLOSED",
             "outcome": final_outcome,
-            "closed_at": _utc(closed_at).isoformat(),
+            "closed_at": close_time.isoformat(),
             "exit_price": float(exit_price),
+            "holding_hours": float(holding_hours),
             "gross_aligned_return": float(aligned_return),
+            "estimated_funding_cost_bps": float(funding_cost_bps),
+            "estimated_realized_cost_bps": float(realized_cost_bps),
             "realized_net_return": float(net_return),
             "realized_net_pnl_usd": float(net_pnl),
             "realized_r": float(realized_r),
         }
     )
-
 
 def active_trade(trades: Iterable[dict[str, Any]]) -> dict[str, Any] | None:
     for trade in reversed(list(trades)):
@@ -780,7 +867,7 @@ def _fallback_probabilities(
 
 
 def _fallback_expected_r(record: dict[str, Any], stop_pct: float) -> float:
-    move = abs(_finite(record.get("expected_return"), 0.0))
+    move = _finite(record.get("expected_return"), 0.0)
     return float(np.clip(move / max(stop_pct, 1e-6), -1.0, 5.0))
 
 
@@ -788,26 +875,35 @@ def _margin_economics(
     *,
     settings: Settings,
     entry: float,
+    direction: str,
     stop_pct: float,
     target_pct: float,
+    holding_hours: float,
     p_target: float,
     p_stop: float,
     p_expiry: float,
     predicted_r: float,
     risk_score: float,
+    probabilities_calibrated: bool,
 ) -> dict[str, Any]:
     strategy = settings.section("strategy")
     account = float(strategy.get("account_equity_usd", 1000.0))
     risk_fraction = float(strategy.get("risk_per_trade_fraction", 0.01))
     risk_budget = account * risk_fraction
-    costs = execution_cost_breakdown(strategy)
-    stress_bps = float(costs["stress_cost_bps"])
+    costs = runtime_cost_breakdown(strategy, holding_hours)
+    stress_bps = float(costs["runtime_stress_cost_bps"])
     cost_fraction = stress_bps / 10_000.0
-    modeled_risk_fraction = stop_pct + cost_fraction
+    gap_fraction = (
+        max(0.0, float(strategy.get("gap_risk_buffer_bps", 0.0)))
+        / 10_000.0
+    )
+    modeled_risk_fraction = stop_pct + cost_fraction + gap_fraction
     leverage = select_leverage(
         strategy,
         risk_score,
         modeled_risk_fraction,
+        entry=entry,
+        direction=direction,
     )
     unit_risk = entry * modeled_risk_fraction
     quantity = risk_budget / max(unit_risk, 1e-9)
@@ -820,8 +916,20 @@ def _margin_economics(
     target_net = target_gross - execution_cost
     stop_net = -(stop_gross + execution_cost)
     expiry_net = notional * predicted_r * stop_pct - execution_cost
-    expected_value = (
+    heuristic_expected_value = (
         p_target * target_net + p_stop * stop_net + p_expiry * expiry_net
+    )
+    liquidation_price = estimate_isolated_liquidation_price(
+        strategy,
+        entry=entry,
+        direction=direction,
+        leverage=leverage,
+        quantity=max(quantity, 1e-12),
+    )
+    liquidation_distance = (
+        None
+        if liquidation_price is None
+        else abs(liquidation_price - entry) / entry
     )
     return {
         "risk_budget_usd": float(risk_budget),
@@ -829,6 +937,9 @@ def _margin_economics(
         "notional_usd": float(notional),
         "suggested_leverage": leverage,
         "margin_required_usd": float(margin),
+        "base_execution_cost_bps": float(costs["base_cost_bps"]),
+        "stress_execution_cost_bps": stress_bps,
+        "projected_funding_bps": float(costs["projected_funding_bps"]),
         "round_trip_stress_cost_usd": float(execution_cost),
         "target_gross_profit_usd": float(target_gross),
         "target_net_profit_usd": float(target_net),
@@ -837,11 +948,27 @@ def _margin_economics(
         "profit_margin_usd": float(target_net),
         "target_margin_roi": float(target_net / max(margin, 1e-9)),
         "stop_margin_roi": float(stop_net / max(margin, 1e-9)),
-        "expected_value_usd": float(expected_value),
-        "stress_execution_cost_bps": stress_bps,
+        "heuristic_expected_value_usd": float(heuristic_expected_value),
+        "expected_value_usd": (
+            float(heuristic_expected_value)
+            if probabilities_calibrated
+            else None
+        ),
+        "expected_value_status": (
+            "CALIBRATED"
+            if probabilities_calibrated
+            else "UNCALIBRATED_HEURISTIC"
+        ),
+        "estimated_liquidation_price": liquidation_price,
+        "liquidation_distance_percent": liquidation_distance,
+        "maintenance_margin_rate": float(
+            strategy.get("maintenance_margin_rate", 0.004)
+        ),
+        "margin_mode": str(
+            strategy.get("margin_mode", "ISOLATED")
+        ).upper(),
         "paper_only": bool(strategy.get("paper_only", True)),
     }
-
 
 def _finite(value: Any, default: float = 0.0) -> float:
     try:

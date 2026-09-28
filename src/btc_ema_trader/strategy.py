@@ -7,7 +7,7 @@ import numpy as np
 import pandas as pd
 
 from .config import Settings
-from .costs import execution_cost_breakdown
+from .costs import execution_cost_breakdown, runtime_cost_breakdown
 from .economic_validation import apply_calibration
 from .model import HourlyModelBundle
 from .risk_economics import select_leverage
@@ -106,37 +106,99 @@ def make_decision(
     policy_by_direction = qualification.get("economic_policy", {})
     direction_policies = policy_by_direction.get(direction_name, {})
 
-    selected_horizon, confidence, tradeability_probability, policy = (
-        _select_economic_horizon(
-            prediction=prediction,
-            qualified_horizons=qualified_horizons,
-            policies=direction_policies,
-            event_score=event_score,
+    selected_horizon = _select_model_trade_horizon(
+        prediction,
+        cfg,
+    )
+    policy = direction_policies.get(
+        str(selected_horizon),
+        direction_policies.get(selected_horizon, {}),
+    )
+    policy = policy if isinstance(policy, dict) else {}
+
+    trade_direction_probability = _mapping_value(
+        prediction.get("trade_direction_probabilities", {}),
+        selected_horizon,
+        float(prediction.get("trade_direction_confidence", 0.5)),
+    )
+    trade_direction_confidence = float(
+        prediction.get(
+            "trade_direction_confidence",
+            max(0.5, trade_direction_probability),
         )
     )
-    event_aligned_return = _mapping_value(
-        prediction.get("event_returns", {}),
+    event_is_aligned = (
+        is_event
+        and event_direction != 0
+        and (
+            (event_direction > 0 and trade_direction == "UP")
+            or (event_direction < 0 and trade_direction == "DOWN")
+        )
+    )
+    raw_success = (
+        _mapping_value(
+            prediction.get("continuation", {}),
+            selected_horizon,
+            trade_direction_confidence,
+        )
+        if event_is_aligned
+        else trade_direction_confidence
+    )
+    raw_tradeability = (
+        _mapping_value(
+            prediction.get("tradeability", {}),
+            selected_horizon,
+            trade_direction_probability,
+        )
+        if event_is_aligned
+        else trade_direction_probability
+    )
+    confidence = apply_calibration(
+        raw_success,
+        policy.get("success_calibration"),
+    )
+    tradeability_probability = apply_calibration(
+        raw_tradeability,
+        policy.get("tradeability_calibration"),
+    )
+
+    expected_return = _mapping_value(
+        prediction.get("trade_returns", {}),
         selected_horizon,
-        float(prediction.get("expected_event_aligned_return", 0.0)),
+        float(prediction.get("expected_return", 0.0)),
     )
-    expected_return = (
-        event_aligned_return
-        if trade_direction == "UP"
-        else -event_aligned_return
+    event_aligned_return = (
+        _mapping_value(
+            prediction.get("event_returns", {}),
+            selected_horizon,
+            0.0,
+        )
+        if event_is_aligned
+        else None
     )
-    base_costs = execution_cost_breakdown(cfg)
-    stress_cost_bps = float(
+    base_costs = runtime_cost_breakdown(cfg, selected_horizon)
+    qualification_stress_bps = float(
         qualification.get(
             "economic_stress_cost_bps",
             base_costs["stress_cost_bps"],
         )
     )
-    net_edge_bps = event_aligned_return * 10_000.0 - stress_cost_bps
-    minimum_edge_bps = float(
-        policy.get(
-            "minimum_predicted_stress_edge_bps",
-            cfg.get("minimum_net_edge_bps", 0.0),
+    stress_cost_bps = (
+        max(
+            qualification_stress_bps,
+            float(base_costs["stress_cost_bps"]),
         )
+        + float(base_costs["projected_funding_bps"])
+    )
+    net_edge_bps = expected_return * 10_000.0 - stress_cost_bps
+    minimum_edge_bps = max(
+        float(cfg.get("minimum_net_edge_bps", 0.0)),
+        float(
+            policy.get(
+                "minimum_predicted_stress_edge_bps",
+                0.0,
+            )
+        ),
     )
     minimum_event_score = float(
         policy.get(
@@ -214,6 +276,14 @@ def make_decision(
         soft_risk_flags.append("LOW_TRADEABILITY_PROBABILITY")
     if net_edge_bps < minimum_edge_bps:
         soft_risk_flags.append("INSUFFICIENT_STRESS_NET_EDGE")
+        hard_blockers.append("NON_POSITIVE_STRESS_NET_EDGE")
+    if (
+        event_aligned_return is not None
+        and abs(event_aligned_return) > 1e-12
+        and event_aligned_return * 10_000.0 - stress_cost_bps
+        < minimum_edge_bps
+    ):
+        hard_blockers.append("EVENT_MODEL_NEGATIVE_EDGE")
 
     atr_pct = float(latest_row.get("atr_pct", np.nan))
     if not np.isfinite(atr_pct) or atr_pct <= 0:
@@ -238,6 +308,8 @@ def make_decision(
             hard_blockers.append("QUOTE_STALE")
         if data_health.get("provider_mismatch", False):
             hard_blockers.append("PROVIDER_MISMATCH")
+        if data_health.get("execution_provider_mismatch", False):
+            hard_blockers.append("EXECUTION_PROVIDER_MISMATCH")
         if data_health.get("model_stale", False):
             soft_risk_flags.append("MODEL_STALE")
         if data_health.get("news_stale", False):
@@ -287,20 +359,33 @@ def make_decision(
         settings,
         action,
         selected_horizon=selected_horizon,
-        expected_aligned_return=event_aligned_return,
+        expected_aligned_return=expected_return,
         stress_cost_bps=stress_cost_bps,
         minimum_edge_bps=minimum_edge_bps,
         calibrated_success=confidence,
         calibrated_tradeability=tradeability_probability,
         risk_assessment=risk_assessment,
     )
+    minimum_reward_r = float(
+        cfg.get("minimum_forecast_reward_r", 1.0)
+    )
+    if (
+        action in {"LONG", "SHORT"}
+        and float(trade_plan.get("forecast_reward_r", 0.0))
+        < minimum_reward_r
+    ):
+        hard_blockers.append("INSUFFICIENT_REWARD_TO_RISK")
+        hard_blockers = list(dict.fromkeys(hard_blockers))
+        action = "WAIT"
+        trade_plan["status"] = "BLOCKED"
+
     trade_plan.update(
         {
             "decision_mode": POLICY_NAME,
             "policy_name": POLICY_NAME,
             "policy_version": POLICY_VERSION,
             "risk_contract_version": RISK_CONTRACT_VERSION,
-            "entry_contract": "STRUCTURAL_EVENT_RISK_SCALED",
+            "entry_contract": "MODEL_MULTI_HORIZON_RISK_SCALED",
             "soft_risk_flags": soft_risk_flags,
             "ignored_soft_blockers": soft_risk_flags,
             "hard_blockers": hard_blockers,
@@ -328,13 +413,64 @@ def make_decision(
         returns={
             int(key): float(value)
             for key, value in prediction.get(
-                "absolute_event_returns",
+                "trade_returns",
                 prediction.get("returns", {}),
             ).items()
         },
         blockers=hard_blockers,
         trade_plan=trade_plan,
     )
+
+
+def _select_model_trade_horizon(
+    prediction: dict[str, Any],
+    cfg: dict[str, Any],
+) -> int:
+    trade_returns = prediction.get("trade_returns", {})
+    direction_probabilities = prediction.get(
+        "trade_direction_probabilities",
+        {},
+    )
+    candidates: list[int] = []
+    if isinstance(trade_returns, dict):
+        for key in trade_returns:
+            try:
+                horizon = int(key)
+            except (TypeError, ValueError):
+                continue
+            if horizon > 1:
+                candidates.append(horizon)
+    if not candidates:
+        return int(
+            prediction.get(
+                "trade_selected_horizon",
+                prediction.get("selected_horizon", 1),
+            )
+        )
+
+    def score(horizon: int) -> tuple[float, float, int]:
+        aligned_return = _mapping_value(
+            trade_returns,
+            horizon,
+            0.0,
+        )
+        probability = _mapping_value(
+            direction_probabilities,
+            horizon,
+            float(prediction.get("trade_direction_confidence", 0.5)),
+        )
+        costs = runtime_cost_breakdown(cfg, horizon)
+        net_edge_bps = (
+            aligned_return * 10_000.0
+            - float(costs["runtime_stress_cost_bps"])
+        )
+        return (
+            probability * net_edge_bps,
+            net_edge_bps,
+            -horizon,
+        )
+
+    return max(sorted(set(candidates)), key=score)
 
 
 def _select_economic_horizon(
@@ -596,17 +732,27 @@ def build_trade_plan(
     stop_price = price * (
         1 - stop_pct if direction == "UP" else 1 + stop_pct
     )
-    base_reward_r = float(cfg.get("target_r_multiple", 5.0))
-    target_pct = stop_pct * base_reward_r
-    target_price = price * (
-        1 + target_pct if direction == "UP" else 1 - target_pct
-    )
-    predicted_move = abs(
+    predicted_move = max(
+        0.0,
         float(
             expected_aligned_return
             if expected_aligned_return is not None
-            else prediction.get("expected_event_aligned_return", 0.0)
+            else prediction.get("expected_return", 0.0)
+        ),
+    )
+    forecast_reward_r = predicted_move / max(stop_pct, 1e-12)
+    minimum_reward_r = float(cfg.get("minimum_forecast_reward_r", 1.0))
+    maximum_reward_r = float(cfg.get("target_r_multiple", 5.0))
+    target_reward_r = float(
+        np.clip(
+            forecast_reward_r,
+            minimum_reward_r,
+            maximum_reward_r,
         )
+    )
+    target_pct = stop_pct * target_reward_r
+    target_price = price * (
+        1 + target_pct if direction == "UP" else 1 - target_pct
     )
     account = float(cfg.get("account_equity_usd", 1000.0))
     assessment = risk_assessment or {}
@@ -618,10 +764,11 @@ def build_trade_plan(
     )
     risk_budget = account * risk_fraction
     costs = execution_cost_breakdown(cfg)
+    runtime_costs = runtime_cost_breakdown(cfg, selected_horizon)
     effective_stress_bps = float(
         stress_cost_bps
         if stress_cost_bps is not None
-        else costs["stress_cost_bps"]
+        else runtime_costs["runtime_stress_cost_bps"]
     )
     cost_buffer = effective_stress_bps / 10_000.0
     gap_buffer = float(cfg.get("gap_risk_buffer_bps", 6.0)) / 10_000.0
@@ -631,6 +778,8 @@ def build_trade_plan(
         cfg,
         float(assessment.get("risk_score", 0.0)),
         effective_risk_pct,
+        entry=price,
+        direction=direction,
     )
     notional = min(
         quantity_btc * price,
@@ -651,7 +800,15 @@ def build_trade_plan(
         "triangle_type": row.get("triangle_type", "NONE"),
         "regime": row.get("regime", "UNKNOWN"),
         "regime_code": float(row.get("regime_code", 0.0)),
-        "trade_direction_source": "MODEL_DIRECTION_WITH_STRUCTURE_CONTEXT",
+        "trade_direction_source": str(
+            prediction.get(
+                "trade_direction_source",
+                "MULTI_HORIZON_GENERAL_MODEL",
+            )
+        ),
+        "position_direction": (
+            "LONG" if direction == "UP" else "SHORT"
+        ),
         "entry_reference": price,
         "entry_reference_kind": "CURRENT_CLOSE_PROXY",
         "entry_definition": "PAPER_MARKET_ORDER_AT_SIGNAL_RUN",
@@ -667,7 +824,8 @@ def build_trade_plan(
         "stop_percent": float(stop_pct),
         "target_percent": float(target_pct),
         "target_atr": float(target_pct * price / max(atr, 1e-9)),
-        "risk_reward": float(base_reward_r),
+        "risk_reward": float(target_reward_r),
+        "forecast_reward_r": float(forecast_reward_r),
         "label_execution_aligned": bool(invalidation is not None),
         "risk_score": float(assessment.get("risk_score", 0.0)),
         "risk_fraction": risk_fraction,
@@ -676,12 +834,17 @@ def build_trade_plan(
         "quantity_btc": float(quantity_btc),
         "notional_usd": float(notional),
         "suggested_leverage": float(leverage),
-        "maximum_holding_hours": int(
-            settings.section("trade_lifecycle").get(
-                "base_maximum_holding_hours", 72
-            )
-        ),
+        "maximum_holding_hours": int(selected_horizon),
         "base_execution_cost_bps": costs["base_cost_bps"],
+        "projected_funding_bps": float(
+            runtime_costs.get("projected_funding_bps", 0.0)
+        ),
+        "funding_interval_hours": float(
+            cfg.get("funding_interval_hours", 8.0)
+        ),
+        "funding_rate_buffer_bps_per_interval": float(
+            cfg.get("funding_rate_buffer_bps_per_interval", 0.0)
+        ),
         "stress_execution_cost_bps": effective_stress_bps,
         "minimum_required_net_edge_bps": minimum_edge_bps,
         "predicted_gross_move_bps": predicted_gross_bps,

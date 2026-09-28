@@ -9,6 +9,7 @@ import pandas as pd
 from btc_ema_trader.config import Settings
 from btc_ema_trader.execution_path import (
     first_full_candle_open,
+    first_full_minute_open,
     install_execution_path_contract,
     resolve_open_trades_after_entry,
 )
@@ -92,7 +93,7 @@ class ExecutionPathTests(unittest.TestCase):
         self.assertEqual(trade["status"], "OPEN")
         self.assertEqual(
             trade["first_evaluable_candle_open"],
-            "2026-01-01T02:00:00+00:00",
+            "2026-01-01T01:04:00+00:00",
         )
 
     def test_first_full_post_entry_candle_can_resolve_target(self) -> None:
@@ -121,6 +122,69 @@ class ExecutionPathTests(unittest.TestCase):
         self.assertEqual(resolved, 1)
         self.assertEqual(trade["status"], "CLOSED")
         self.assertEqual(trade["outcome"], "TARGET")
+
+    def test_first_full_minute_after_second_level_entry_is_causal(self) -> None:
+        self.assertEqual(
+            first_full_minute_open("2026-01-01T01:04:20Z"),
+            pd.Timestamp("2026-01-01T01:05:00Z"),
+        )
+
+    def test_post_entry_minute_can_resolve_without_using_entry_minute(self) -> None:
+        trade = install_execution_path_contract(
+            {
+                "status": "OPEN",
+                "direction": "LONG",
+                "opened_at": "2026-01-01T01:04:20Z",
+                "signal_candle_time": "2026-01-01T01:00:00Z",
+                "entry_price": 100.0,
+                "target_price": 101.0,
+                "initial_stop_price": 99.0,
+                "current_stop_price": 99.0,
+                "initial_risk_price": 1.0,
+                "entry_atr": 1.0,
+                "expires_at": "2026-01-01T04:04:20Z",
+                "stress_execution_cost_bps": 0.0,
+                "base_execution_cost_bps": 0.0,
+                "notional_usd": 1000.0,
+                "risk_budget_usd": 10.0,
+                "max_favorable_r": 0.0,
+                "max_adverse_r": 0.0,
+                "breakeven_trigger_r": 2.0,
+                "trailing_trigger_r": 3.0,
+                "trailing_atr_multiplier": 1.0,
+            }
+        )
+        candles = pd.DataFrame(
+            [
+                {
+                    "open_time": "2026-01-01T01:04:00Z",
+                    "open": 100.0,
+                    "high": 102.0,
+                    "low": 98.0,
+                    "close": 100.0,
+                },
+                {
+                    "open_time": "2026-01-01T01:05:00Z",
+                    "open": 100.0,
+                    "high": 101.2,
+                    "low": 99.8,
+                    "close": 101.0,
+                },
+            ]
+        )
+        resolved = resolve_open_trades_after_entry(
+            [trade],
+            candles,
+            self.settings,
+            bar_minutes=1,
+        )
+        self.assertEqual(resolved, 1)
+        self.assertEqual(trade["status"], "CLOSED")
+        self.assertEqual(trade["outcome"], "TARGET")
+        self.assertEqual(
+            trade["closed_at"],
+            "2026-01-01T01:06:00+00:00",
+        )
 
     def test_exact_hour_entry_can_use_that_hour(self) -> None:
         self.assertEqual(
