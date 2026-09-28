@@ -20,7 +20,6 @@ def main() -> int:
     root = Path(__file__).resolve().parents[1]
     site_dir = root / "site"
     latest = _load_json(site_dir / "latest.json", {})
-    history = _load_json(site_dir / "history.json", [])
     index_path = site_dir / "index.html"
     document = index_path.read_text(encoding="utf-8")
     document = document.replace(
@@ -29,7 +28,7 @@ def main() -> int:
     )
     document = document.replace(
         "Direction-first forecasting with adaptive price learning",
-        "Persistent paper positions with causal structure and immutable outcomes",
+        "Model-first paper positions with disciplined risk and clear outcomes",
     )
     document = document.replace(
         "Adaptive next-candle BTC direction and price forecast",
