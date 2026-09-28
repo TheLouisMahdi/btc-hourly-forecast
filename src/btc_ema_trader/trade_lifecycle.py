@@ -14,6 +14,7 @@ from sklearn.preprocessing import StandardScaler
 
 from .config import Settings
 from .costs import execution_cost_breakdown
+from .risk_economics import select_leverage
 
 TRADE_STATE_SCHEMA_VERSION = 1
 TRADE_FEATURES = (
@@ -333,6 +334,7 @@ class AdaptiveTradeEngine:
             p_stop=p_stop,
             p_expiry=p_expiry,
             predicted_r=predicted_r,
+            risk_score=_finite(output.get("risk_score"), 0.0),
         )
         output.update(
             {
@@ -791,22 +793,25 @@ def _margin_economics(
     p_stop: float,
     p_expiry: float,
     predicted_r: float,
+    risk_score: float,
 ) -> dict[str, Any]:
     strategy = settings.section("strategy")
     account = float(strategy.get("account_equity_usd", 1000.0))
     risk_fraction = float(strategy.get("risk_per_trade_fraction", 0.01))
     risk_budget = account * risk_fraction
-    maximum_leverage = float(strategy.get("maximum_leverage", 5.0))
     costs = execution_cost_breakdown(strategy)
     stress_bps = float(costs["stress_cost_bps"])
     cost_fraction = stress_bps / 10_000.0
-    unit_risk = entry * (stop_pct + cost_fraction)
-    quantity = risk_budget / max(unit_risk, 1e-9)
-    notional = min(quantity * entry, account * maximum_leverage)
-    quantity = notional / entry
-    leverage = float(
-        np.clip(notional / max(account, 1e-9), 1.0, maximum_leverage)
+    modeled_risk_fraction = stop_pct + cost_fraction
+    leverage = select_leverage(
+        strategy,
+        risk_score,
+        modeled_risk_fraction,
     )
+    unit_risk = entry * modeled_risk_fraction
+    quantity = risk_budget / max(unit_risk, 1e-9)
+    notional = min(quantity * entry, account * leverage)
+    quantity = notional / entry
     margin = notional / leverage
     execution_cost = notional * cost_fraction
     target_gross = notional * target_pct
