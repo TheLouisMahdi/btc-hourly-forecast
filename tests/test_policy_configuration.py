@@ -43,11 +43,25 @@ class PolicyConfigurationTests(unittest.TestCase):
         self.assertEqual(strategy["maximum_leverage"], 40.0)
         self.assertEqual(strategy["leverage_tiers"], [10.0, 20.0, 40.0])
         self.assertEqual(
+            config["market"]["execution_quote_provider"],
+            "binance_futures",
+        )
+        self.assertEqual(
+            strategy["execution_venue"],
+            "BINANCE_USDM_BTCUSDT",
+        )
+        self.assertEqual(strategy["margin_mode"], "isolated")
+        self.assertEqual(strategy["maintenance_margin_rate"], 0.004)
+        self.assertEqual(
             strategy["leverage_risk_score_thresholds"],
             [0.35, 0.65],
         )
         self.assertFalse(
             config["trade_assistant"]["require_qualified_meta_for_position"]
+        )
+        self.assertEqual(
+            config["trade_lifecycle"]["same_bar_policy"],
+            "STOP_FIRST",
         )
         self.assertEqual(config["trade_lifecycle"]["breakeven_trigger_r"], 1.0)
         self.assertEqual(config["trade_lifecycle"]["trailing_trigger_r"], 1.5)
