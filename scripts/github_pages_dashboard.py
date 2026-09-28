@@ -47,7 +47,7 @@ def main() -> int:
         count=1,
     )
     marker = '<section class="panel ledger">'
-    panels = _economic_panel(latest, history) + "\n" + _structure_panel(latest)
+    panels = _economic_panel(latest) + "\n" + _structure_panel(latest)
     if marker in document:
         document = document.replace(marker, panels + "\n" + marker, 1)
     index_path.write_text(document, encoding="utf-8")
@@ -86,17 +86,13 @@ def _badge(label: str, value: str, ok: bool) -> str:
     )
 
 
-def _economic_panel(latest: dict[str, Any], history: list[Any]) -> str:
+def _economic_panel(latest: dict[str, Any]) -> str:
     active = latest.get("active_trade")
     active = active if isinstance(active, dict) else None
     current_plan = _plan(latest)
     candidate = latest.get("candidate_trade_plan") if active else current_plan
     candidate = candidate if isinstance(candidate, dict) else current_plan
 
-    expected_gross = _number(candidate.get("predicted_gross_move_bps"))
-    stress_cost = _number(candidate.get("stress_execution_cost_bps"))
-    if stress_cost is None:
-        stress_cost = _number(latest.get("actual_cost_bps"))
     net_edge = _number(
         candidate.get(
             "predicted_stress_net_edge_bps",
@@ -104,8 +100,6 @@ def _economic_panel(latest: dict[str, Any], history: list[Any]) -> str:
         )
     )
     expected_value = _number(candidate.get("expected_value_usd"))
-    ignored = candidate.get("ignored_soft_blockers")
-    ignored = ignored if isinstance(ignored, list) else []
     hard = latest.get("candidate_blockers") if active else latest.get("blockers")
     hard = hard if isinstance(hard, list) else []
     mode = str(
@@ -118,18 +112,6 @@ def _economic_panel(latest: dict[str, Any], history: list[Any]) -> str:
         if active
         else latest.get("action")
         or "WAIT"
-    )
-    resolved_positions = _number(
-        (latest.get("trade_lifecycle_summary") or {}).get("resolved_trades")
-        if isinstance(latest.get("trade_lifecycle_summary"), dict)
-        else None
-    )
-    resolved_forecasts = sum(
-        1
-        for item in history
-        if isinstance(item, dict)
-        and item.get("direction_result")
-        in {"DIRECTION_CORRECT", "DIRECTION_WRONG"}
     )
     leverage = _number(candidate.get("suggested_leverage"))
     risk_fraction = _number(candidate.get("risk_fraction"))
@@ -184,23 +166,7 @@ def _structure_panel(latest: dict[str, Any]) -> str:
             latest.get("breakout_invalidation_level"),
         )
     )
-    triangle_type = str(
-        source.get("triangle_type")
-        or latest.get("triangle_type")
-        or "NONE"
-    )
-    selected_horizon = (
-        source.get("selected_horizon")
-        or latest.get("trade_selected_horizon")
-        or latest.get("selected_horizon")
-    )
     action = str(latest.get("action") or "WAIT")
-    context_complete = bool(
-        source.get(
-            "candle_context_complete",
-            latest.get("candle_context_complete", False),
-        )
-    )
     state = (
         "Managing the frozen context of the active position"
         if active
