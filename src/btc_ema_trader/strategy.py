@@ -710,10 +710,11 @@ def build_trade_plan(
     )
     risk_budget = account * risk_fraction
     costs = execution_cost_breakdown(cfg)
+    runtime_costs = runtime_cost_breakdown(cfg, selected_horizon)
     effective_stress_bps = float(
         stress_cost_bps
         if stress_cost_bps is not None
-        else costs["stress_cost_bps"]
+        else runtime_costs["runtime_stress_cost_bps"]
     )
     cost_buffer = effective_stress_bps / 10_000.0
     gap_buffer = float(cfg.get("gap_risk_buffer_bps", 6.0)) / 10_000.0
@@ -777,7 +778,7 @@ def build_trade_plan(
         "maximum_holding_hours": int(selected_horizon),
         "base_execution_cost_bps": costs["base_cost_bps"],
         "projected_funding_bps": float(
-            base_costs.get("projected_funding_bps", 0.0)
+            runtime_costs.get("projected_funding_bps", 0.0)
         ),
         "funding_interval_hours": float(
             cfg.get("funding_interval_hours", 8.0)
