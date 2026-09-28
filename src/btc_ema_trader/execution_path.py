@@ -73,6 +73,7 @@ def resolve_open_trades_after_entry(
                     exit_price=event["exit_price"],
                     outcome=event["outcome"],
                     closed_at=candle_time + pd.Timedelta(hours=1),
+                    fill_reason=event.get("fill_reason"),
                 )
                 resolved += 1
                 break
