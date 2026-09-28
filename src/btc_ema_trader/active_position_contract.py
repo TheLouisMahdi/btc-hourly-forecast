@@ -99,6 +99,7 @@ def build_active_position_plan(
         "entry_atr": trade.get("entry_atr"),
         "quantity_btc": trade.get("quantity_btc"),
         "notional_usd": trade.get("notional_usd"),
+        "suggested_leverage": trade.get("suggested_leverage"),
         "margin_required_usd": trade.get("margin_required_usd"),
         "risk_budget_usd": trade.get("risk_budget_usd"),
         "stress_execution_cost_bps": trade.get(
