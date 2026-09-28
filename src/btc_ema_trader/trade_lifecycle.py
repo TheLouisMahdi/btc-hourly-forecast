@@ -217,7 +217,11 @@ class AdaptiveTradeEngine:
         if direction not in {"LONG", "SHORT"}:
             direction = (
                 "LONG"
-                if str(record.get("trade_forecast_direction") or record.get("forecast_direction"))
+                if str(
+                    record.get("trade_direction")
+                    or record.get("trade_forecast_direction")
+                    or record.get("forecast_direction")
+                )
                 == "UP"
                 else "SHORT"
             )
@@ -308,8 +312,8 @@ class AdaptiveTradeEngine:
         reward_r = float(
             np.clip(
                 reward_r,
-                float(self.cfg.get("minimum_reward_r", 3.0)),
-                float(self.cfg.get("maximum_reward_r", 8.0)),
+                float(self.cfg.get("minimum_reward_r", 1.0)),
+                float(self.cfg.get("maximum_reward_r", 5.0)),
             )
         )
         stop_pct = float(
