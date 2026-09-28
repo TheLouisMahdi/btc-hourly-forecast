@@ -7,6 +7,7 @@ from pathlib import Path
 
 import github_assistant_dashboard
 import github_chart_dashboard
+import github_crypto_logo_dashboard
 import github_market_price_dashboard
 import github_pages_dashboard
 import github_resilience_dashboard
@@ -29,6 +30,7 @@ def main() -> int:
         github_assistant_dashboard,
         github_chart_dashboard,
         github_market_price_dashboard,
+        github_crypto_logo_dashboard,
     ):
         status = component.main()
         if status != 0:
