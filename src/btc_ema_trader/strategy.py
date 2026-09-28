@@ -482,6 +482,10 @@ def _risk_assessment(
         "MODEL_STALE": 0.85,
         "NEWS_STALE": 0.96,
         "REGIME_UNKNOWN": 0.92,
+        "MODEL_DIRECTION_ONLY": 0.85,
+        "STRUCTURE_METADATA_INCOMPLETE": 0.90,
+        "EVENT_ALREADY_TRADED": 0.90,
+        "EVENT_DIRECTION_MISMATCH": 0.75,
     }
     penalty_multiplier = 1.0
     applied_penalties: dict[str, float] = {}
