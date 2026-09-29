@@ -74,19 +74,25 @@ def make_decision(
     cfg = settings.section("strategy")
     qualification = bundle.qualification or {}
     forecast_direction = str(prediction["direction"])
-    trade_direction = str(
+    model_trade_direction = str(
         prediction.get("trade_direction", forecast_direction)
     )
 
     is_event = int(latest_row.get("is_event", 0)) == 1
     event_direction = int(latest_row.get("event_direction", 0))
-    if trade_direction not in {"UP", "DOWN"}:
-        trade_direction = forecast_direction
+    if model_trade_direction not in {"UP", "DOWN"}:
+        model_trade_direction = forecast_direction
+    invert_execution = bool(cfg.get("invert_trade_direction", False))
+    trade_direction = (
+        _opposite_direction(model_trade_direction)
+        if invert_execution
+        else model_trade_direction
+    )
     direction_name = (
         "LONG"
-        if trade_direction == "UP"
+        if model_trade_direction == "UP"
         else "SHORT"
-        if trade_direction == "DOWN"
+        if model_trade_direction == "DOWN"
         else "NONE"
     )
     event_type = str(latest_row.get("event_type", "NONE"))
@@ -119,10 +125,15 @@ def make_decision(
         selected_horizon,
         float(prediction.get("expected_event_aligned_return", 0.0)),
     )
-    expected_return = (
+    model_expected_return = (
         event_aligned_return
-        if trade_direction == "UP"
+        if model_trade_direction == "UP"
         else -event_aligned_return
+    )
+    expected_return = (
+        -model_expected_return
+        if invert_execution
+        else model_expected_return
     )
     base_costs = execution_cost_breakdown(cfg)
     stress_cost_bps = float(
@@ -177,12 +188,12 @@ def make_decision(
         if event_direction > 0
         else "DOWN"
         if event_direction < 0
-        else trade_direction
+        else model_trade_direction
     )
     if (
         is_event
         and event_direction != 0
-        and trade_direction != expected_trade_direction
+        and model_trade_direction != expected_trade_direction
     ):
         soft_risk_flags.append("EVENT_DIRECTION_MISMATCH")
     if trade_direction == "DOWN" and not bool(cfg.get("allow_short", False)):
@@ -263,9 +274,9 @@ def make_decision(
         regime=str(latest_row.get("regime", "UNKNOWN")),
         event_direction=(
             1
-            if trade_direction == "UP"
+            if model_trade_direction == "UP"
             else -1
-            if trade_direction == "DOWN"
+            if model_trade_direction == "DOWN"
             else 0
         ),
         soft_risk_flags=soft_risk_flags,
@@ -282,7 +293,7 @@ def make_decision(
         action = "WAIT"
     trade_plan = build_trade_plan(
         latest_row,
-        trade_direction,
+        model_trade_direction,
         prediction,
         settings,
         action,
@@ -294,6 +305,8 @@ def make_decision(
         calibrated_tradeability=tradeability_probability,
         risk_assessment=risk_assessment,
     )
+    if invert_execution and action in {"LONG", "SHORT"}:
+        trade_plan = _mirror_trade_plan_direction(trade_plan, action)
     trade_plan.update(
         {
             "decision_mode": POLICY_NAME,
@@ -307,6 +320,11 @@ def make_decision(
             "qualification_passed": qualification_passed,
             "direction_qualified": direction_qualified,
             "economic_policy_available": bool(policy),
+            "model_trade_direction": (
+                "LONG" if model_trade_direction == "UP" else "SHORT"
+            ),
+            "execution_direction_inverted": invert_execution,
+            "execution_direction": action,
         }
     )
     return Decision(
@@ -335,6 +353,47 @@ def make_decision(
         blockers=hard_blockers,
         trade_plan=trade_plan,
     )
+
+
+
+def _opposite_direction(direction: str) -> str:
+    side = str(direction or "").upper()
+    if side == "UP":
+        return "DOWN"
+    if side == "DOWN":
+        return "UP"
+    return side
+
+
+def _mirror_trade_plan_direction(
+    plan: dict[str, Any],
+    action: str,
+) -> dict[str, Any]:
+    output = dict(plan)
+    try:
+        entry = float(output["entry_reference"])
+        stop_pct = abs(float(output["stop_percent"]))
+        target_pct = abs(float(output["target_percent"]))
+    except (KeyError, TypeError, ValueError):
+        return output
+    if entry <= 0 or stop_pct <= 0 or target_pct <= 0:
+        return output
+
+    side = str(action or "").upper()
+    if side == "SHORT":
+        output["direction"] = "SHORT"
+        output["stop_price"] = entry * (1.0 + stop_pct)
+        output["target_price"] = entry * (1.0 - target_pct)
+    elif side == "LONG":
+        output["direction"] = "LONG"
+        output["stop_price"] = entry * (1.0 - stop_pct)
+        output["target_price"] = entry * (1.0 + target_pct)
+    else:
+        return output
+
+    output["trade_direction_source"] = "INVERTED_MODEL_DIRECTION"
+    output["execution_direction_inverted"] = True
+    return output
 
 
 def _select_economic_horizon(
