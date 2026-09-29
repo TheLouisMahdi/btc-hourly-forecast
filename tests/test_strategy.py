@@ -242,6 +242,41 @@ class StrategyRiskPolicyTests(unittest.TestCase):
         )
         self.assertGreater(decision.trade_plan["stop_percent"], 0.0)
 
+    def test_down_model_signal_executes_long(self) -> None:
+        prediction = _prediction(
+            success=0.72,
+            tradeability=0.70,
+            event_return=0.006,
+        )
+        prediction["direction"] = "DOWN"
+        prediction["trade_direction"] = "DOWN"
+        decision = make_decision(
+            _row(
+                is_event=0,
+                event_direction=0,
+                event_type="NONE",
+                event_id=None,
+                breakout_level=None,
+                breakout_invalidation_level=None,
+            ),
+            prediction,
+            _unqualified_bundle(),
+            self.settings,
+        )
+
+        self.assertEqual(decision.action, "LONG")
+        self.assertEqual(decision.trade_plan["model_trade_direction"], "SHORT")
+        self.assertEqual(decision.trade_plan["execution_direction"], "LONG")
+        self.assertLess(
+            decision.trade_plan["stop_price"],
+            decision.trade_plan["entry_reference"],
+        )
+        self.assertGreater(
+            decision.trade_plan["target_price"],
+            decision.trade_plan["entry_reference"],
+        )
+        self.assertFalse(decision.trade_plan["label_execution_aligned"])
+
     def test_unhealthy_market_data_remains_a_hard_blocker(self) -> None:
         decision = make_decision(
             _row(),
