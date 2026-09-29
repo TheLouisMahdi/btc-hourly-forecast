@@ -393,6 +393,8 @@ def _mirror_trade_plan_direction(
 
     output["trade_direction_source"] = "INVERTED_MODEL_DIRECTION"
     output["execution_direction_inverted"] = True
+    output["label_execution_aligned"] = False
+    output["execution_alignment_status"] = "INTENTIONALLY_INVERTED_MODEL_SIGNAL"
     return output
 
 
