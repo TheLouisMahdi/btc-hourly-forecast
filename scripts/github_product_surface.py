@@ -133,6 +133,17 @@ def main() -> int:
         flags=re.DOTALL,
     )
     doc = re.sub(
+        r'<section class="hero">.*?</section>',
+        _hero(latest),
+        doc,
+        count=1,
+        flags=re.DOTALL,
+    )
+    if "hero-kpis" not in doc:
+        raise RuntimeError("Compact hero was not rendered")
+    doc = doc.replace("</style>", _hero_styles() + "\n</style>", 1)
+
+    doc = re.sub(
         r'<section class="panel boundary-memory-panel">.*?</section>',
         "",
         doc,
@@ -216,6 +227,101 @@ def main() -> int:
         doc = doc.replace("<body", f'<body {MARKER}', 1)
     index.write_text(doc, encoding="utf-8")
     return 0
+
+
+
+def _hero(latest: dict[str, Any]) -> str:
+    contract = latest.get("next_candle_forecast")
+    contract = contract if isinstance(contract, dict) else {}
+    plan = latest.get("trade_plan")
+    plan = plan if isinstance(plan, dict) else {}
+
+    model_direction = str(
+        contract.get("direction")
+        or latest.get("forecast_direction")
+        or latest.get("trade_forecast_direction")
+        or "—"
+    ).upper()
+    position = str(latest.get("action") or "WAIT").upper()
+    confidence = _percent(
+        contract.get(
+            "direction_probability",
+            latest.get("trade_confidence", latest.get("confidence")),
+        )
+    )
+    risk = _percent(plan.get("risk_fraction"))
+    leverage = _multiple(plan.get("suggested_leverage"))
+    btc = _price(latest.get("market_price", latest.get("price")))
+    low = _price(contract.get("likely_close_low"))
+    high = _price(contract.get("likely_close_high"))
+    entry = _price(plan.get("entry_reference"))
+    target = _price(plan.get("target_price"))
+    stop = _price(plan.get("stop_price"))
+
+    side_class = (
+        "up" if position == "LONG"
+        else "down" if position == "SHORT"
+        else ""
+    )
+    return f'''<section class="hero hero-compact">
+  <div class="hero-primary">
+    <div class="eyebrow">BTC · 1H</div>
+    <div class="hero-position">
+      <div>
+        <span>POSITION</span>
+        <strong class="direction {side_class}">{html.escape(position)}</strong>
+      </div>
+      <div class="hero-model">
+        <span>MODEL</span>
+        <strong>{html.escape(model_direction)}</strong>
+      </div>
+    </div>
+    <div class="hero-kpis">
+      {_hero_stat("BTC", btc)}
+      {_hero_stat("CONFIDENCE", confidence)}
+      {_hero_stat("RISK", risk)}
+      {_hero_stat("LEVERAGE", leverage)}
+    </div>
+  </div>
+  <aside class="forecast-card hero-range-card">
+    <div class="label">PROJECTED 1H RANGE</div>
+    <div class="expected">{html.escape(low)} – {html.escape(high)}</div>
+    <div class="hero-levels">
+      {_hero_stat("ENTRY", entry)}
+      {_hero_stat("TARGET", target)}
+      {_hero_stat("STOP", stop)}
+    </div>
+  </aside>
+</section>'''
+
+
+def _hero_stat(label: str, value: str) -> str:
+    return (
+        '<div class="hero-stat">'
+        f'<span>{html.escape(label)}</span>'
+        f'<strong>{html.escape(value)}</strong>'
+        '</div>'
+    )
+
+
+def _hero_styles() -> str:
+    return r'''
+.hero-compact{grid-template-columns:minmax(0,1.25fr) minmax(320px,.75fr);padding:30px 34px;align-items:stretch}
+.hero-primary{display:flex;flex-direction:column;justify-content:center;min-width:0}
+.hero-position{display:flex;align-items:flex-end;gap:30px;margin-top:10px}
+.hero-position>div>span,.hero-stat span{display:block;color:var(--muted);font-size:9px;font-weight:850;letter-spacing:.11em}
+.hero-position .direction{font-size:clamp(52px,8vw,88px);margin-top:6px}
+.hero-model{padding-bottom:10px}.hero-model strong{display:block;margin-top:5px;font-size:22px;letter-spacing:-.03em}
+.hero-kpis,.hero-levels{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:9px;margin-top:22px}
+.hero-levels{grid-template-columns:repeat(3,minmax(0,1fr));margin-top:20px}
+.hero-stat{min-width:0;padding:12px 13px;border:1px solid var(--line);border-radius:15px;background:rgba(255,255,255,.52)}
+.hero-stat strong{display:block;margin-top:5px;font-size:14px;overflow-wrap:anywhere}
+.hero-range-card{display:flex;flex-direction:column;justify-content:center}
+.hero-range-card .expected{font-size:clamp(23px,3vw,34px);line-height:1.15}
+@media(max-width:900px){.hero-compact{grid-template-columns:1fr}.hero-kpis{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:620px){.hero-compact{padding:20px}.hero-position{gap:20px}.hero-position .direction{font-size:52px}.hero-levels{grid-template-columns:1fr}.hero-kpis{grid-template-columns:repeat(2,minmax(0,1fr))}}
+'''
+
 
 
 def _position_plan(latest: dict[str, Any]) -> str:
