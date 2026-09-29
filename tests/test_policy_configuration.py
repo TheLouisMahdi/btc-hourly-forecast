@@ -59,6 +59,7 @@ class PolicyConfigurationTests(unittest.TestCase):
             "OKX_BTC_USDT_SWAP",
         )
         self.assertEqual(strategy["margin_mode"], "isolated")
+        self.assertTrue(strategy["invert_trade_direction"])
         self.assertEqual(strategy["maintenance_margin_rate"], 0.005)
         self.assertEqual(
             strategy["leverage_risk_score_thresholds"],
