@@ -3,9 +3,6 @@ name: Deploy BTC dashboard
 run-name: Deploy BTC dashboard · ${{ github.event_name }}
 
 on:
-  push:
-    branches:
-      - main
   workflow_dispatch:
   workflow_run:
     workflows:
