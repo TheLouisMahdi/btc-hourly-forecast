@@ -135,7 +135,7 @@ class StrategyRiskPolicyTests(unittest.TestCase):
             self.settings,
         )
 
-        self.assertEqual(decision.action, "SHORT")
+        self.assertEqual(decision.action, "LONG")
         self.assertEqual(decision.blockers, [])
         self.assertIn(
             "MODEL_NOT_QUALIFIED",
@@ -172,7 +172,7 @@ class StrategyRiskPolicyTests(unittest.TestCase):
             self.settings,
         )
 
-        self.assertEqual(strong.action, "SHORT")
+        self.assertEqual(strong.action, "LONG")
         self.assertEqual(strong.blockers, [])
         self.assertEqual(strong.trade_plan["soft_risk_flags"], [])
         self.assertGreater(
@@ -200,7 +200,7 @@ class StrategyRiskPolicyTests(unittest.TestCase):
             self.settings,
         )
 
-        self.assertEqual(decision.action, "SHORT")
+        self.assertEqual(decision.action, "LONG")
         self.assertEqual(decision.blockers, [])
         self.assertIn(
             "MODEL_DIRECTION_ONLY",
@@ -208,16 +208,16 @@ class StrategyRiskPolicyTests(unittest.TestCase):
         )
         self.assertEqual(
             decision.trade_plan["trade_direction_source"],
-            "INVERTED_MODEL_DIRECTION",
+            "MODEL_DIRECTION_WITH_STRUCTURE_CONTEXT",
         )
         self.assertEqual(decision.trade_plan["model_trade_direction"], "LONG")
-        self.assertEqual(decision.trade_plan["execution_direction"], "SHORT")
-        self.assertTrue(decision.trade_plan["execution_direction_inverted"])
-        self.assertGreater(
+        self.assertEqual(decision.trade_plan["execution_direction"], "LONG")
+        self.assertFalse(decision.trade_plan["execution_direction_inverted"])
+        self.assertLess(
             decision.trade_plan["stop_price"],
             decision.trade_plan["entry_reference"],
         )
-        self.assertLess(
+        self.assertGreater(
             decision.trade_plan["target_price"],
             decision.trade_plan["entry_reference"],
         )
@@ -234,7 +234,7 @@ class StrategyRiskPolicyTests(unittest.TestCase):
             self.settings,
         )
 
-        self.assertEqual(decision.action, "SHORT")
+        self.assertEqual(decision.action, "LONG")
         self.assertEqual(decision.blockers, [])
         self.assertIn(
             "STRUCTURE_METADATA_INCOMPLETE",
@@ -242,7 +242,7 @@ class StrategyRiskPolicyTests(unittest.TestCase):
         )
         self.assertGreater(decision.trade_plan["stop_percent"], 0.0)
 
-    def test_down_model_signal_executes_long(self) -> None:
+    def test_down_model_signal_executes_short(self) -> None:
         prediction = _prediction(
             success=0.72,
             tradeability=0.70,
@@ -264,18 +264,18 @@ class StrategyRiskPolicyTests(unittest.TestCase):
             self.settings,
         )
 
-        self.assertEqual(decision.action, "LONG")
+        self.assertEqual(decision.action, "SHORT")
         self.assertEqual(decision.trade_plan["model_trade_direction"], "SHORT")
-        self.assertEqual(decision.trade_plan["execution_direction"], "LONG")
-        self.assertLess(
+        self.assertEqual(decision.trade_plan["execution_direction"], "SHORT")
+        self.assertGreater(
             decision.trade_plan["stop_price"],
             decision.trade_plan["entry_reference"],
         )
-        self.assertGreater(
+        self.assertLess(
             decision.trade_plan["target_price"],
             decision.trade_plan["entry_reference"],
         )
-        self.assertFalse(decision.trade_plan["label_execution_aligned"])
+        self.assertFalse(decision.trade_plan["execution_direction_inverted"])
 
     def test_unhealthy_market_data_remains_a_hard_blocker(self) -> None:
         decision = make_decision(
