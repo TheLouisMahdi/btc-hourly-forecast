@@ -371,7 +371,7 @@ strategy:
   position_policy: AGGRESSIVE_STRUCTURAL_RISK_SCALED
   policy_version: 2
   allow_short: true
-  invert_trade_direction: true
+  invert_trade_direction: false
   entry_order_style: market
   exit_order_style: taker
   maker_fee_bps: 2.0
