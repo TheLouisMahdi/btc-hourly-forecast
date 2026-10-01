@@ -279,7 +279,11 @@ def _position_snapshot(
         pnl_usd = _number(trade.get("realized_net_pnl_usd"))
         net_return = _number(trade.get("realized_net_return"))
         realized_r = _number(trade.get("realized_r"))
-        outcome = str(trade.get("outcome") or "CLOSED").replace("_", " ")
+        outcome = str(
+            trade.get("historical_corrected_result")
+            or trade.get("outcome")
+            or "CLOSED"
+        ).replace("_", " ")
     else:
         pnl_usd, net_return, realized_r = _open_mark_to_market(
             trade,
