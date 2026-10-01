@@ -3,11 +3,6 @@ name: Deploy BTC dashboard
 run-name: Deploy BTC dashboard · ${{ github.event_name }}
 
 on:
-  push:
-    branches:
-      - main
-    paths:
-      - ".github/workflows/dashboard.yml"
   workflow_dispatch:
   workflow_run:
     workflows:
@@ -26,7 +21,7 @@ concurrency:
 
 jobs:
   render-and-deploy:
-    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
+    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
     runs-on: ubuntu-latest
     timeout-minutes: 20
     environment:
