@@ -67,6 +67,31 @@ class TradeDashboardTests(unittest.TestCase):
         self.assertIn("TIME EXIT WIN", document)
         self.assertNotIn("$999.00", document)
 
+    def test_corrected_history_displays_corrected_win_loss(self) -> None:
+        latest = {"price": 100.0}
+        trades = [
+            {
+                "status": "CLOSED",
+                "direction": "LONG",
+                "opened_at": "2026-01-01T01:10:00Z",
+                "closed_at": "2026-01-01T04:00:00Z",
+                "entry_price": 100.0,
+                "target_price": 105.0,
+                "initial_stop_price": 99.0,
+                "exit_price": 101.0,
+                "realized_net_pnl_usd": 8.0,
+                "realized_net_return": 0.008,
+                "realized_r": 0.8,
+                "outcome": "STOP",
+                "historical_corrected_result": "WIN",
+            }
+        ]
+
+        document = _position_ledger(latest, trades)
+
+        self.assertIn(">WIN<", document)
+        self.assertNotIn(">STOP<", document)
+
     def test_panel_displays_risk_policy_and_soft_evidence(self) -> None:
         latest = {
             "action": "LONG",
