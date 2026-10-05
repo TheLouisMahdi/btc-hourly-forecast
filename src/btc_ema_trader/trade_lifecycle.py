@@ -72,7 +72,10 @@ class TradeAdaptiveState:
     target_model: SGDClassifier = field(default_factory=lambda: _classifier(9101))
     stop_model: SGDClassifier = field(default_factory=lambda: _classifier(9102))
     r_model: SGDRegressor = field(default_factory=lambda: _regressor(9103))
+    profit_model: SGDClassifier = field(default_factory=lambda: _classifier(9104))
+    loss_model: SGDClassifier = field(default_factory=lambda: _classifier(9105))
     initialized: bool = False
+    profit_loss_initialized: bool = False
     samples_seen: int = 0
     learned_trade_ids: set[str] = field(default_factory=set)
     source_model_ids: list[str] = field(default_factory=list)

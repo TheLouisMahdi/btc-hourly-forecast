@@ -346,6 +346,13 @@ trade_lifecycle:
   minimum_online_samples: 20
   maximum_online_weight: 0.65
   stop_learning_weight: 1.75
+  loss_learning_weight: 1.75
+  entry_loss_guard_enabled: true
+  entry_loss_guard_minimum_samples: 20
+  entry_loss_probability_threshold: 0.70
+  entry_profit_probability_ceiling: 0.30
+  entry_predicted_r_ceiling: 0.0
+  entry_loss_probability_margin: 0.35
   reward_probability_gain: 0.80
   reward_r_gain: 0.08
 

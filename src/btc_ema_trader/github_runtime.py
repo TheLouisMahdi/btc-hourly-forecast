@@ -30,7 +30,7 @@ from .trade_lifecycle import (
 )
 
 MODEL_PREFIX = "directional-breakout-hourly-"
-TRADE_STATE_SCHEMA_VERSION = 2
+TRADE_STATE_SCHEMA_VERSION = 3
 RUNTIME_CONTRACT = "CANONICAL_GITHUB_RUNTIME_V2"
 
 FORECAST_IMMUTABLE_FIELDS = {
@@ -188,7 +188,7 @@ class CanonicalRuntimeEngine(RuntimeEngine):
 
 
 class CanonicalAdaptiveTradeEngine(AdaptiveTradeEngine):
-    """Context-aware adaptive exits with an explicit active-position contract."""
+    """Context-aware adaptive exits plus conservative loss-memory entry gating."""
 
     def __init__(self, *args, **kwargs) -> None:
         self._feature_record: dict[str, Any] | None = None
@@ -243,18 +243,34 @@ class CanonicalAdaptiveTradeEngine(AdaptiveTradeEngine):
             outcome = str(trade.get("outcome") or "")
             target = int(outcome == "TARGET")
             stop = int(outcome == "STOP")
+            raw_net_pnl = trade.get("realized_net_pnl_usd")
+            if raw_net_pnl is None:
+                continue
+            realized_net_pnl = _finite(raw_net_pnl, 0.0)
+            profitable = int(realized_net_pnl > 0.0)
+            unprofitable = 1 - profitable
             realized_r = _finite(trade.get("realized_r"), 0.0)
-            weight = 1.0 + min(3.0, abs(realized_r))
+            base_weight = 1.0 + min(3.0, abs(realized_r))
+
+            barrier_weight = base_weight
             if stop:
-                weight *= float(
+                barrier_weight *= float(
                     self.cfg.get("stop_learning_weight", 1.75)
+                )
+            pnl_weight = base_weight
+            if unprofitable:
+                pnl_weight *= float(
+                    self.cfg.get(
+                        "loss_learning_weight",
+                        self.cfg.get("stop_learning_weight", 1.75),
+                    )
                 )
 
             matrix = vector.reshape(1, -1)
             self.state.scaler.partial_fit(matrix)
             transformed = self.state.scaler.transform(matrix)
             classifier_kwargs: dict[str, Any] = {
-                "sample_weight": np.asarray([weight], dtype=float)
+                "sample_weight": np.asarray([barrier_weight], dtype=float)
             }
             if not self.state.initialized:
                 classifier_kwargs["classes"] = np.asarray(
@@ -271,12 +287,32 @@ class CanonicalAdaptiveTradeEngine(AdaptiveTradeEngine):
                 np.asarray([stop], dtype=int),
                 **dict(classifier_kwargs),
             )
+
+            pnl_classifier_kwargs: dict[str, Any] = {
+                "sample_weight": np.asarray([pnl_weight], dtype=float)
+            }
+            if not self.state.profit_loss_initialized:
+                pnl_classifier_kwargs["classes"] = np.asarray(
+                    [0, 1],
+                    dtype=int,
+                )
+            self.state.profit_model.partial_fit(
+                transformed,
+                np.asarray([profitable], dtype=int),
+                **pnl_classifier_kwargs,
+            )
+            self.state.loss_model.partial_fit(
+                transformed,
+                np.asarray([unprofitable], dtype=int),
+                **dict(pnl_classifier_kwargs),
+            )
             self.state.r_model.partial_fit(
                 transformed,
                 np.asarray([realized_r], dtype=float),
-                sample_weight=np.asarray([weight], dtype=float),
+                sample_weight=np.asarray([pnl_weight], dtype=float),
             )
             self.state.initialized = True
+            self.state.profit_loss_initialized = True
             self.state.samples_seen += 1
             self.state.learned_trade_ids.add(trade_id)
             trade["adaptive_learned"] = True
@@ -289,11 +325,11 @@ class CanonicalAdaptiveTradeEngine(AdaptiveTradeEngine):
                     "closed_at": trade.get("closed_at"),
                     "direction": trade.get("direction"),
                     "outcome": outcome,
-                    "realized_r": realized_r,
-                    "realized_net_pnl_usd": _finite(
-                        trade.get("realized_net_pnl_usd"),
-                        0.0,
+                    "learning_result": (
+                        "PROFIT" if profitable else "LOSS"
                     ),
+                    "realized_r": realized_r,
+                    "realized_net_pnl_usd": realized_net_pnl,
                 }
             )
             learned += 1
@@ -326,6 +362,7 @@ class CanonicalAdaptiveTradeEngine(AdaptiveTradeEngine):
             candidate,
             self.settings,
         )
+        candidate = self._apply_loss_memory_entry_guard(record, candidate)
 
         active = self._active_position
         if active is None:
@@ -339,6 +376,128 @@ class CanonicalAdaptiveTradeEngine(AdaptiveTradeEngine):
         record["active_position_contract"] = ACTIVE_POSITION_CONTRACT
         record["blockers"] = ["ACTIVE_TRADE_IN_PROGRESS"]
         return build_active_position_plan(active)
+
+
+    def _apply_loss_memory_entry_guard(
+        self,
+        record: dict[str, Any],
+        plan: dict[str, Any],
+    ) -> dict[str, Any]:
+        """Veto only high-confidence repeats of historically losing setups."""
+        output = dict(plan)
+        cfg = self.cfg
+        sample_count = int(self.state.samples_seen)
+        minimum_samples = int(
+            cfg.get(
+                "entry_loss_guard_minimum_samples",
+                cfg.get("minimum_online_samples", 20),
+            )
+        )
+        enabled = bool(cfg.get("entry_loss_guard_enabled", True))
+        guard: dict[str, Any] = {
+            "enabled": enabled,
+            "samples_seen": sample_count,
+            "minimum_samples": minimum_samples,
+            "veto": False,
+        }
+
+        vector = self._last_extended_vector
+        if (
+            not enabled
+            or vector is None
+            or not self.state.profit_loss_initialized
+        ):
+            output["loss_memory_guard"] = guard
+            return output
+
+        transformed = self.state.scaler.transform(
+            vector.reshape(1, -1)
+        )
+        p_profit = float(
+            np.clip(
+                self.state.profit_model.predict_proba(transformed)[0, 1],
+                0.01,
+                0.99,
+            )
+        )
+        p_loss = float(
+            np.clip(
+                self.state.loss_model.predict_proba(transformed)[0, 1],
+                0.01,
+                0.99,
+            )
+        )
+        total = p_profit + p_loss
+        if total > 0.0:
+            p_profit /= total
+            p_loss /= total
+
+        predicted_r = _finite(
+            output.get("adaptive_predicted_r"),
+            0.0,
+        )
+        loss_threshold = float(
+            cfg.get("entry_loss_probability_threshold", 0.70)
+        )
+        profit_ceiling = float(
+            cfg.get("entry_profit_probability_ceiling", 0.30)
+        )
+        r_ceiling = float(
+            cfg.get("entry_predicted_r_ceiling", 0.0)
+        )
+        probability_margin = float(
+            cfg.get("entry_loss_probability_margin", 0.35)
+        )
+        guard.update(
+            {
+                "profit_probability": p_profit,
+                "loss_probability": p_loss,
+                "predicted_r": predicted_r,
+                "loss_probability_threshold": loss_threshold,
+                "profit_probability_ceiling": profit_ceiling,
+                "predicted_r_ceiling": r_ceiling,
+                "loss_probability_margin": probability_margin,
+            }
+        )
+        output["adaptive_profit_probability"] = p_profit
+        output["adaptive_loss_probability"] = p_loss
+        output["adaptive_probability_semantics"] = (
+            "ENTRY_NET_PNL_PROFIT_LOSS_V1"
+        )
+
+        actionable = (
+            str(record.get("action") or "").upper() in {"LONG", "SHORT"}
+            and output.get("status") == "ACTIONABLE"
+        )
+        veto = bool(
+            actionable
+            and sample_count >= minimum_samples
+            and p_loss >= loss_threshold
+            and p_profit <= profit_ceiling
+            and p_loss - p_profit >= probability_margin
+            and predicted_r <= r_ceiling
+        )
+        guard["veto"] = veto
+        output["loss_memory_guard"] = guard
+        if not veto:
+            return output
+
+        output["status"] = "BLOCKED"
+        output["loss_memory_veto"] = True
+        output["loss_memory_reason"] = (
+            "HIGH_PREDICTED_LOSS_LOW_PREDICTED_PROFIT"
+        )
+        record["candidate_action_before_loss_memory_veto"] = record.get(
+            "action"
+        )
+        record["action"] = "WAIT"
+        record["blockers"] = list(
+            dict.fromkeys(
+                list(record.get("blockers", []))
+                + ["ADAPTIVE_LOSS_MEMORY_VETO"]
+            )
+        )
+        return output
 
     def _predict(
         self,
@@ -366,10 +525,30 @@ class CanonicalAdaptiveTradeEngine(AdaptiveTradeEngine):
         *,
         learned_now: int = 0,
     ) -> dict[str, Any]:
-        summary = super().summary(trades, learned_now=learned_now)
+        items = list(trades)
+        summary = super().summary(items, learned_now=learned_now)
+        resolved = [
+            item for item in items if item.get("status") == "CLOSED"
+        ]
+        profitable = sum(
+            _finite(item.get("realized_net_pnl_usd"), 0.0) > 0.0
+            for item in resolved
+        )
+        losing = sum(
+            _finite(item.get("realized_net_pnl_usd"), 0.0) < 0.0
+            for item in resolved
+        )
         summary["schema_version"] = TRADE_STATE_SCHEMA_VERSION
         summary["feature_count"] = len(EXTENDED_TRADE_FEATURES)
         summary["runtime_contract"] = RUNTIME_CONTRACT
+        summary["profitable_trades"] = profitable
+        summary["losing_trades"] = losing
+        summary["net_win_rate"] = (
+            profitable / (profitable + losing)
+            if profitable + losing
+            else None
+        )
+        summary["entry_learning_target"] = "REALIZED_NET_PNL_SIGN"
         return summary
 
 
