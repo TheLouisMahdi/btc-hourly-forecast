@@ -100,6 +100,14 @@ POSITION_PLAN_FIELDS = (
     "loss_memory_guard",
     "loss_memory_veto",
     "loss_memory_reason",
+    "entry_quality_guard",
+    "entry_quality_veto",
+    "entry_quality_reason",
+    "position_decision",
+    "position_decision_reason",
+    "position_metrics",
+    "position_strengths",
+    "position_risks",
 )
 
 
@@ -388,6 +396,8 @@ class CanonicalAdaptiveTradeEngine(AdaptiveTradeEngine):
             self.settings,
         )
         candidate = self._apply_loss_memory_entry_guard(record, candidate)
+        candidate = self._apply_entry_quality_guard(record, candidate)
+        candidate = self._attach_position_decision(record, candidate)
 
         active = self._active_position
         if active is None:
@@ -532,6 +542,218 @@ class CanonicalAdaptiveTradeEngine(AdaptiveTradeEngine):
         )
         return output
 
+
+
+    def _apply_entry_quality_guard(
+        self,
+        record: dict[str, Any],
+        plan: dict[str, Any],
+    ) -> dict[str, Any]:
+        """Block only very weak model-only entries after enough live samples."""
+        output = dict(plan)
+        cfg = self.cfg
+        enabled = bool(cfg.get("entry_quality_guard_enabled", True))
+        sample_count = int(self.state.samples_seen)
+        minimum_samples = int(
+            cfg.get(
+                "entry_quality_guard_minimum_samples",
+                cfg.get("minimum_online_samples", 20),
+            )
+        )
+        minimum_score = float(
+            cfg.get(
+                "entry_quality_guard_minimum_model_only_score",
+                0.14,
+            )
+        )
+        soft_flags = output.get("soft_risk_flags", [])
+        soft_flags = soft_flags if isinstance(soft_flags, list) else []
+        model_only = "MODEL_DIRECTION_ONLY" in soft_flags
+        risk_score = _finite(output.get("risk_score"), 0.0)
+        actionable = (
+            str(record.get("action") or "").upper() in {"LONG", "SHORT"}
+            and output.get("status") == "ACTIONABLE"
+        )
+        veto = bool(
+            enabled
+            and actionable
+            and sample_count >= minimum_samples
+            and model_only
+            and risk_score < minimum_score
+        )
+        guard = {
+            "enabled": enabled,
+            "samples_seen": sample_count,
+            "minimum_samples": minimum_samples,
+            "model_direction_only": model_only,
+            "risk_score": risk_score,
+            "minimum_model_only_score": minimum_score,
+            "veto": veto,
+        }
+        output["entry_quality_guard"] = guard
+        output["entry_quality_veto"] = veto
+        if not veto:
+            return output
+
+        output["status"] = "BLOCKED"
+        output["entry_quality_reason"] = "LOW_QUALITY_MODEL_DIRECTION_ONLY"
+        record["candidate_action_before_entry_quality_veto"] = record.get(
+            "action"
+        )
+        record["action"] = "WAIT"
+        record["blockers"] = list(
+            dict.fromkeys(
+                list(record.get("blockers", []))
+                + ["LOW_QUALITY_MODEL_DIRECTION_ONLY"]
+            )
+        )
+        return output
+
+    def _attach_position_decision(
+        self,
+        record: dict[str, Any],
+        plan: dict[str, Any],
+    ) -> dict[str, Any]:
+        """Attach a compact profit-first explanation for humans and the UI."""
+        output = dict(plan)
+        expected_value = _optional_finite(output.get("expected_value_usd"))
+        risk_budget = _optional_finite(output.get("risk_budget_usd"))
+        target_profit = _optional_finite(
+            output.get("target_net_profit_usd")
+        )
+        stop_loss = _optional_finite(output.get("stop_net_loss_usd"))
+        p_target = _optional_finite(
+            output.get("adaptive_target_probability")
+        )
+        p_stop = _optional_finite(
+            output.get("adaptive_stop_probability")
+        )
+        p_profit = _optional_finite(
+            output.get("adaptive_profit_probability")
+        )
+        p_loss = _optional_finite(
+            output.get("adaptive_loss_probability")
+        )
+        predicted_r = _optional_finite(
+            output.get("adaptive_predicted_r")
+        )
+
+        expected_value_to_risk = (
+            expected_value / risk_budget
+            if expected_value is not None
+            and risk_budget is not None
+            and risk_budget > 0.0
+            else None
+        )
+        net_reward_risk = (
+            target_profit / abs(stop_loss)
+            if target_profit is not None
+            and stop_loss is not None
+            and stop_loss < 0.0
+            else None
+        )
+
+        loss_guard = output.get("loss_memory_guard")
+        loss_guard = loss_guard if isinstance(loss_guard, dict) else {}
+        neighbors = loss_guard.get("neighbor_memory")
+        neighbors = neighbors if isinstance(neighbors, dict) else {}
+        neighbor_loss_rate = _optional_finite(
+            neighbors.get("loss_rate")
+        )
+
+        strengths: list[str] = []
+        risks: list[str] = []
+        if expected_value is not None:
+            (
+                strengths if expected_value > 0.0 else risks
+            ).append(
+                "POSITIVE_EXPECTED_VALUE"
+                if expected_value > 0.0
+                else "NEGATIVE_EXPECTED_VALUE"
+            )
+        if (
+            p_target is not None
+            and p_stop is not None
+        ):
+            (
+                strengths if p_target > p_stop else risks
+            ).append(
+                "TARGET_PROBABILITY_LEADS"
+                if p_target > p_stop
+                else "STOP_PROBABILITY_LEADS"
+            )
+        if (
+            p_profit is not None
+            and p_loss is not None
+        ):
+            (
+                strengths if p_profit > p_loss else risks
+            ).append(
+                "PROFIT_MODEL_LEADS"
+                if p_profit > p_loss
+                else "LOSS_MODEL_LEADS"
+            )
+        if predicted_r is not None:
+            (
+                strengths if predicted_r > 0.0 else risks
+            ).append(
+                "POSITIVE_PREDICTED_R"
+                if predicted_r > 0.0
+                else "NON_POSITIVE_PREDICTED_R"
+            )
+        if bool(neighbors.get("supported_bad_pattern", False)):
+            risks.append("REPEATED_NEARBY_LOSING_PATTERN")
+
+        blocked = (
+            output.get("status") != "ACTIONABLE"
+            or str(record.get("action") or "").upper()
+            not in {"LONG", "SHORT"}
+        )
+        if blocked:
+            decision = "BLOCKED"
+            reason = str(
+                output.get("loss_memory_reason")
+                or output.get("entry_quality_reason")
+                or (
+                    record.get("blockers", ["BLOCKED"])[0]
+                    if record.get("blockers")
+                    else "BLOCKED"
+                )
+            )
+        elif len(risks) >= 3:
+            decision = "CAUTION"
+            reason = risks[0]
+        elif len(strengths) >= 3 and not risks:
+            decision = "FAVORABLE"
+            reason = "MULTIPLE_PROFIT_SIGNALS_ALIGNED"
+        else:
+            decision = "ACTIONABLE"
+            reason = (
+                strengths[0]
+                if strengths
+                else risks[0]
+                if risks
+                else "MIXED_OR_LIMITED_EVIDENCE"
+            )
+
+        output["position_decision"] = decision
+        output["position_decision_reason"] = reason
+        output["position_metrics"] = {
+            "expected_value_usd": expected_value,
+            "expected_value_to_risk": expected_value_to_risk,
+            "target_net_profit_usd": target_profit,
+            "stop_net_loss_usd": stop_loss,
+            "net_reward_risk": net_reward_risk,
+            "target_probability": p_target,
+            "stop_probability": p_stop,
+            "profit_probability": p_profit,
+            "loss_probability": p_loss,
+            "predicted_r": predicted_r,
+            "neighbor_loss_rate": neighbor_loss_rate,
+        }
+        output["position_strengths"] = strengths[:4]
+        output["position_risks"] = risks[:4]
+        return output
 
     def _loss_memory_support(
         self,
@@ -931,6 +1153,14 @@ def _not_created_contract(
         "retroactive_forecast": False,
         "error": error,
     }
+
+
+def _optional_finite(value: Any) -> float | None:
+    try:
+        number = float(value)
+    except (TypeError, ValueError):
+        return None
+    return number if math.isfinite(number) else None
 
 
 def _finite(value: Any, default: float = 0.0) -> float:

@@ -92,7 +92,7 @@ class TradeDashboardTests(unittest.TestCase):
         self.assertIn(">WIN<", document)
         self.assertNotIn(">STOP<", document)
 
-    def test_panel_displays_risk_policy_and_soft_evidence(self) -> None:
+    def test_panel_concentrates_profit_first_position_evidence(self) -> None:
         latest = {
             "action": "LONG",
             "trade_plan": {
@@ -115,14 +115,37 @@ class TradeDashboardTests(unittest.TestCase):
             "trade_lifecycle_summary": {},
         }
 
+        latest["trade_plan"].update(
+            {
+                "expected_value_usd": 6.0,
+                "target_net_profit_usd": 18.0,
+                "stop_net_loss_usd": -9.0,
+                "adaptive_profit_probability": 0.64,
+                "adaptive_loss_probability": 0.36,
+                "adaptive_target_probability": 0.68,
+                "adaptive_stop_probability": 0.22,
+                "position_decision": "FAVORABLE",
+                "position_decision_reason": (
+                    "MULTIPLE_PROFIT_SIGNALS_ALIGNED"
+                ),
+                "position_metrics": {
+                    "expected_value_to_risk": 0.30,
+                    "net_reward_risk": 2.0,
+                },
+            }
+        )
+
         document = _panel(latest, [])
 
-        self.assertIn("Risk allocation", document)
-        self.assertIn("$+20.00 · 2.00%", document)
-        self.assertIn("Risk score", document)
-        self.assertIn("60.00%", document)
-        self.assertIn("v2", document)
-        self.assertIn("RISK-SCALED", document)
+        self.assertIn("Position decision", document)
+        self.assertIn("LONG · FAVORABLE", document)
+        self.assertIn("Expected value", document)
+        self.assertIn("$+6.00", document)
+        self.assertIn("+30.00% of risk budget", document)
+        self.assertIn("Profit / loss", document)
+        self.assertIn("$+18.00 / $-9.00", document)
+        self.assertIn("2.00:1", document)
+        self.assertIn("PROFIT 64.00% · LOSS 36.00%", document)
         self.assertIn("MODEL NOT QUALIFIED", document)
 
 

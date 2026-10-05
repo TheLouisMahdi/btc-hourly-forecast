@@ -60,6 +60,9 @@ class GithubRuntimeLossMemoryTests(unittest.TestCase):
                     "entry_profit_probability_ceiling": 0.30,
                     "entry_predicted_r_ceiling": 0.0,
                     "entry_loss_probability_margin": 0.35,
+                    "entry_quality_guard_enabled": True,
+                    "entry_quality_guard_minimum_samples": 20,
+                    "entry_quality_guard_minimum_model_only_score": 0.14,
                 },
             },
         )
@@ -200,6 +203,74 @@ class GithubRuntimeLossMemoryTests(unittest.TestCase):
             ]
         )
 
+
+    def test_low_quality_model_only_entry_is_vetoed(self) -> None:
+        engine = CanonicalAdaptiveTradeEngine(self.settings, "model-1")
+        engine.state.samples_seen = 20
+        record = {"action": "SHORT", "blockers": []}
+        plan = {
+            "status": "ACTIONABLE",
+            "risk_score": 0.125,
+            "soft_risk_flags": ["MODEL_DIRECTION_ONLY"],
+        }
+
+        output = engine._apply_entry_quality_guard(record, plan)
+
+        self.assertEqual(record["action"], "WAIT")
+        self.assertEqual(output["status"], "BLOCKED")
+        self.assertTrue(output["entry_quality_veto"])
+        self.assertIn(
+            "LOW_QUALITY_MODEL_DIRECTION_ONLY",
+            record["blockers"],
+        )
+
+    def test_reasonable_model_only_entry_is_not_vetoed(self) -> None:
+        engine = CanonicalAdaptiveTradeEngine(self.settings, "model-1")
+        engine.state.samples_seen = 20
+        record = {"action": "LONG", "blockers": []}
+        plan = {
+            "status": "ACTIONABLE",
+            "risk_score": 0.15,
+            "soft_risk_flags": ["MODEL_DIRECTION_ONLY"],
+        }
+
+        output = engine._apply_entry_quality_guard(record, plan)
+
+        self.assertEqual(record["action"], "LONG")
+        self.assertEqual(output["status"], "ACTIONABLE")
+        self.assertFalse(output["entry_quality_veto"])
+
+    def test_position_decision_exposes_profit_first_metrics(self) -> None:
+        engine = CanonicalAdaptiveTradeEngine(self.settings, "model-1")
+        record = {"action": "LONG", "blockers": []}
+        plan = {
+            "status": "ACTIONABLE",
+            "expected_value_usd": 5.0,
+            "risk_budget_usd": 10.0,
+            "target_net_profit_usd": 20.0,
+            "stop_net_loss_usd": -10.0,
+            "adaptive_target_probability": 0.70,
+            "adaptive_stop_probability": 0.20,
+            "adaptive_profit_probability": 0.65,
+            "adaptive_loss_probability": 0.35,
+            "adaptive_predicted_r": 0.40,
+        }
+
+        output = engine._attach_position_decision(record, plan)
+
+        self.assertEqual(output["position_decision"], "FAVORABLE")
+        self.assertEqual(
+            output["position_metrics"]["expected_value_to_risk"],
+            0.5,
+        )
+        self.assertEqual(
+            output["position_metrics"]["net_reward_risk"],
+            2.0,
+        )
+        self.assertIn(
+            "POSITIVE_EXPECTED_VALUE",
+            output["position_strengths"],
+        )
 
 if __name__ == "__main__":
     unittest.main()

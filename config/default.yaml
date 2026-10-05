@@ -356,6 +356,9 @@ trade_lifecycle:
   entry_loss_guard_neighbors: 4
   entry_loss_guard_neighbor_loss_rate: 0.75
   entry_loss_guard_max_neighbor_distance: 1.75
+  entry_quality_guard_enabled: true
+  entry_quality_guard_minimum_samples: 20
+  entry_quality_guard_minimum_model_only_score: 0.14
   reward_probability_gain: 0.80
   reward_r_gain: 0.08
 
