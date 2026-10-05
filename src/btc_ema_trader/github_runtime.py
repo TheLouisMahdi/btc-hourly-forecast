@@ -30,7 +30,7 @@ from .trade_lifecycle import (
 )
 
 MODEL_PREFIX = "directional-breakout-hourly-"
-TRADE_STATE_SCHEMA_VERSION = 3
+TRADE_STATE_SCHEMA_VERSION = 4
 RUNTIME_CONTRACT = "CANONICAL_GITHUB_RUNTIME_V2"
 
 FORECAST_IMMUTABLE_FIELDS = {
@@ -91,6 +91,15 @@ POSITION_PLAN_FIELDS = (
     "label_entry_definition",
     "runtime_entry_definition",
     "execution_alignment_status",
+    "adaptive_profit_probability",
+    "adaptive_loss_probability",
+    "adaptive_probability_semantics",
+    "adaptive_predicted_r",
+    "adaptive_online_weight",
+    "adaptive_samples_seen",
+    "loss_memory_guard",
+    "loss_memory_veto",
+    "loss_memory_reason",
 )
 
 
@@ -269,24 +278,32 @@ class CanonicalAdaptiveTradeEngine(AdaptiveTradeEngine):
             matrix = vector.reshape(1, -1)
             self.state.scaler.partial_fit(matrix)
             transformed = self.state.scaler.transform(matrix)
-            classifier_kwargs: dict[str, Any] = {
-                "sample_weight": np.asarray([barrier_weight], dtype=float)
-            }
-            if not self.state.initialized:
-                classifier_kwargs["classes"] = np.asarray(
-                    [0, 1],
-                    dtype=int,
+            corrected_history = bool(
+                trade.get("historical_direction_corrected", False)
+            )
+            if not corrected_history:
+                classifier_kwargs: dict[str, Any] = {
+                    "sample_weight": np.asarray(
+                        [barrier_weight],
+                        dtype=float,
+                    )
+                }
+                if not self.state.initialized:
+                    classifier_kwargs["classes"] = np.asarray(
+                        [0, 1],
+                        dtype=int,
+                    )
+                self.state.target_model.partial_fit(
+                    transformed,
+                    np.asarray([target], dtype=int),
+                    **classifier_kwargs,
                 )
-            self.state.target_model.partial_fit(
-                transformed,
-                np.asarray([target], dtype=int),
-                **classifier_kwargs,
-            )
-            self.state.stop_model.partial_fit(
-                transformed,
-                np.asarray([stop], dtype=int),
-                **dict(classifier_kwargs),
-            )
+                self.state.stop_model.partial_fit(
+                    transformed,
+                    np.asarray([stop], dtype=int),
+                    **dict(classifier_kwargs),
+                )
+                self.state.initialized = True
 
             pnl_classifier_kwargs: dict[str, Any] = {
                 "sample_weight": np.asarray([pnl_weight], dtype=float)
@@ -311,9 +328,17 @@ class CanonicalAdaptiveTradeEngine(AdaptiveTradeEngine):
                 np.asarray([realized_r], dtype=float),
                 sample_weight=np.asarray([pnl_weight], dtype=float),
             )
-            self.state.initialized = True
             self.state.profit_loss_initialized = True
             self.state.samples_seen += 1
+            self.state.entry_memory.append(
+                {
+                    "trade_id": trade_id,
+                    "direction_code": float(vector[0]),
+                    "profitable": bool(profitable),
+                    "vector": vector.tolist(),
+                }
+            )
+            self.state.entry_memory = self.state.entry_memory[-500:]
             self.state.learned_trade_ids.add(trade_id)
             trade["adaptive_learned"] = True
             trade["adaptive_learned_at"] = pd.Timestamp.now(
@@ -448,6 +473,7 @@ class CanonicalAdaptiveTradeEngine(AdaptiveTradeEngine):
         probability_margin = float(
             cfg.get("entry_loss_probability_margin", 0.35)
         )
+        neighbor_memory = self._loss_memory_support(vector)
         guard.update(
             {
                 "profit_probability": p_profit,
@@ -457,6 +483,7 @@ class CanonicalAdaptiveTradeEngine(AdaptiveTradeEngine):
                 "profit_probability_ceiling": profit_ceiling,
                 "predicted_r_ceiling": r_ceiling,
                 "loss_probability_margin": probability_margin,
+                "neighbor_memory": neighbor_memory,
             }
         )
         output["adaptive_profit_probability"] = p_profit
@@ -476,6 +503,12 @@ class CanonicalAdaptiveTradeEngine(AdaptiveTradeEngine):
             and p_profit <= profit_ceiling
             and p_loss - p_profit >= probability_margin
             and predicted_r <= r_ceiling
+            and bool(
+                neighbor_memory.get(
+                    "supported_bad_pattern",
+                    False,
+                )
+            )
         )
         guard["veto"] = veto
         output["loss_memory_guard"] = guard
@@ -498,6 +531,107 @@ class CanonicalAdaptiveTradeEngine(AdaptiveTradeEngine):
             )
         )
         return output
+
+
+    def _loss_memory_support(
+        self,
+        vector: np.ndarray,
+    ) -> dict[str, Any]:
+        """Require repeated nearby losing setups before a hard entry veto."""
+        cfg = self.cfg
+        neighbor_count = max(
+            1,
+            int(cfg.get("entry_loss_guard_neighbors", 4)),
+        )
+        minimum_loss_rate = float(
+            cfg.get("entry_loss_guard_neighbor_loss_rate", 0.75)
+        )
+        maximum_distance = float(
+            cfg.get("entry_loss_guard_max_neighbor_distance", 1.75)
+        )
+
+        records: list[tuple[float, bool, str]] = []
+        direction_code = float(vector[0])
+        candidate = self.state.scaler.transform(
+            vector.reshape(1, -1)
+        )[0]
+        for item in self.state.entry_memory:
+            try:
+                historical = np.asarray(item.get("vector", []), dtype=float)
+            except Exception:
+                continue
+            if (
+                historical.shape != vector.shape
+                or not np.isfinite(historical).all()
+                or abs(
+                    float(item.get("direction_code", historical[0]))
+                    - direction_code
+                )
+                > 0.5
+            ):
+                continue
+            transformed = self.state.scaler.transform(
+                historical.reshape(1, -1)
+            )[0]
+            distance = float(
+                np.sqrt(np.mean((transformed - candidate) ** 2))
+            )
+            records.append(
+                (
+                    distance,
+                    bool(item.get("profitable", False)),
+                    str(item.get("trade_id") or ""),
+                )
+            )
+
+        records.sort(key=lambda value: value[0])
+        nearest = records[:neighbor_count]
+        if len(nearest) < neighbor_count:
+            return {
+                "available_neighbors": len(nearest),
+                "required_neighbors": neighbor_count,
+                "loss_rate": None,
+                "maximum_distance": None,
+                "distance_threshold": maximum_distance,
+                "minimum_loss_rate": minimum_loss_rate,
+                "supported_bad_pattern": False,
+                "neighbors": [
+                    {
+                        "trade_id": trade_id,
+                        "distance": distance,
+                        "profitable": profitable,
+                    }
+                    for distance, profitable, trade_id in nearest
+                ],
+            }
+
+        loss_rate = float(
+            np.mean(
+                [not profitable for _, profitable, _ in nearest]
+            )
+        )
+        furthest = float(max(distance for distance, _, _ in nearest))
+        supported = bool(
+            loss_rate >= minimum_loss_rate
+            and furthest <= maximum_distance
+        )
+        return {
+            "available_neighbors": len(nearest),
+            "required_neighbors": neighbor_count,
+            "loss_rate": loss_rate,
+            "maximum_distance": furthest,
+            "distance_threshold": maximum_distance,
+            "minimum_loss_rate": minimum_loss_rate,
+            "supported_bad_pattern": supported,
+            "neighbors": [
+                {
+                    "trade_id": trade_id,
+                    "distance": distance,
+                    "profitable": profitable,
+                }
+                for distance, profitable, trade_id in nearest
+            ],
+        }
 
     def _predict(
         self,

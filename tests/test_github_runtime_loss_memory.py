@@ -90,6 +90,7 @@ class GithubRuntimeLossMemoryTests(unittest.TestCase):
             "PROFIT",
         )
         self.assertTrue(engine.state.profit_loss_initialized)
+        self.assertFalse(engine.state.initialized)
 
     def test_high_confidence_loss_pattern_is_vetoed(self) -> None:
         engine = CanonicalAdaptiveTradeEngine(self.settings, "model-1")
@@ -102,6 +103,16 @@ class GithubRuntimeLossMemoryTests(unittest.TestCase):
             len(EXTENDED_TRADE_FEATURES),
             dtype=float,
         )
+        engine._last_extended_vector[0] = 1.0
+        engine.state.entry_memory = [
+            {
+                "trade_id": f"loss-{index}",
+                "direction_code": 1.0,
+                "profitable": False,
+                "vector": engine._last_extended_vector.tolist(),
+            }
+            for index in range(4)
+        ]
         record = {"action": "LONG", "blockers": []}
         plan = {
             "status": "ACTIONABLE",
@@ -126,6 +137,16 @@ class GithubRuntimeLossMemoryTests(unittest.TestCase):
             len(EXTENDED_TRADE_FEATURES),
             dtype=float,
         )
+        engine._last_extended_vector[0] = 1.0
+        engine.state.entry_memory = [
+            {
+                "trade_id": f"loss-{index}",
+                "direction_code": 1.0,
+                "profitable": False,
+                "vector": engine._last_extended_vector.tolist(),
+            }
+            for index in range(4)
+        ]
         record = {"action": "LONG", "blockers": []}
         plan = {
             "status": "ACTIONABLE",
@@ -138,6 +159,45 @@ class GithubRuntimeLossMemoryTests(unittest.TestCase):
         self.assertEqual(record["blockers"], [])
         self.assertEqual(output["status"], "ACTIONABLE")
         self.assertFalse(output["loss_memory_guard"]["veto"])
+
+
+    def test_loss_model_without_repeated_bad_neighbors_does_not_veto(self) -> None:
+        engine = CanonicalAdaptiveTradeEngine(self.settings, "model-1")
+        engine.state.samples_seen = 20
+        engine.state.profit_loss_initialized = True
+        engine.state.scaler = _IdentityScaler()
+        engine.state.profit_model = _FixedProbabilityModel(0.10)
+        engine.state.loss_model = _FixedProbabilityModel(0.90)
+        engine._last_extended_vector = np.zeros(
+            len(EXTENDED_TRADE_FEATURES),
+            dtype=float,
+        )
+        engine._last_extended_vector[0] = 1.0
+        engine.state.entry_memory = [
+            {
+                "trade_id": f"mixed-{index}",
+                "direction_code": 1.0,
+                "profitable": index >= 2,
+                "vector": engine._last_extended_vector.tolist(),
+            }
+            for index in range(4)
+        ]
+        record = {"action": "LONG", "blockers": []}
+        plan = {
+            "status": "ACTIONABLE",
+            "adaptive_predicted_r": -0.40,
+        }
+
+        output = engine._apply_loss_memory_entry_guard(record, plan)
+
+        self.assertEqual(record["action"], "LONG")
+        self.assertEqual(output["status"], "ACTIONABLE")
+        self.assertFalse(output["loss_memory_guard"]["veto"])
+        self.assertFalse(
+            output["loss_memory_guard"]["neighbor_memory"][
+                "supported_bad_pattern"
+            ]
+        )
 
 
 if __name__ == "__main__":

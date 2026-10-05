@@ -80,6 +80,7 @@ class TradeAdaptiveState:
     learned_trade_ids: set[str] = field(default_factory=set)
     source_model_ids: list[str] = field(default_factory=list)
     recent_outcomes: list[dict[str, Any]] = field(default_factory=list)
+    entry_memory: list[dict[str, Any]] = field(default_factory=list)
 
 
 class AdaptiveTradeEngine:

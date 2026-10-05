@@ -353,6 +353,9 @@ trade_lifecycle:
   entry_profit_probability_ceiling: 0.30
   entry_predicted_r_ceiling: 0.0
   entry_loss_probability_margin: 0.35
+  entry_loss_guard_neighbors: 4
+  entry_loss_guard_neighbor_loss_rate: 0.75
+  entry_loss_guard_max_neighbor_distance: 1.75
   reward_probability_gain: 0.80
   reward_r_gain: 0.08
 
