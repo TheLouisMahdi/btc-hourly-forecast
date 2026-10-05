@@ -78,6 +78,7 @@ class GithubRuntimeLossMemoryTests(unittest.TestCase):
             "direction": "LONG",
             "realized_r": 0.25,
             "realized_net_pnl_usd": 2.5,
+            "historical_direction_corrected": True,
             "entry_feature_names": list(EXTENDED_TRADE_FEATURES),
             "entry_feature_vector": [0.0] * len(EXTENDED_TRADE_FEATURES),
         }
