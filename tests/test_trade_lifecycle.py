@@ -181,6 +181,35 @@ class TradeLifecycleTests(unittest.TestCase):
             trade["stop_net_loss_usd"],
         )
 
+    def test_legacy_resolver_never_uses_pre_entry_hour(self) -> None:
+        engine = AdaptiveTradeEngine(self.settings, "model-1")
+        record = self._record()
+        record["run_finished_at"] = "2026-01-01T01:20:00+00:00"
+        record["trade_plan"] = engine.enrich_trade_plan(record, self._plan())
+        trade = open_trade_from_record(record)
+        assert trade is not None
+        candle = pd.DataFrame(
+            [
+                {
+                    "open_time": "2026-01-01T01:00:00Z",
+                    "open": 100.0,
+                    "high": trade["target_price"] + 10.0,
+                    "low": trade["initial_stop_price"] - 10.0,
+                    "close": 100.0,
+                },
+                {
+                    "open_time": "2026-01-01T02:00:00Z",
+                    "open": 100.0,
+                    "high": 100.5,
+                    "low": 99.5,
+                    "close": 100.2,
+                },
+            ]
+        )
+        self.assertEqual(resolve_open_trades([trade], candle, self.settings), 0)
+        self.assertEqual(trade["status"], "OPEN")
+        self.assertEqual(trade["max_favorable_r"], 0.5)
+
     def test_resolved_trade_updates_online_learner(self) -> None:
         engine = AdaptiveTradeEngine(self.settings, "model-1")
         record = self._record()
