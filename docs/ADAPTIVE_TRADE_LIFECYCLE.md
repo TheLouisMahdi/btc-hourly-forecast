@@ -54,3 +54,7 @@ The persistent files are:
 The GitHub workflow enables model-first aggressive paper mode. Missing structure, model qualification, edge threshold, news shock, duplicate-event context, meta-model rejection and negative-memory warnings are advisory or risk penalties instead of automatic vetoes. Hard blockers remain for unusable direction, invalid prices or ATR, unhealthy candle data, stale or unavailable execution quotes, provider mismatch and unsupported short execution. Only one paper position is managed at a time.
 
 No exchange order is submitted by this repository.
+
+## Model-only entry eligibility
+
+When no confirmed structural event exists, paper entry requires a qualified model and selected direction/horizon, an available economic policy, predicted stress-net edge above both the policy minimum and the configured profit buffer, and a non-stale model. Otherwise the forecast is still published, but the trade action is `WAIT`. Confirmed structural events retain the existing risk-scaled advisory policy.
