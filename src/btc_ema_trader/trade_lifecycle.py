@@ -629,8 +629,9 @@ def resolve_open_trades(
                     trade,
                     exit_price=event["exit_price"],
                     outcome=event["outcome"],
-                    closed_at=(candle_time + pd.Timedelta(hours=1)),
+                    closed_at=_event_exit_time(candle_time, event),
                     fill_reason=event.get("fill_reason"),
+                    evidence_available_at=candle_time + pd.Timedelta(hours=1),
                 )
                 resolved += 1
                 break
@@ -645,6 +646,15 @@ def resolve_open_trades(
                 resolved += 1
                 break
     return resolved
+
+
+def _event_exit_time(
+    candle_time: pd.Timestamp, event: dict[str, Any]
+) -> pd.Timestamp:
+    """Gap fills occur at the candle open; other fills have hourly precision."""
+    if event.get("fill_reason") in {"GAP_THROUGH_STOP", "GAP_THROUGH_TARGET"}:
+        return candle_time
+    return candle_time + pd.Timedelta(hours=1)
 
 
 def _evaluate_candle(
@@ -794,6 +804,7 @@ def _close_trade(
     outcome: str,
     closed_at: pd.Timestamp,
     fill_reason: str | None = None,
+    evidence_available_at: pd.Timestamp | None = None,
 ) -> None:
     entry = float(trade["entry_price"])
     direction = str(trade["direction"])
@@ -864,6 +875,13 @@ def _close_trade(
     risk_budget = max(float(trade.get("risk_budget_usd", 0.0)), 1e-9)
     realized_r = net_pnl / risk_budget
     final_outcome = outcome
+    exit_time_basis = (
+        "CANDLE_OPEN"
+        if fill_reason in {"GAP_THROUGH_STOP", "GAP_THROUGH_TARGET"}
+        else "CANDLE_CLOSE"
+        if outcome == "TIME_EXIT"
+        else "INTRABAR_END_BOUND"
+    )
     if outcome == "TIME_EXIT":
         final_outcome = "TIME_EXIT_WIN" if net_pnl > 0 else "TIME_EXIT_LOSS"
     trade.update(
@@ -871,6 +889,10 @@ def _close_trade(
             "status": "CLOSED",
             "outcome": final_outcome,
             "closed_at": _utc(closed_at).isoformat(),
+            "exit_time_basis": exit_time_basis,
+            "exit_evidence_available_at": _utc(
+                evidence_available_at if evidence_available_at is not None else closed_at
+            ).isoformat(),
             "exit_price": float(exit_price),
             "fill_reason": fill_reason,
             "gross_aligned_return": float(aligned_return),
