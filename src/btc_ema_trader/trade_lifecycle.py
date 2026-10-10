@@ -613,12 +613,16 @@ def resolve_open_trades(
     frame = candles.copy().sort_values("open_time").reset_index(drop=True)
     frame["open_time"] = pd.to_datetime(frame["open_time"], utc=True)
     resolved = 0
+    from .execution_path import first_full_candle_open
+
     for trade in trades:
         if trade.get("status") != "OPEN":
             continue
-        signal_time = _utc(trade.get("signal_candle_time"))
+        first_open = first_full_candle_open(
+            trade.get("opened_at") or trade.get("signal_candle_time")
+        )
         expiry = _utc(trade.get("expires_at"))
-        relevant = frame.loc[frame["open_time"] > signal_time]
+        relevant = frame.loc[frame["open_time"] >= first_open]
         if relevant.empty:
             continue
         for _, candle in relevant.iterrows():
