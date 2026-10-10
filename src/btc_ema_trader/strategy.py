@@ -172,6 +172,11 @@ def make_decision(
         hard_blockers.append("DIRECTION_UNAVAILABLE")
     if not is_event or event_direction == 0:
         soft_risk_flags.append("MODEL_DIRECTION_ONLY")
+        # Economic qualification is measured on events, not model-only rows.
+        if not qualification_passed or not direction_qualified or not policy:
+            hard_blockers.append("MODEL_ONLY_UNQUALIFIED")
+        if net_edge_bps < max(minimum_edge_bps, base_costs["profit_buffer_bps"]):
+            hard_blockers.append("MODEL_ONLY_INSUFFICIENT_EDGE")
     elif event_type not in STRUCTURAL_EVENTS:
         soft_risk_flags.append("STRUCTURE_METADATA_INCOMPLETE")
     if is_event and event_score < minimum_event_score:
@@ -251,6 +256,8 @@ def make_decision(
             hard_blockers.append("PROVIDER_MISMATCH")
         if data_health.get("model_stale", False):
             soft_risk_flags.append("MODEL_STALE")
+            if not is_event or event_direction == 0:
+                hard_blockers.append("MODEL_ONLY_STALE")
         if data_health.get("news_stale", False):
             soft_risk_flags.append("NEWS_STALE")
 
