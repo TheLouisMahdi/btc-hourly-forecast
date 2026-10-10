@@ -57,4 +57,4 @@ No exchange order is submitted by this repository.
 
 ## Model-only entry eligibility
 
-When no confirmed structural event exists, paper entry requires a qualified model and selected direction/horizon, an available economic policy, predicted stress-net edge above both the policy minimum and the configured profit buffer, and a non-stale model. Otherwise the forecast is still published, but the trade action is `WAIT`. Confirmed structural events retain the existing risk-scaled advisory policy.
+When no confirmed structural event exists, the position action is always `WAIT`. Event-only continuation, tradeability, and expected-return heads have no validated trade label for a model-direction-only row; even a positive event-only qualification cannot authorize these entries. The general UP/DOWN forecast is still published. Confirmed structural events retain the existing risk-scaled advisory policy. To enable model-only entries in the future, build and independently validate an economic model for non-event rows.
