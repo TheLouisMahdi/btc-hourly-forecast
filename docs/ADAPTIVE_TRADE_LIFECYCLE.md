@@ -51,7 +51,7 @@ The persistent files are:
 
 ## Paper-only aggressive mode
 
-The GitHub workflow enables model-first aggressive paper mode. Missing structure, model qualification, edge threshold, news shock, duplicate-event context, meta-model rejection and negative-memory warnings are advisory or risk penalties instead of automatic vetoes. Hard blockers remain for unusable direction, invalid prices or ATR, unhealthy candle data, stale or unavailable execution quotes, provider mismatch and unsupported short execution. Only one paper position is managed at a time.
+The GitHub workflow enables model-first aggressive paper mode. A missing structural event prevents a new position. For confirmed structural events, model qualification, edge threshold, news shock, duplicate-event context, meta-model rejection and negative-memory warnings remain advisory or risk penalties instead of automatic vetoes. Hard blockers remain for unusable direction, invalid prices or ATR, unhealthy candle data, stale or unavailable execution quotes, provider mismatch and unsupported short execution. Only one paper position is managed at a time.
 
 No exchange order is submitted by this repository.
 
