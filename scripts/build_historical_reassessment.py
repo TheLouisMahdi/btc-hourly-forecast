@@ -11,8 +11,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-from compare_observed_paper_trades import STRUCTURAL_EVENTS, metrics, validate_ledger
-from replay_recorded_exits import replay_entries
+from scripts.compare_observed_paper_trades import STRUCTURAL_EVENTS, metrics, validate_ledger
+from scripts.replay_recorded_exits import replay_entries
 
 SCHEMA_VERSION = 1
 REPLAY_METHOD = "SAME_RECORDED_ENTRY_HOURLY_EXIT_REPLAY_V1"
