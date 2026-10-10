@@ -185,7 +185,7 @@ class StrategyRiskPolicyTests(unittest.TestCase):
             weak.trade_plan["risk_score"],
         )
 
-    def test_no_event_uses_model_direction_with_scaled_risk(self) -> None:
+    def test_no_event_is_forecast_only_even_with_high_event_scores(self) -> None:
         decision = make_decision(
             _row(
                 is_event=0,
@@ -200,8 +200,9 @@ class StrategyRiskPolicyTests(unittest.TestCase):
             self.settings,
         )
 
-        self.assertEqual(decision.action, "LONG")
-        self.assertEqual(decision.blockers, [])
+        self.assertEqual(decision.action, "WAIT")
+        self.assertIn("MODEL_ONLY_NO_EVENT_EVIDENCE", decision.blockers)
+        self.assertEqual(decision.trade_plan["status"], "BLOCKED")
         self.assertIn(
             "MODEL_DIRECTION_ONLY",
             decision.trade_plan["soft_risk_flags"],
@@ -211,7 +212,7 @@ class StrategyRiskPolicyTests(unittest.TestCase):
             "MODEL_DIRECTION_WITH_STRUCTURE_CONTEXT",
         )
         self.assertEqual(decision.trade_plan["model_trade_direction"], "LONG")
-        self.assertEqual(decision.trade_plan["execution_direction"], "LONG")
+        self.assertEqual(decision.trade_plan["execution_direction"], "WAIT")
         self.assertFalse(decision.trade_plan["execution_direction_inverted"])
         self.assertLess(
             decision.trade_plan["stop_price"],
@@ -234,7 +235,7 @@ class StrategyRiskPolicyTests(unittest.TestCase):
             self.settings,
         )
         self.assertEqual(decision.action, "WAIT")
-        self.assertIn("MODEL_ONLY_UNQUALIFIED", decision.blockers)
+        self.assertIn("MODEL_ONLY_NO_EVENT_EVIDENCE", decision.blockers)
         self.assertEqual(decision.trade_plan["status"], "BLOCKED")
 
     def test_model_only_below_stress_cost_buffer_cannot_open(self) -> None:
@@ -245,7 +246,7 @@ class StrategyRiskPolicyTests(unittest.TestCase):
             self.settings,
         )
         self.assertEqual(decision.action, "WAIT")
-        self.assertIn("MODEL_ONLY_INSUFFICIENT_EDGE", decision.blockers)
+        self.assertIn("MODEL_ONLY_NO_EVENT_EVIDENCE", decision.blockers)
         self.assertIn("INSUFFICIENT_STRESS_NET_EDGE", decision.trade_plan["soft_risk_flags"])
 
     def test_stale_model_only_entry_is_blocked(self) -> None:
@@ -257,7 +258,8 @@ class StrategyRiskPolicyTests(unittest.TestCase):
             data_health={"model_stale": True},
         )
         self.assertEqual(decision.action, "WAIT")
-        self.assertIn("MODEL_ONLY_STALE", decision.blockers)
+        self.assertIn("MODEL_ONLY_NO_EVENT_EVIDENCE", decision.blockers)
+        self.assertIn("MODEL_STALE", decision.trade_plan["soft_risk_flags"])
 
     def test_missing_invalidation_uses_atr_stop_with_risk_penalty(self) -> None:
         decision = make_decision(
@@ -298,7 +300,7 @@ class StrategyRiskPolicyTests(unittest.TestCase):
         )
 
         self.assertEqual(decision.action, "WAIT")
-        self.assertIn("MODEL_ONLY_UNQUALIFIED", decision.blockers)
+        self.assertIn("MODEL_ONLY_NO_EVENT_EVIDENCE", decision.blockers)
         self.assertEqual(decision.trade_plan["model_trade_direction"], "SHORT")
         self.assertEqual(decision.trade_plan["execution_direction"], "WAIT")
         self.assertGreater(
