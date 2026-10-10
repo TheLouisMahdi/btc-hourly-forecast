@@ -1,0 +1,9 @@
+{
+  "status": "PASS",
+  "commit_sha": "494a96b3f12e68ab53a9bfa1a499cfe84f52fd81",
+  "workflow_run_id": "38066852333",
+  "workflow_run_attempt": "1",
+  "checked_at": "2026-10-10T16:15:08.718532+00:00",
+  "test_exit_code": 0,
+  "compile_exit_code": 0
+}
