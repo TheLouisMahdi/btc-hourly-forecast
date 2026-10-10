@@ -45,8 +45,8 @@ jobs:
 
       - name: Verify attribution and replay unit tests
         run: |
-          python -m unittest discover -s tests -p test_paper_policy_attribution.py -v
-          python -m unittest discover -s tests -p test_recorded_exit_replay.py -v
+          PYTHONPATH=src python -m unittest discover -s tests -p test_paper_policy_attribution.py -v
+          PYTHONPATH=src python -m unittest discover -s tests -p test_recorded_exit_replay.py -v
 
       - name: Build immutable-source comparison report
         run: |
@@ -65,7 +65,7 @@ jobs:
             --trades observed-state/trades.json \
             --candles observed-state/chart_candles.json \
             --output attribution-report/candidate_exit_replay.json
-          python scripts/replay_recorded_exits.py \
+          PYTHONPATH=src python scripts/replay_recorded_exits.py \
             --baseline attribution-report/baseline_exit_replay.json \
             --candidate attribution-report/candidate_exit_replay.json \
             --output attribution-report/paired_exit_replay.json
