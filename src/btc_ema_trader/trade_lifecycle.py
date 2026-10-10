@@ -755,27 +755,35 @@ def _update_dynamic_stop(trade: dict[str, Any], candle: pd.Series) -> None:
     risk = max(float(trade["initial_risk_price"]), 1e-9)
     direction = str(trade["direction"])
     current = float(trade["current_stop_price"])
+    close = float(candle["close"])
     mfe = float(trade.get("max_favorable_r", 0.0))
     cost_fraction = float(trade.get("stress_execution_cost_bps", 0.0)) / 10_000.0
     if mfe >= float(trade.get("breakeven_trigger_r", 2.0)):
         breakeven = entry * (
             1.0 + cost_fraction if direction == "LONG" else 1.0 - cost_fraction
         )
-        current = max(current, breakeven) if direction == "LONG" else min(current, breakeven)
-        trade["breakeven_armed"] = True
+        # Stop changes become active only after this candle has closed.
+        if (direction == "LONG" and breakeven < close) or (
+            direction == "SHORT" and breakeven > close
+        ):
+            current = max(current, breakeven) if direction == "LONG" else min(current, breakeven)
+            trade["breakeven_armed"] = True
     if mfe >= float(trade.get("trailing_trigger_r", 3.0)):
         trail = max(
             float(trade.get("entry_atr", risk))
             * float(trade.get("trailing_atr_multiplier", 1.0)),
             risk * 0.25,
         )
-        if direction == "LONG":
-            candidate = float(candle["high"]) - trail
-            current = max(current, candidate)
-        else:
-            candidate = float(candle["low"]) + trail
-            current = min(current, candidate)
-        trade["trailing_armed"] = True
+        candidate = (
+            float(candle["high"]) - trail
+            if direction == "LONG"
+            else float(candle["low"]) + trail
+        )
+        if (direction == "LONG" and candidate < close) or (
+            direction == "SHORT" and candidate > close
+        ):
+            current = max(current, candidate) if direction == "LONG" else min(current, candidate)
+            trade["trailing_armed"] = True
     trade["current_stop_price"] = float(current)
 
 
