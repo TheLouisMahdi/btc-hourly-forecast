@@ -6,6 +6,7 @@ on:
   push:
     branches:
       - main
+      - fix/model-only-entry-evidence-20261010
   pull_request:
     branches:
       - main
@@ -78,7 +79,7 @@ jobs:
           exit 0
 
       - name: Publish quality diagnostics
-        if: github.event_name != 'pull_request'
+        if: github.ref == 'refs/heads/main'
         env:
           GITHUB_TOKEN: ${{ github.token }}
         run: bash scripts/push_snapshot_branch.sh quality-state quality-state-output
