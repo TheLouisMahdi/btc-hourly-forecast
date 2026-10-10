@@ -188,9 +188,9 @@ class ExecutionPathTests(unittest.TestCase):
     def test_valid_long_and_short_trailing_stops_still_advance(self) -> None:
         from btc_ema_trader.trade_lifecycle import _update_dynamic_stop
 
-        for direction, close, expected in (
-            ("LONG", 101.7, 101.2),
-            ("SHORT", 98.4, 98.8),
+        for direction, high, low, close, expected in (
+            ("LONG", 102.0, 99.5, 101.7, 101.2),
+            ("SHORT", 100.5, 98.0, 98.4, 98.8),
         ):
             with self.subTest(direction=direction):
                 trade = self._trade()
@@ -205,7 +205,7 @@ class ExecutionPathTests(unittest.TestCase):
                         "stress_execution_cost_bps": 21.0,
                     }
                 )
-                candle = pd.Series({"high": 102.0, "low": 98.0, "close": close})
+                candle = pd.Series({"high": high, "low": low, "close": close})
                 _update_dynamic_stop(trade, candle)
                 self.assertAlmostEqual(trade["current_stop_price"], expected)
                 self.assertTrue(trade["breakeven_armed"])
