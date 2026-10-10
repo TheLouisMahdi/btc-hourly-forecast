@@ -41,7 +41,41 @@ def main() -> int:
     status = github_product_surface.main()
     if status != 0:
         return status
+    _append_historical_reassessment_link()
     return 0
+
+
+def _append_historical_reassessment_link(
+    index_path: Path | None = None,
+    report_path: Path | None = None,
+) -> None:
+    """Link to a clearly labeled immutable-ledger replay report, if present."""
+    root = Path(__file__).resolve().parents[1]
+    index_path = index_path or root / "site" / "index.html"
+    report_path = report_path or root / ".github_state" / "historical_reassessment.json"
+    if not report_path.exists():
+        return
+    import json
+
+    report = json.loads(report_path.read_text(encoding="utf-8"))
+    if report.get("report_type") != "HISTORICAL_REASSESSMENT_NOT_COUNTERFACTUAL_BACKTEST":
+        return
+    document = index_path.read_text(encoding="utf-8")
+    if 'data-historical-audit="v1"' in document:
+        return
+    block = (
+        '<p data-historical-audit="v1" class="historical-audit-note">'
+        '<a href="historical_reassessment.json">Historical results audit</a>'
+        ' · Original realized results preserved; alternative exit replay is '
+        'research-only, not a backtest.'
+        '</p>'
+    )
+    if "</main>" not in document:
+        raise RuntimeError("No dashboard anchor for historical audit link")
+    index_path.write_text(
+        document.replace("</main>", block + "\n</main>", 1),
+        encoding="utf-8",
+    )
 
 
 def _ensure_resilience_panel(index_path: Path | None = None) -> None:
