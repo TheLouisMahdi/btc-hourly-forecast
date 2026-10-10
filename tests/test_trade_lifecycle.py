@@ -130,6 +130,8 @@ class TradeLifecycleTests(unittest.TestCase):
         self.assertEqual(resolve_open_trades([trade], candle, self.settings), 1)
         self.assertEqual(trade["status"], "CLOSED")
         self.assertEqual(trade["outcome"], "TARGET")
+        self.assertEqual(trade["closed_at"], "2026-01-01T02:00:00+00:00")
+        self.assertEqual(trade["exit_time_basis"], "INTRABAR_END_BOUND")
         self.assertGreater(trade["realized_r"], 0.0)
         self.assertEqual(trade["realized_cost_source"], "BASE_COMPONENTS")
         self.assertGreater(trade["simulated_execution_cost_usd"], 0.0)
@@ -168,6 +170,11 @@ class TradeLifecycleTests(unittest.TestCase):
         )
         self.assertEqual(trade["outcome"], "STOP")
         self.assertEqual(trade["fill_reason"], "GAP_THROUGH_STOP")
+        self.assertEqual(trade["closed_at"], "2026-01-01T01:00:00+00:00")
+        self.assertEqual(trade["exit_time_basis"], "CANDLE_OPEN")
+        self.assertEqual(
+            trade["exit_evidence_available_at"], "2026-01-01T02:00:00+00:00"
+        )
         self.assertEqual(trade["exit_price"], gap_open)
         self.assertLess(
             trade["realized_net_pnl_usd"],
