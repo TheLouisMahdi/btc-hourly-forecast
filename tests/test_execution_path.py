@@ -59,6 +59,8 @@ class ExecutionPathTests(unittest.TestCase):
                 "risk_budget_usd": 10.0,
                 "max_favorable_r": 0.0,
                 "max_adverse_r": 0.0,
+                "breakeven_armed": False,
+                "trailing_armed": False,
                 "breakeven_trigger_r": 2.0,
                 "trailing_trigger_r": 3.0,
                 "trailing_atr_multiplier": 1.0,
