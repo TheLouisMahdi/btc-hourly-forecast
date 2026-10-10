@@ -97,6 +97,10 @@ class RecordedExitReplayTests(unittest.TestCase):
         result = compare_replays(baseline, candidate)
         self.assertEqual(result["paired_resolved"], 1)
         self.assertEqual(result["candidate_minus_baseline_net_pnl_usd"], 2.0)
+        self.assertEqual(result["replayed_model_only_entries_blocked_by_new_entry_policy"], 1)
+        self.assertEqual(result["replayed_structural_entries"], 0)
+        self.assertEqual(result["structural_entry_exit_delta_usd"], 0.0)
+        self.assertEqual(result["baseline_matches_recorded_net_pnl_count"], 1)
         self.assertIn("NOT a full strategy backtest", result["warning"])
         candidate["trades"][0]["trade_id"] = "other"
         with self.assertRaises(ValueError):
