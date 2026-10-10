@@ -122,6 +122,95 @@ class ExecutionPathTests(unittest.TestCase):
         self.assertEqual(trade["status"], "CLOSED")
         self.assertEqual(trade["outcome"], "TARGET")
 
+    def test_retraced_long_candle_does_not_arm_unmarketable_stop(self) -> None:
+        trade = self._trade()
+        trade.update(
+            {
+                "breakeven_trigger_r": 0.75,
+                "trailing_trigger_r": 1.25,
+                "trailing_atr_multiplier": 0.8,
+                "stress_execution_cost_bps": 21.0,
+            }
+        )
+        candles = pd.DataFrame(
+            [
+                {
+                    "open_time": "2026-01-01T02:00:00Z",
+                    "open": 100.0,
+                    "high": 102.0,
+                    "low": 99.5,
+                    "close": 100.1,
+                },
+                {
+                    "open_time": "2026-01-01T03:00:00Z",
+                    "open": 100.1,
+                    "high": 100.4,
+                    "low": 99.8,
+                    "close": 100.2,
+                },
+            ]
+        )
+        self.assertEqual(resolve_open_trades_after_entry([trade], candles.iloc[:1], self.settings), 0)
+        self.assertEqual(trade["current_stop_price"], 99.0)
+        self.assertFalse(trade["breakeven_armed"])
+        self.assertFalse(trade["trailing_armed"])
+        self.assertEqual(resolve_open_trades_after_entry([trade], candles.iloc[1:], self.settings), 0)
+        self.assertEqual(trade["status"], "OPEN")
+
+    def test_retraced_short_candle_does_not_arm_unmarketable_stop(self) -> None:
+        trade = self._trade()
+        trade.update(
+            {
+                "direction": "SHORT",
+                "target_price": 95.0,
+                "initial_stop_price": 101.0,
+                "current_stop_price": 101.0,
+                "breakeven_trigger_r": 0.75,
+                "trailing_trigger_r": 1.25,
+                "trailing_atr_multiplier": 0.8,
+                "stress_execution_cost_bps": 21.0,
+            }
+        )
+        candles = pd.DataFrame(
+            [{
+                "open_time": "2026-01-01T02:00:00Z",
+                "open": 100.0,
+                "high": 100.5,
+                "low": 98.0,
+                "close": 99.9,
+            }]
+        )
+        self.assertEqual(resolve_open_trades_after_entry([trade], candles, self.settings), 0)
+        self.assertEqual(trade["current_stop_price"], 101.0)
+        self.assertFalse(trade["breakeven_armed"])
+        self.assertFalse(trade["trailing_armed"])
+
+    def test_valid_long_and_short_trailing_stops_still_advance(self) -> None:
+        from btc_ema_trader.trade_lifecycle import _update_dynamic_stop
+
+        for direction, close, expected in (
+            ("LONG", 101.7, 101.2),
+            ("SHORT", 98.4, 98.8),
+        ):
+            with self.subTest(direction=direction):
+                trade = self._trade()
+                trade.update(
+                    {
+                        "direction": direction,
+                        "current_stop_price": 99.0 if direction == "LONG" else 101.0,
+                        "max_favorable_r": 2.0,
+                        "breakeven_trigger_r": 0.75,
+                        "trailing_trigger_r": 1.25,
+                        "trailing_atr_multiplier": 0.8,
+                        "stress_execution_cost_bps": 21.0,
+                    }
+                )
+                candle = pd.Series({"high": 102.0, "low": 98.0, "close": close})
+                _update_dynamic_stop(trade, candle)
+                self.assertAlmostEqual(trade["current_stop_price"], expected)
+                self.assertTrue(trade["breakeven_armed"])
+                self.assertTrue(trade["trailing_armed"])
+
     def test_exact_hour_entry_can_use_that_hour(self) -> None:
         self.assertEqual(
             first_full_candle_open("2026-01-01T01:00:00Z"),
