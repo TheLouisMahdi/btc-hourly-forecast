@@ -62,3 +62,7 @@ When no confirmed structural event exists, the position action is always `WAIT`.
 ## Candle-close stop activation safety
 
 Break-even and trailing changes are evaluated after the full hourly candle is complete. A newly proposed LONG stop must remain strictly below that candle's closing price; a SHORT stop must remain strictly above it. When the candle retraces through a proposed level, the existing stop remains in force instead of assuming that an invalid stop order can be placed retroactively. Historical entries and already resolved paper trades are not rewritten.
+
+## Gap-fill timestamps and hourly evidence
+
+A full hourly candle can confirm at its end that its **opening** price crossed a stop or target. For `GAP_THROUGH_STOP` and `GAP_THROUGH_TARGET`, `closed_at` now records that candle's **open**, the first observable fill price time. `exit_evidence_available_at` separately records the candle end when the hourly evidence becomes available; `exit_time_basis` labels `CANDLE_OPEN`, `INTRABAR_END_BOUND`, or `CANDLE_CLOSE`. For intrabar touches, the exact minute is unknown and `closed_at` remains the candle-end upper bound. The partially observed entry candle is still excluded from OHLC barrier tests to prevent pre-entry look-ahead. Old closed trades are not recalculated.
