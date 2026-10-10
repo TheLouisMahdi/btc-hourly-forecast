@@ -54,15 +54,21 @@ jobs:
             git show origin/forecast-state:latest.json > .github_state/latest.json 2>/dev/null || printf '{}\n' > .github_state/latest.json
             git show origin/forecast-state:trades.json > .github_state/trades.json 2>/dev/null || printf '[]\n' > .github_state/trades.json
             git show origin/forecast-state:chart_candles.json > .github_state/chart_candles.json 2>/dev/null || printf '[]\n' > .github_state/chart_candles.json
+            git show origin/forecast-state:historical_reassessment.json > .github_state/historical_reassessment.json 2>/dev/null || printf '{}\n' > .github_state/historical_reassessment.json
           else
             printf '[]\n' > .github_state/history.json
             printf '{}\n' > .github_state/latest.json
             printf '[]\n' > .github_state/trades.json
             printf '[]\n' > .github_state/chart_candles.json
+            printf '{}\n' > .github_state/historical_reassessment.json
           fi
 
       - name: Render canonical dashboard
         run: python scripts/render_dashboard.py --runtime-dir .dashboard_runtime
+
+      - name: Publish separately labeled historical reassessment data
+        run: |
+          cp .github_state/historical_reassessment.json site/historical_reassessment.json
 
       - name: Verify dashboard contracts
         run: |

@@ -130,6 +130,8 @@ class TradeLifecycleTests(unittest.TestCase):
         self.assertEqual(resolve_open_trades([trade], candle, self.settings), 1)
         self.assertEqual(trade["status"], "CLOSED")
         self.assertEqual(trade["outcome"], "TARGET")
+        self.assertEqual(trade["closed_at"], "2026-01-01T02:00:00+00:00")
+        self.assertEqual(trade["exit_time_basis"], "INTRABAR_END_BOUND")
         self.assertGreater(trade["realized_r"], 0.0)
         self.assertEqual(trade["realized_cost_source"], "BASE_COMPONENTS")
         self.assertGreater(trade["simulated_execution_cost_usd"], 0.0)
@@ -168,11 +170,45 @@ class TradeLifecycleTests(unittest.TestCase):
         )
         self.assertEqual(trade["outcome"], "STOP")
         self.assertEqual(trade["fill_reason"], "GAP_THROUGH_STOP")
+        self.assertEqual(trade["closed_at"], "2026-01-01T01:00:00+00:00")
+        self.assertEqual(trade["exit_time_basis"], "CANDLE_OPEN")
+        self.assertEqual(
+            trade["exit_evidence_available_at"], "2026-01-01T02:00:00+00:00"
+        )
         self.assertEqual(trade["exit_price"], gap_open)
         self.assertLess(
             trade["realized_net_pnl_usd"],
             trade["stop_net_loss_usd"],
         )
+
+    def test_legacy_resolver_never_uses_pre_entry_hour(self) -> None:
+        engine = AdaptiveTradeEngine(self.settings, "model-1")
+        record = self._record()
+        record["run_finished_at"] = "2026-01-01T01:20:00+00:00"
+        record["trade_plan"] = engine.enrich_trade_plan(record, self._plan())
+        trade = open_trade_from_record(record)
+        assert trade is not None
+        candle = pd.DataFrame(
+            [
+                {
+                    "open_time": "2026-01-01T01:00:00Z",
+                    "open": 100.0,
+                    "high": trade["target_price"] + 10.0,
+                    "low": trade["initial_stop_price"] - 10.0,
+                    "close": 100.0,
+                },
+                {
+                    "open_time": "2026-01-01T02:00:00Z",
+                    "open": 100.0,
+                    "high": 100.5,
+                    "low": 99.5,
+                    "close": 100.2,
+                },
+            ]
+        )
+        self.assertEqual(resolve_open_trades([trade], candle, self.settings), 0)
+        self.assertEqual(trade["status"], "OPEN")
+        self.assertEqual(trade["max_favorable_r"], 0.5)
 
     def test_resolved_trade_updates_online_learner(self) -> None:
         engine = AdaptiveTradeEngine(self.settings, "model-1")

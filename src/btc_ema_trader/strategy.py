@@ -172,6 +172,8 @@ def make_decision(
         hard_blockers.append("DIRECTION_UNAVAILABLE")
     if not is_event or event_direction == 0:
         soft_risk_flags.append("MODEL_DIRECTION_ONLY")
+        # Event-only return heads cannot qualify entries without an event.
+        hard_blockers.append("MODEL_ONLY_NO_EVENT_EVIDENCE")
     elif event_type not in STRUCTURAL_EVENTS:
         soft_risk_flags.append("STRUCTURE_METADATA_INCOMPLETE")
     if is_event and event_score < minimum_event_score:

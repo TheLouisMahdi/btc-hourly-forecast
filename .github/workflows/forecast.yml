@@ -47,12 +47,14 @@ jobs:
             git show origin/forecast-state:trades.json > .github_state/trades.json 2>/dev/null || printf '[]\n' > .github_state/trades.json
             git show origin/forecast-state:retrain_control.json > .github_state/retrain_control.json 2>/dev/null || printf '{}\n' > .github_state/retrain_control.json
             git show origin/forecast-state:chart_candles.json > .github_state/chart_candles.json 2>/dev/null || printf '[]\n' > .github_state/chart_candles.json
+            git show origin/forecast-state:historical_reassessment.json > .github_state/historical_reassessment.json 2>/dev/null || printf '{}\n' > .github_state/historical_reassessment.json
           else
             printf '[]\n' > .github_state/history.json
             printf '{}\n' > .github_state/latest.json
             printf '[]\n' > .github_state/trades.json
             printf '{}\n' > .github_state/retrain_control.json
             printf '[]\n' > .github_state/chart_candles.json
+            printf '{}\n' > .github_state/historical_reassessment.json
           fi
 
       - name: Restore batch champion, memories and trade assistant
@@ -88,6 +90,14 @@ jobs:
             --runtime-dir .github_runtime/hourly \
             --state-dir .github_state \
             --hours 168
+
+      - name: Publish non-mutating historical replay assessment
+        run: |
+          python -m scripts.build_historical_reassessment \
+            --trades .github_state/trades.json \
+            --candles .github_state/chart_candles.json \
+            --previous .github_state/historical_reassessment.json \
+            --output .github_state/historical_reassessment.json
 
       - name: Resolve secondary next-candle outcomes
         run: python scripts/github_dashboard.py

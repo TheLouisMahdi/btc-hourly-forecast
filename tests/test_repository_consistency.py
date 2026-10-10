@@ -77,6 +77,7 @@ class RepositoryConsistencyTests(unittest.TestCase):
         workflow_dir = self.root / ".github" / "workflows"
         expected = {
             "quality.yml",
+            "paper-policy-attribution.yml",
             "forecast.yml",
             "dashboard.yml",
             "retrain.yml",

@@ -613,12 +613,16 @@ def resolve_open_trades(
     frame = candles.copy().sort_values("open_time").reset_index(drop=True)
     frame["open_time"] = pd.to_datetime(frame["open_time"], utc=True)
     resolved = 0
+    from .execution_path import first_full_candle_open
+
     for trade in trades:
         if trade.get("status") != "OPEN":
             continue
-        signal_time = _utc(trade.get("signal_candle_time"))
+        first_open = first_full_candle_open(
+            trade.get("opened_at") or trade.get("signal_candle_time")
+        )
         expiry = _utc(trade.get("expires_at"))
-        relevant = frame.loc[frame["open_time"] > signal_time]
+        relevant = frame.loc[frame["open_time"] >= first_open]
         if relevant.empty:
             continue
         for _, candle in relevant.iterrows():
@@ -629,8 +633,9 @@ def resolve_open_trades(
                     trade,
                     exit_price=event["exit_price"],
                     outcome=event["outcome"],
-                    closed_at=(candle_time + pd.Timedelta(hours=1)),
+                    closed_at=_event_exit_time(candle_time, event),
                     fill_reason=event.get("fill_reason"),
+                    evidence_available_at=candle_time + pd.Timedelta(hours=1),
                 )
                 resolved += 1
                 break
@@ -645,6 +650,15 @@ def resolve_open_trades(
                 resolved += 1
                 break
     return resolved
+
+
+def _event_exit_time(
+    candle_time: pd.Timestamp, event: dict[str, Any]
+) -> pd.Timestamp:
+    """Gap fills occur at the candle open; other fills have hourly precision."""
+    if event.get("fill_reason") in {"GAP_THROUGH_STOP", "GAP_THROUGH_TARGET"}:
+        return candle_time
+    return candle_time + pd.Timedelta(hours=1)
 
 
 def _evaluate_candle(
@@ -755,27 +769,35 @@ def _update_dynamic_stop(trade: dict[str, Any], candle: pd.Series) -> None:
     risk = max(float(trade["initial_risk_price"]), 1e-9)
     direction = str(trade["direction"])
     current = float(trade["current_stop_price"])
+    close = float(candle["close"])
     mfe = float(trade.get("max_favorable_r", 0.0))
     cost_fraction = float(trade.get("stress_execution_cost_bps", 0.0)) / 10_000.0
     if mfe >= float(trade.get("breakeven_trigger_r", 2.0)):
         breakeven = entry * (
             1.0 + cost_fraction if direction == "LONG" else 1.0 - cost_fraction
         )
-        current = max(current, breakeven) if direction == "LONG" else min(current, breakeven)
-        trade["breakeven_armed"] = True
+        # Stop changes become active only after this candle has closed.
+        if (direction == "LONG" and breakeven < close) or (
+            direction == "SHORT" and breakeven > close
+        ):
+            current = max(current, breakeven) if direction == "LONG" else min(current, breakeven)
+            trade["breakeven_armed"] = True
     if mfe >= float(trade.get("trailing_trigger_r", 3.0)):
         trail = max(
             float(trade.get("entry_atr", risk))
             * float(trade.get("trailing_atr_multiplier", 1.0)),
             risk * 0.25,
         )
-        if direction == "LONG":
-            candidate = float(candle["high"]) - trail
-            current = max(current, candidate)
-        else:
-            candidate = float(candle["low"]) + trail
-            current = min(current, candidate)
-        trade["trailing_armed"] = True
+        candidate = (
+            float(candle["high"]) - trail
+            if direction == "LONG"
+            else float(candle["low"]) + trail
+        )
+        if (direction == "LONG" and candidate < close) or (
+            direction == "SHORT" and candidate > close
+        ):
+            current = max(current, candidate) if direction == "LONG" else min(current, candidate)
+            trade["trailing_armed"] = True
     trade["current_stop_price"] = float(current)
 
 
@@ -786,6 +808,7 @@ def _close_trade(
     outcome: str,
     closed_at: pd.Timestamp,
     fill_reason: str | None = None,
+    evidence_available_at: pd.Timestamp | None = None,
 ) -> None:
     entry = float(trade["entry_price"])
     direction = str(trade["direction"])
@@ -856,6 +879,13 @@ def _close_trade(
     risk_budget = max(float(trade.get("risk_budget_usd", 0.0)), 1e-9)
     realized_r = net_pnl / risk_budget
     final_outcome = outcome
+    exit_time_basis = (
+        "CANDLE_OPEN"
+        if fill_reason in {"GAP_THROUGH_STOP", "GAP_THROUGH_TARGET"}
+        else "CANDLE_CLOSE"
+        if outcome == "TIME_EXIT"
+        else "INTRABAR_END_BOUND"
+    )
     if outcome == "TIME_EXIT":
         final_outcome = "TIME_EXIT_WIN" if net_pnl > 0 else "TIME_EXIT_LOSS"
     trade.update(
@@ -863,6 +893,10 @@ def _close_trade(
             "status": "CLOSED",
             "outcome": final_outcome,
             "closed_at": _utc(closed_at).isoformat(),
+            "exit_time_basis": exit_time_basis,
+            "exit_evidence_available_at": _utc(
+                evidence_available_at if evidence_available_at is not None else closed_at
+            ).isoformat(),
             "exit_price": float(exit_price),
             "fill_reason": fill_reason,
             "gross_aligned_return": float(aligned_return),
