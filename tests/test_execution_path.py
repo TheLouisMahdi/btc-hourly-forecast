@@ -124,6 +124,38 @@ class ExecutionPathTests(unittest.TestCase):
         self.assertEqual(trade["status"], "CLOSED")
         self.assertEqual(trade["outcome"], "TARGET")
 
+    def test_first_full_candle_gap_stop_has_open_fill_time(self) -> None:
+        trade = self._trade()
+        candles = pd.DataFrame(
+            [
+                {
+                    "open_time": "2026-01-01T01:00:00Z",
+                    "open": 100.0,
+                    "high": 106.0,
+                    "low": 97.0,
+                    "close": 98.0,
+                },
+                {
+                    "open_time": "2026-01-01T02:00:00Z",
+                    "open": 98.0,
+                    "high": 98.4,
+                    "low": 97.8,
+                    "close": 98.1,
+                },
+            ]
+        )
+        self.assertEqual(resolve_open_trades_after_entry([trade], candles, self.settings), 1)
+        self.assertEqual(trade["outcome"], "STOP")
+        self.assertEqual(trade["fill_reason"], "GAP_THROUGH_STOP")
+        self.assertEqual(trade["exit_price"], 98.0)
+        self.assertEqual(trade["closed_at"], "2026-01-01T02:00:00+00:00")
+        self.assertEqual(trade["exit_time_basis"], "CANDLE_OPEN")
+        self.assertEqual(
+            trade["exit_evidence_available_at"], "2026-01-01T03:00:00+00:00"
+        )
+        self.assertEqual(trade["first_evaluable_candle_open"], "2026-01-01T02:00:00+00:00")
+        self.assertFalse(trade["partial_entry_candle_used_for_barriers"])
+
     def test_retraced_long_candle_does_not_arm_unmarketable_stop(self) -> None:
         trade = self._trade()
         trade.update(
