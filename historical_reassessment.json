@@ -1,0 +1,306 @@
+{
+  "schema_version": 1,
+  "generated_at": "2026-10-10T16:15:39.959Z",
+  "report_type": "HISTORICAL_REASSESSMENT_NOT_COUNTERFACTUAL_BACKTEST",
+  "recorded_ledger_untouched": true,
+  "current_policy": "Direction-only forecasts cannot open new entries without a structural event. Previously opened positions continue through their existing exit lifecycle.",
+  "original_closed_trades": {
+    "closed_trades": 25,
+    "winning_trades": 12,
+    "losing_or_flat_trades": 13,
+    "net_pnl_usd": -27.549562,
+    "gross_wins_usd": 37.252733,
+    "gross_losses_usd": -64.802294,
+    "profit_factor": 0.574867,
+    "realized_close_only_max_drawdown_usd": 45.42427,
+    "execution_costs_usd": 53.649076
+  },
+  "historically_structural_subset": {
+    "closed_trades": 4,
+    "winning_trades": 3,
+    "losing_or_flat_trades": 1,
+    "net_pnl_usd": 15.785555,
+    "gross_wins_usd": 16.396924,
+    "gross_losses_usd": -0.611369,
+    "profit_factor": 26.820015,
+    "realized_close_only_max_drawdown_usd": 0.611369,
+    "execution_costs_usd": 8.73922
+  },
+  "historically_model_only_subset": {
+    "closed_trades": 21,
+    "winning_trades": 9,
+    "losing_or_flat_trades": 12,
+    "net_pnl_usd": -43.335117,
+    "gross_wins_usd": 20.855808,
+    "gross_losses_usd": -64.190925,
+    "profit_factor": 0.324903,
+    "realized_close_only_max_drawdown_usd": 45.549434,
+    "execution_costs_usd": 44.909856
+  },
+  "historically_profitable_but_now_blocked_entries": 9,
+  "currently_open_trades_are_not_repriced": [
+    "daabbbbac296bcd186d2"
+  ],
+  "previously_replayed_trades_retained_when_candles_roll_off": true,
+  "closed_trades_with_hourly_exit_replay": 0,
+  "replay_warning": "Initial backfill of all recorded outcomes and historical policy classifications. The next scheduled runtime will attach eligible hourly exit replay estimates.",
+  "entries": [
+    {
+      "trade_id": "c2c1546dcc71ccc4d5d7",
+      "event_type": "RESISTANCE_BREAKOUT_LONG",
+      "recorded_direction": "LONG",
+      "opened_at": "2026-08-04T15:16:12.830880+00:00",
+      "closed_at": "2026-08-07T16:00:00+00:00",
+      "original_net_pnl_usd": 8.789871486670025,
+      "historical_policy_class": "STRUCTURAL_ENTRY_CANDIDATE_RECHECK_OTHER_GATES",
+      "recorded_result_is_immutable": true
+    },
+    {
+      "trade_id": "fba52bc21dcaae295591",
+      "event_type": "SUPPORT_BREAKDOWN_SHORT",
+      "recorded_direction": "LONG",
+      "opened_at": "2026-09-28T15:21:40.020336+00:00",
+      "closed_at": "2026-09-28T17:00:00+00:00",
+      "original_net_pnl_usd": 6.870520299529246,
+      "historical_policy_class": "STRUCTURAL_ENTRY_CANDIDATE_RECHECK_OTHER_GATES",
+      "recorded_result_is_immutable": true
+    },
+    {
+      "trade_id": "263eb73bdb9ac507bc35",
+      "event_type": "NONE",
+      "recorded_direction": "SHORT",
+      "opened_at": "2026-09-29T02:01:04.937815+00:00",
+      "closed_at": "2026-09-29T09:00:00+00:00",
+      "original_net_pnl_usd": -10.565800405481827,
+      "historical_policy_class": "MODEL_ONLY_ENTRY_BLOCKED_BY_NEW_POLICY",
+      "recorded_result_is_immutable": true
+    },
+    {
+      "trade_id": "ccde44becda6009f3f33",
+      "event_type": "NONE",
+      "recorded_direction": "LONG",
+      "opened_at": "2026-09-29T15:07:37.894754+00:00",
+      "closed_at": "2026-09-29T19:00:00+00:00",
+      "original_net_pnl_usd": -2.4835405443410843,
+      "historical_policy_class": "MODEL_ONLY_ENTRY_BLOCKED_BY_NEW_POLICY",
+      "recorded_result_is_immutable": true
+    },
+    {
+      "trade_id": "3d7e9547ccf89bcd70be",
+      "event_type": "NONE",
+      "recorded_direction": "SHORT",
+      "opened_at": "2026-09-29T20:01:17.925735+00:00",
+      "closed_at": "2026-09-30T01:00:00+00:00",
+      "original_net_pnl_usd": 1.0179123530027137,
+      "historical_policy_class": "MODEL_ONLY_ENTRY_BLOCKED_BY_NEW_POLICY",
+      "recorded_result_is_immutable": true
+    },
+    {
+      "trade_id": "71a746da1789a25fcc7f",
+      "event_type": "NONE",
+      "recorded_direction": "LONG",
+      "opened_at": "2026-09-30T02:27:47.336981+00:00",
+      "closed_at": "2026-09-30T05:00:00+00:00",
+      "original_net_pnl_usd": 0.006165632006567723,
+      "historical_policy_class": "MODEL_ONLY_ENTRY_BLOCKED_BY_NEW_POLICY",
+      "recorded_result_is_immutable": true
+    },
+    {
+      "trade_id": "00de4f6e92fdd6f76237",
+      "event_type": "NONE",
+      "recorded_direction": "LONG",
+      "opened_at": "2026-09-30T09:02:16.634096+00:00",
+      "closed_at": "2026-09-30T11:00:00+00:00",
+      "original_net_pnl_usd": 12.472970672062905,
+      "historical_policy_class": "MODEL_ONLY_ENTRY_BLOCKED_BY_NEW_POLICY",
+      "recorded_result_is_immutable": true
+    },
+    {
+      "trade_id": "76a35d0e364f80a06671",
+      "event_type": "NONE",
+      "recorded_direction": "LONG",
+      "opened_at": "2026-09-30T15:57:51.181791+00:00",
+      "closed_at": "2026-09-30T20:00:00+00:00",
+      "original_net_pnl_usd": -0.9414243083603577,
+      "historical_policy_class": "MODEL_ONLY_ENTRY_BLOCKED_BY_NEW_POLICY",
+      "recorded_result_is_immutable": true
+    },
+    {
+      "trade_id": "27d3c21ee65618b0d6d5",
+      "event_type": "NONE",
+      "recorded_direction": "LONG",
+      "opened_at": "2026-09-30T20:50:43.331305+00:00",
+      "closed_at": "2026-10-01T08:00:00+00:00",
+      "original_net_pnl_usd": 2.7080336559566938,
+      "historical_policy_class": "MODEL_ONLY_ENTRY_BLOCKED_BY_NEW_POLICY",
+      "recorded_result_is_immutable": true
+    },
+    {
+      "trade_id": "fa1361150fdea56a8867",
+      "event_type": "NONE",
+      "recorded_direction": "LONG",
+      "opened_at": "2026-10-01T13:57:39.801476+00:00",
+      "closed_at": "2026-10-01T15:00:00+00:00",
+      "original_net_pnl_usd": -7.323859585057928,
+      "historical_policy_class": "MODEL_ONLY_ENTRY_BLOCKED_BY_NEW_POLICY",
+      "recorded_result_is_immutable": true
+    },
+    {
+      "trade_id": "560bac54f17d28edf71c",
+      "event_type": "NONE",
+      "recorded_direction": "LONG",
+      "opened_at": "2026-10-01T19:34:39.849569+00:00",
+      "closed_at": "2026-10-02T02:00:00+00:00",
+      "original_net_pnl_usd": -0.5679595012944001,
+      "historical_policy_class": "MODEL_ONLY_ENTRY_BLOCKED_BY_NEW_POLICY",
+      "recorded_result_is_immutable": true
+    },
+    {
+      "trade_id": "851116eaa8f7bea8bf5f",
+      "event_type": "NONE",
+      "recorded_direction": "SHORT",
+      "opened_at": "2026-10-02T02:37:02.999649+00:00",
+      "closed_at": "2026-10-02T04:00:00+00:00",
+      "original_net_pnl_usd": -7.045690164027635,
+      "historical_policy_class": "MODEL_ONLY_ENTRY_BLOCKED_BY_NEW_POLICY",
+      "recorded_result_is_immutable": true
+    },
+    {
+      "trade_id": "f91c0b59d0eeb8daca44",
+      "event_type": "NONE",
+      "recorded_direction": "SHORT",
+      "opened_at": "2026-10-02T09:03:17.675468+00:00",
+      "closed_at": "2026-10-02T11:00:00+00:00",
+      "original_net_pnl_usd": -7.1778024753901075,
+      "historical_policy_class": "MODEL_ONLY_ENTRY_BLOCKED_BY_NEW_POLICY",
+      "recorded_result_is_immutable": true
+    },
+    {
+      "trade_id": "757f41a72a91b6a588e1",
+      "event_type": "NONE",
+      "recorded_direction": "LONG",
+      "opened_at": "2026-10-02T15:53:04.692991+00:00",
+      "closed_at": "2026-10-02T18:00:00+00:00",
+      "original_net_pnl_usd": -7.876549852271698,
+      "historical_policy_class": "MODEL_ONLY_ENTRY_BLOCKED_BY_NEW_POLICY",
+      "recorded_result_is_immutable": true
+    },
+    {
+      "trade_id": "9259997b3bdb14eb2e64",
+      "event_type": "NONE",
+      "recorded_direction": "LONG",
+      "opened_at": "2026-10-02T20:47:53.121555+00:00",
+      "closed_at": "2026-10-03T05:00:00+00:00",
+      "original_net_pnl_usd": 0.9634972075647827,
+      "historical_policy_class": "MODEL_ONLY_ENTRY_BLOCKED_BY_NEW_POLICY",
+      "recorded_result_is_immutable": true
+    },
+    {
+      "trade_id": "6e6dcf5a23fa8ebf3996",
+      "event_type": "NONE",
+      "recorded_direction": "LONG",
+      "opened_at": "2026-10-03T05:22:18.733788+00:00",
+      "closed_at": "2026-10-03T15:00:00+00:00",
+      "original_net_pnl_usd": 1.1925518806057838,
+      "historical_policy_class": "MODEL_ONLY_ENTRY_BLOCKED_BY_NEW_POLICY",
+      "recorded_result_is_immutable": true
+    },
+    {
+      "trade_id": "71bc23b0103e020f7fdf",
+      "event_type": "NONE",
+      "recorded_direction": "SHORT",
+      "opened_at": "2026-10-03T18:42:46.709048+00:00",
+      "closed_at": "2026-10-03T21:00:00+00:00",
+      "original_net_pnl_usd": -1.2249760406088812,
+      "historical_policy_class": "MODEL_ONLY_ENTRY_BLOCKED_BY_NEW_POLICY",
+      "recorded_result_is_immutable": true
+    },
+    {
+      "trade_id": "f47e8b660adb7504e365",
+      "event_type": "NONE",
+      "recorded_direction": "LONG",
+      "opened_at": "2026-10-03T21:49:19.359282+00:00",
+      "closed_at": "2026-10-04T07:00:00+00:00",
+      "original_net_pnl_usd": 1.149249530605796,
+      "historical_policy_class": "MODEL_ONLY_ENTRY_BLOCKED_BY_NEW_POLICY",
+      "recorded_result_is_immutable": true
+    },
+    {
+      "trade_id": "4a34b9b5f43fba507994",
+      "event_type": "NONE",
+      "recorded_direction": "SHORT",
+      "opened_at": "2026-10-04T12:53:47.875384+00:00",
+      "closed_at": "2026-10-04T16:00:00+00:00",
+      "original_net_pnl_usd": -7.00502480167233,
+      "historical_policy_class": "MODEL_ONLY_ENTRY_BLOCKED_BY_NEW_POLICY",
+      "recorded_result_is_immutable": true
+    },
+    {
+      "trade_id": "4b457d3fb231eb62898e",
+      "event_type": "RESISTANCE_BREAKOUT_LONG",
+      "recorded_direction": "LONG",
+      "opened_at": "2026-10-04T17:37:26.189600+00:00",
+      "closed_at": "2026-10-04T21:00:00+00:00",
+      "original_net_pnl_usd": -0.6113689605212809,
+      "historical_policy_class": "STRUCTURAL_ENTRY_CANDIDATE_RECHECK_OTHER_GATES",
+      "recorded_result_is_immutable": true
+    },
+    {
+      "trade_id": "3db5eb1b6984c3880c52",
+      "event_type": "RESISTANCE_BREAKOUT_LONG",
+      "recorded_direction": "LONG",
+      "opened_at": "2026-10-04T23:38:03.258877+00:00",
+      "closed_at": "2026-10-05T03:00:00+00:00",
+      "original_net_pnl_usd": 0.7365326719684551,
+      "historical_policy_class": "STRUCTURAL_ENTRY_CANDIDATE_RECHECK_OTHER_GATES",
+      "recorded_result_is_immutable": true
+    },
+    {
+      "trade_id": "41317a7b2228d1bec020",
+      "event_type": "NONE",
+      "recorded_direction": "LONG",
+      "opened_at": "2026-10-05T09:38:55.073270+00:00",
+      "closed_at": "2026-10-05T12:00:00+00:00",
+      "original_net_pnl_usd": 0.48657312823289134,
+      "historical_policy_class": "MODEL_ONLY_ENTRY_BLOCKED_BY_NEW_POLICY",
+      "recorded_result_is_immutable": true
+    },
+    {
+      "trade_id": "567d0302909710bf9572",
+      "event_type": "NONE",
+      "recorded_direction": "LONG",
+      "opened_at": "2026-10-05T18:52:12.442332+00:00",
+      "closed_at": "2026-10-05T21:00:00+00:00",
+      "original_net_pnl_usd": 0.8588542265872356,
+      "historical_policy_class": "MODEL_ONLY_ENTRY_BLOCKED_BY_NEW_POLICY",
+      "recorded_result_is_immutable": true
+    },
+    {
+      "trade_id": "768dffecfbde9411bb4b",
+      "event_type": "NONE",
+      "recorded_direction": "LONG",
+      "opened_at": "2026-10-06T00:51:19.809079+00:00",
+      "closed_at": "2026-10-06T03:00:00+00:00",
+      "original_net_pnl_usd": -4.517719086182614,
+      "historical_policy_class": "MODEL_ONLY_ENTRY_BLOCKED_BY_NEW_POLICY",
+      "recorded_result_is_immutable": true
+    },
+    {
+      "trade_id": "dc9afea0cb1eef55a1c3",
+      "event_type": "NONE",
+      "recorded_direction": "LONG",
+      "opened_at": "2026-10-06T19:52:29.320015+00:00",
+      "closed_at": "2026-10-07T02:00:00+00:00",
+      "original_net_pnl_usd": -7.460578678456749,
+      "historical_policy_class": "MODEL_ONLY_ENTRY_BLOCKED_BY_NEW_POLICY",
+      "recorded_result_is_immutable": true
+    }
+  ],
+  "limitations": [
+    "Recorded outcomes, fills, historical forecasts and live-learning labels are NOT rewritten.",
+    "Exit replay is based on immutable recorded entries and available hourly candles.",
+    "This is not a counterfactual trading-strategy backtest: blocked entries change later opportunities and learning.",
+    "The currently open position remains managed by the live runtime, regardless of its original entry class.",
+    "No intrahour execution timing or missing older candle paths can be reconstructed from hourly OHLC."
+  ]
+}
