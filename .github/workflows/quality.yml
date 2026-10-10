@@ -6,7 +6,6 @@ on:
   push:
     branches:
       - main
-      - fix/model-only-entry-evidence-20261010
   pull_request:
     branches:
       - main
