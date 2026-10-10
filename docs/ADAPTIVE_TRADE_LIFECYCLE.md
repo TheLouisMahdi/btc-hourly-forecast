@@ -58,3 +58,7 @@ No exchange order is submitted by this repository.
 ## Model-only entry eligibility
 
 When no confirmed structural event exists, the position action is always `WAIT`. Event-only continuation, tradeability, and expected-return heads have no validated trade label for a model-direction-only row; even a positive event-only qualification cannot authorize these entries. The general UP/DOWN forecast is still published. Confirmed structural events retain the existing risk-scaled advisory policy. To enable model-only entries in the future, build and independently validate an economic model for non-event rows.
+
+## Candle-close stop activation safety
+
+Break-even and trailing changes are evaluated after the full hourly candle is complete. A newly proposed LONG stop must remain strictly below that candle's closing price; a SHORT stop must remain strictly above it. When the candle retraces through a proposed level, the existing stop remains in force instead of assuming that an invalid stop order can be placed retroactively. Historical entries and already resolved paper trades are not rewritten.
