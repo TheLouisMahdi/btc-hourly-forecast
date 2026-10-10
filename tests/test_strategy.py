@@ -226,6 +226,39 @@ class StrategyRiskPolicyTests(unittest.TestCase):
             {20.0, 30.0, 40.0},
         )
 
+    def test_model_only_without_qualification_cannot_open(self) -> None:
+        decision = make_decision(
+            _row(is_event=0, event_direction=0, event_type="NONE"),
+            _prediction(success=0.80, tradeability=0.80, event_return=0.01),
+            _unqualified_bundle(),
+            self.settings,
+        )
+        self.assertEqual(decision.action, "WAIT")
+        self.assertIn("MODEL_ONLY_UNQUALIFIED", decision.blockers)
+        self.assertEqual(decision.trade_plan["status"], "BLOCKED")
+
+    def test_model_only_below_stress_cost_buffer_cannot_open(self) -> None:
+        decision = make_decision(
+            _row(is_event=0, event_direction=0, event_type="NONE"),
+            _prediction(event_return=0.0),
+            _qualified_bundle(),
+            self.settings,
+        )
+        self.assertEqual(decision.action, "WAIT")
+        self.assertIn("MODEL_ONLY_INSUFFICIENT_EDGE", decision.blockers)
+        self.assertIn("INSUFFICIENT_STRESS_NET_EDGE", decision.trade_plan["soft_risk_flags"])
+
+    def test_stale_model_only_entry_is_blocked(self) -> None:
+        decision = make_decision(
+            _row(is_event=0, event_direction=0, event_type="NONE"),
+            _prediction(event_return=0.01),
+            _qualified_bundle(),
+            self.settings,
+            data_health={"model_stale": True},
+        )
+        self.assertEqual(decision.action, "WAIT")
+        self.assertIn("MODEL_ONLY_STALE", decision.blockers)
+
     def test_missing_invalidation_uses_atr_stop_with_risk_penalty(self) -> None:
         decision = make_decision(
             _row(breakout_invalidation_level=None),
@@ -242,7 +275,7 @@ class StrategyRiskPolicyTests(unittest.TestCase):
         )
         self.assertGreater(decision.trade_plan["stop_percent"], 0.0)
 
-    def test_down_model_signal_executes_short(self) -> None:
+    def test_unqualified_down_model_signal_is_not_executed(self) -> None:
         prediction = _prediction(
             success=0.72,
             tradeability=0.70,
@@ -264,9 +297,10 @@ class StrategyRiskPolicyTests(unittest.TestCase):
             self.settings,
         )
 
-        self.assertEqual(decision.action, "SHORT")
+        self.assertEqual(decision.action, "WAIT")
+        self.assertIn("MODEL_ONLY_UNQUALIFIED", decision.blockers)
         self.assertEqual(decision.trade_plan["model_trade_direction"], "SHORT")
-        self.assertEqual(decision.trade_plan["execution_direction"], "SHORT")
+        self.assertEqual(decision.trade_plan["execution_direction"], "WAIT")
         self.assertGreater(
             decision.trade_plan["stop_price"],
             decision.trade_plan["entry_reference"],
