@@ -137,6 +137,19 @@ def compare_replays(baseline: dict, candidate: dict) -> dict:
             }
         )
     resolved = [t for t in paired if t["both_resolved"]]
+    structural = [
+        trade for trade in resolved
+        if trade["event_type"] in {
+            "RESISTANCE_BREAKOUT_LONG", "SUPPORT_BREAKDOWN_SHORT"
+        }
+    ]
+    model_only = [
+        trade for trade in resolved if trade not in structural
+    ]
+    matched_observed = sum(
+        abs(trade["baseline_net_pnl_usd"] - trade["recorded_observed_pnl_usd"]) < 1e-6
+        for trade in resolved
+    )
     return {
         "analysis_type": "SAME_RECORDED_ENTRIES_EXIT_REPLAY_ONLY",
         "warning": (
@@ -148,6 +161,18 @@ def compare_replays(baseline: dict, candidate: dict) -> dict:
         ),
         "paired_resolved": len(resolved),
         "eligible_entries": len(paired),
+        "baseline_matches_recorded_net_pnl_count": matched_observed,
+        "replayed_structural_entries": len(structural),
+        "replayed_model_only_entries_blocked_by_new_entry_policy": len(model_only),
+        "structural_entry_baseline_net_pnl_usd": round(
+            sum(t["baseline_net_pnl_usd"] for t in structural), 6
+        ),
+        "structural_entry_candidate_net_pnl_usd": round(
+            sum(t["candidate_net_pnl_usd"] for t in structural), 6
+        ),
+        "structural_entry_exit_delta_usd": round(
+            sum(t["delta_net_pnl_usd"] for t in structural), 6
+        ),
         "candidate_minus_baseline_net_pnl_usd": round(
             sum(t["delta_net_pnl_usd"] for t in resolved), 6
         ),
