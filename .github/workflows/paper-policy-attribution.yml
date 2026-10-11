@@ -47,6 +47,7 @@ jobs:
         run: |
           PYTHONPATH=src python -m unittest discover -s tests -p test_paper_policy_attribution.py -v
           PYTHONPATH=src python -m unittest discover -s tests -p test_recorded_exit_replay.py -v
+          PYTHONPATH=src python -m unittest discover -s tests -p test_backtest_readiness.py -v
 
       - name: Build immutable-source comparison report
         run: |
@@ -54,6 +55,10 @@ jobs:
             --trades observed-state/trades.json \
             --candles observed-state/chart_candles.json \
             --output attribution-report
+
+      - name: Audit frozen history coverage before backtesting
+        run: |
+          python scripts/audit_backtest_readiness.py             --history observed-state/history.json             --candles observed-state/chart_candles.json             --trades observed-state/trades.json             --output attribution-report/backtest_readiness.json
 
       - name: Replay recorded entries with baseline and candidate exit code
         run: |
