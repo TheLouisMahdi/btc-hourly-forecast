@@ -82,6 +82,7 @@ class AggressiveRiskContractTests(unittest.TestCase):
             "model_id": "directional-breakout-hourly-test",
             "event_id": "V5-TEST-LONG",
             "event_type": "RESISTANCE_BREAKOUT_LONG",
+            "expected_net_edge_bps": 15.5,
             "candle_time": "2026-08-05T10:00:00+00:00",
             "run_finished_at": "2026-08-05T11:01:00+00:00",
             "trade_plan": {
@@ -102,6 +103,8 @@ class AggressiveRiskContractTests(unittest.TestCase):
                 "soft_risk_flags": ["MODEL_NOT_QUALIFIED"],
                 "qualification_passed": False,
                 "direction_qualified": False,
+                "economic_policy_available": False,
+                "minimum_required_net_edge_bps": 12.0,
                 "modeled_total_risk_usd": 20.0,
                 "gap_risk_buffer_bps": 6.0,
                 "label_execution_aligned": False,
@@ -135,6 +138,45 @@ class AggressiveRiskContractTests(unittest.TestCase):
             trade["soft_risk_flags"],
             ["MODEL_NOT_QUALIFIED"],
         )
+        self.assertFalse(trade["economic_policy_available"])
+        self.assertEqual(trade["expected_net_edge_bps"], 15.5)
+        self.assertEqual(trade["minimum_required_net_edge_bps"], 12.0)
+
+    def test_missing_economic_entry_evidence_is_not_fabricated(self) -> None:
+        record = {
+            "action": "LONG",
+            "candle_time": "2026-08-05T10:00:00+00:00",
+            "trade_plan": {
+                "status": "ACTIONABLE",
+                "entry_reference": 100.0,
+                "stop_price": 99.0,
+                "target_price": 105.0,
+            },
+        }
+        trade = open_trade_with_context(record)
+        self.assertIsNotNone(trade)
+        assert trade is not None
+        self.assertNotIn("economic_policy_available", trade)
+        self.assertNotIn("expected_net_edge_bps", trade)
+        self.assertNotIn("minimum_required_net_edge_bps", trade)
+
+    def test_nonfinite_expected_edge_is_not_saved(self) -> None:
+        record = {
+            "action": "LONG",
+            "expected_net_edge_bps": float("nan"),
+            "trade_plan": {
+                "status": "ACTIONABLE",
+                "entry_reference": 100.0,
+                "stop_price": 99.0,
+                "target_price": 105.0,
+                "economic_policy_available": True,
+            },
+        }
+        trade = open_trade_with_context(record)
+        self.assertIsNotNone(trade)
+        assert trade is not None
+        self.assertTrue(trade["economic_policy_available"])
+        self.assertNotIn("expected_net_edge_bps", trade)
 
 
 if __name__ == "__main__":
