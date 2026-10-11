@@ -1,142 +1,55 @@
 <div align="center">
 
-<img src="docs/assets/candlestick-loop.svg" alt="Animated BTC breakout chart" width="100%" />
+<img src="docs/assets/candlestick-loop.svg" alt="Bitcoin candlesticks" width="100%" />
 
-<br />
+# BTC Rule-Based Spot Paper Trader
 
-<a href="https://thelouismahdi.github.io/btc-hourly-forecast/">
-  <img src="https://img.shields.io/badge/OPEN_LIVE_DASHBOARD-GITHUB_PAGES-6f9b91?style=for-the-badge&logo=githubpages&logoColor=ffffff" alt="Open live dashboard" />
-</a>
+**Deterministic BTC-USD research. No model training, AI inference or exchange orders.**
 
-<br /><br />
+[Live paper dashboard](https://thelouismahdi.github.io/btc-hourly-forecast/) | [Methodology](docs/RULE_BASED_STRATEGY.md) | [Legacy AI documentation](docs/LEGACY_AI_README.md)
 
-<a href="https://github.com/TheLouisMahdi/btc-hourly-forecast/actions/workflows/forecast.yml">
-  <img src="https://github.com/TheLouisMahdi/btc-hourly-forecast/actions/workflows/forecast.yml/badge.svg?branch=main" alt="Hourly BTC forecast status" />
-</a>
-<a href="https://github.com/TheLouisMahdi/btc-hourly-forecast/actions/workflows/retrain.yml">
-  <img src="https://github.com/TheLouisMahdi/btc-hourly-forecast/actions/workflows/retrain.yml/badge.svg?branch=main" alt="On-demand BTC model retraining status" />
-</a>
-<a href="https://github.com/TheLouisMahdi/btc-hourly-forecast/actions/workflows/dashboard.yml">
-  <img src="https://github.com/TheLouisMahdi/btc-hourly-forecast/actions/workflows/dashboard.yml/badge.svg?branch=main" alt="Dashboard deployment status" />
-</a>
-<a href="https://github.com/TheLouisMahdi/btc-hourly-forecast/actions/workflows/quality.yml">
-  <img src="https://github.com/TheLouisMahdi/btc-hourly-forecast/actions/workflows/quality.yml/badge.svg?branch=main" alt="Repository quality status" />
-</a>
-
-<br /><br />
-
-<img src="https://img.shields.io/badge/version-5.6.0-8f8ab8?style=flat-square" alt="Version 5.6.0" />
-<img src="https://img.shields.io/badge/Python-3.11%2B-3776ab?style=flat-square&logo=python&logoColor=white" alt="Python 3.11 or newer" />
-<img src="https://img.shields.io/badge/training-no_random_sampling-6f9b91?style=flat-square" alt="No random sampling" />
-<img src="https://img.shields.io/badge/mode-paper_trading_only-c99078?style=flat-square" alt="Paper trading only" />
+![Version](https://img.shields.io/badge/version-5.6.0-6f9b91) ![Mode](https://img.shields.io/badge/mode-PAPER_ONLY-9fbcaa)
 
 </div>
 
-# BTC Adaptive Directional Breakout Trader
+## Active architecture
 
-<div align="center">
+The **hourly GitHub workflow** runs only scripts/rule_based.py, and its **dashboard workflow** runs only scripts/render_rules_dashboard.py. Both use the separate rule-state branch. Old AI training modules, historical model-state and forecast-state records remain archived for comparison, **not imported by the new runtime**. The retrain workflow is legacy manual tooling only.
 
-### Structural intelligence. Adaptive risk. Verifiable outcomes.
+This is a fixed-hypothesis system, **not an experimentally proven best Bitcoin strategy**. No live or out-of-sample profitable performance is claimed. No trading API credentials are required.
 
-An always-on Bitcoin market intelligence platform that converts the model's hourly directional decision into auditable risk-scaled paper positions while using market structure as decision context.
+## Strategy
 
-</div>
+* Product: Coinbase BTC-USD spot, long or cash, **never short or leverage**.
+* Only finalized **hourly candles** are accepted.
+* **Buy** if the closed price breaks the prior 55-candle Donchian high and exceeds EMA(200), with ATR(14)/price between 0.2% and 6%.
+* **Exit** for an ATR-based simulated stop, a close below the prior 20-candle low or a close below EMA(200).
+* **Position sizing**: at most 0.5% of available paper cash at the initial stop distance and at most 50% of paper cash allocated. Stop distance is 3 × ATR(14).
+* Default paper assumptions: 15 bps trading fee and 3 bps slippage **per side**, not a claim about Coinbase's actual fee tier.
+* Malformed or stale market data causes **FAIL_SAFE**. After missed cycles, the paper engine safely resyncs while flat or exits an open simulated position at the fresh quote, without inventing historical fills.
+* These stops exist **only in the simulation** and are evaluated using completed candles. They are **not broker stop orders**.
 
-## Market Intelligence, Delivered Hourly
+## Run locally
 
-BTC Adaptive Directional Breakout Trader is a research-grade decision platform built to identify meaningful resistance breakouts and support breakdowns while filtering weak, duplicated, stale, or operationally unsafe signals.
+Python 3.11 or newer; standard library only for the new runtime.
 
-The system combines hourly directional prediction, structural market context, adaptive target-and-stop planning, execution-aware risk controls, and continuous outcome tracking in one automated research environment. A confirmed structural event is required for a new paper entry; direction-only predictions remain available as forecasts but do not authorize positions. Meta-model evidence can still adjust risk.
+```bash
+python -m unittest discover -s tests -p 'test_rule_based.py' -v
+python scripts/rule_based.py --state-dir .rule_state
+python scripts/render_rules_dashboard.py
+```
 
-Its primary product is a persistent paper position with a frozen entry reference, target, stop-loss, risk allocation, holding window, and immutable final outcome. A secondary public forecast tracks the direction and likely closing range of the next completed one-hour candle.
+The first command performs offline tests. The second requests public Coinbase market data and writes isolated paper-state JSON. The third builds site/index.html.
 
-## Live Research Snapshot
+The scheduled workflow is .github/workflows/forecast.yml, running every 15 minutes and on main-branch pushes; deployment uses .github/workflows/dashboard.yml. For broken, discontinuous or stale market data, the workflow enters FAIL_SAFE until fresh valid data is available. After a missed execution interval with valid market data, the engine closes an open simulated position at the current quote or resyncs a flat state. It never fabricates retrospective fills.
 
-<div align="center">
+## Backtest
 
-<a href="https://thelouismahdi.github.io/btc-hourly-forecast/">
-  <img src="https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fraw.githubusercontent.com%2FTheLouisMahdi%2Fbtc-hourly-forecast%2Fforecast-state%2Flatest.json&query=%24.run_status&label=System+Status&style=for-the-badge&color=6f9b91&cacheSeconds=300" alt="Live system status" />
-</a>
-<a href="https://thelouismahdi.github.io/btc-hourly-forecast/">
-  <img src="https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fraw.githubusercontent.com%2FTheLouisMahdi%2Fbtc-hourly-forecast%2Fforecast-state%2Flatest.json&query=%24.action&label=Live+Position&style=for-the-badge&color=8f8ab8&cacheSeconds=300" alt="Live paper position" />
-</a>
-<a href="https://thelouismahdi.github.io/btc-hourly-forecast/">
-  <img src="https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fraw.githubusercontent.com%2FTheLouisMahdi%2Fbtc-hourly-forecast%2Fforecast-state%2Flatest.json&query=%24.next_candle_direction&label=Next+1H+Bias&style=for-the-badge&color=c99078&cacheSeconds=300" alt="Next one-hour directional bias" />
-</a>
-<a href="https://thelouismahdi.github.io/btc-hourly-forecast/">
-  <img src="https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fraw.githubusercontent.com%2FTheLouisMahdi%2Fbtc-hourly-forecast%2Fforecast-state%2Flatest.json&query=%24.direction_result&label=Forecast+Result&style=for-the-badge&color=6f9b91&cacheSeconds=300" alt="Latest resolved forecast result" />
-</a>
+```bash
+python scripts/backtest_rules.py hourly_ohlcv.csv --out-of-sample-fraction 0.30
+```
 
-<br /><br />
 
-<a href="https://thelouismahdi.github.io/btc-hourly-forecast/">
-  <img src="https://img.shields.io/badge/VIEW_FULL_LIVE_ANALYTICS-DASHBOARD-1f2937?style=for-the-badge&logo=bitcoin&logoColor=ffffff" alt="View full live analytics" />
-</a>
+Required CSV columns: time (UTC epoch seconds), open, high, low, close, volume. Candles must be hourly, sorted, complete and gap-free. Signals use closed bars and **next bar's opening price**, with assumed transaction costs. The out-of-sample segment uses the most recent 30% of candles. Avoid searching dozens of parameters and then reporting the best historical result.
 
-</div>
-
-The live indicators above are sourced from the latest public forecast snapshot and refresh automatically. The dashboard provides the complete market context, active-position lifecycle, forecast history, resolved outcomes, model status, and risk information.
-
-**Public live records:** [Latest forecast](https://github.com/TheLouisMahdi/btc-hourly-forecast/blob/forecast-state/latest.json) · [Forecast history](https://github.com/TheLouisMahdi/btc-hourly-forecast/blob/forecast-state/history.json) · [Paper-position ledger](https://github.com/TheLouisMahdi/btc-hourly-forecast/blob/forecast-state/trades.json) · [Model metrics](https://github.com/TheLouisMahdi/btc-hourly-forecast/blob/model-state/latest_metrics.csv)
-
-**Historical reassessment:** [Research-only trade replay and prior-results audit](https://github.com/TheLouisMahdi/btc-hourly-forecast/blob/forecast-state/historical_reassessment.json) is generated by the live forecast cycle. The recorded trade ledger remains unchanged; replay estimates are labeled and never treated as realized earnings. The dashboard also links this report after the first generated snapshot.
-
-## Product Capabilities
-
-| Capability | Business value |
-|---|---|
-| **Structural Context Engine** | Detects resistance breakouts and support breakdowns across multiple market scales and uses them to adjust risk around the model's directional decision. |
-| **Independent Long and Short Intelligence** | Models upside and downside events separately, allowing each direction to learn its own market behavior and risk profile. |
-| **Adaptive Position Lifecycle** | Maintains one auditable paper position from entry through target, stop-loss, breakeven, trailing management, or time exit. |
-| **Risk-Scaled Decisioning** | Adjusts paper risk according to event quality, confidence, tradeability, economic edge, volatility, data health, and negative-pattern evidence. |
-| **Continuous Evaluation** | Scores forecasts only after the exact target candle closes and preserves completed outcomes without retroactive rewriting. |
-| **Auditable Research Operations** | Provides explicit manual workflows for quality validation, hourly cycles, dashboard deployment and policy-driven challenger training. |
-
-## Maintenance mode
-
-GitHub Actions workflows are currently manual-only. This prevents overlapping scheduled runs while repository structure and data resilience are validated. The supported execution order is documented in [Repository structure](docs/REPOSITORY_STRUCTURE.md).
-
-## Built for Trust, Not Hype
-
-The platform is designed around causal inputs and auditable decisions. Future candles are never used as predictors, historical validation remains chronological, synthetic event duplication is prohibited, and model challengers cannot replace the active champion unless they pass locked economic and negative-memory validation gates.
-
-Operational safeguards can prevent a new position when candle data is unhealthy, the execution quote is stale or unavailable, providers are inconsistent, the direction is unavailable, short execution is disabled, or another position is still active. Direction-only model outputs do not authorize new paper positions without an event. For confirmed structural events, qualification, meta-model and duplicate-event concerns adjust risk under the paper policy.
-
-Every published position and forecast remains attributable to the model, event, market timestamp, data provider, execution assumptions, and risk contract that created it.
-
-## Verifiable Product Contracts
-
-The commercial surface is backed by explicit machine-tested contracts rather than marketing-only claims:
-
-- Structural opportunities are classified as `RESISTANCE_BREAKOUT_LONG` or `SUPPORT_BREAKDOWN_SHORT`.
-- Directional model inventory requires at least `2,000 unique` events per side with `sampling: NONE`.
-- Published champion identifiers follow the `directional-breakout-hourly-` model family.
-- The secondary public product is bound to the exact `NEXT_CLOSED_1H_CANDLE`.
-- Completed direction outcomes are immutable as `DIRECTION_CORRECT` or `DIRECTION_WRONG`; interval outcomes remain independently immutable as `IN_RANGE` or `OUT_OF_RANGE`.
-
-## Commercial Direction
-
-This project is being developed as a foundation for real-time Bitcoin market intelligence, quantitative research dashboards, signal-quality analysis, auditable paper-trading operations, and future decision-support products.
-
-The platform is intentionally transparent about uncertainty. It does not present backtests as guaranteed performance, does not place live orders, and does not claim profitability. Its commercial value is built around disciplined research infrastructure, explainable market context, continuous measurement, and verifiable public outcomes.
-
-## Current Product Scope
-
-| Area | Current scope |
-|---|---|
-| Market | Bitcoin spot and compatible BTC market data |
-| Decision cadence | Closed one-hour candles |
-| Primary output | Long, Short, Hold, or Wait paper-position lifecycle |
-| Secondary output | Exact next closed one-hour candle direction and likely close range |
-| Execution mode | Paper trading only |
-| Public transparency | Live dashboard, forecast history, position ledger, and model metrics |
-
-## Research Notice
-
-This repository is an experimental quantitative-research system. Forecasts, probabilities, target prices, stop prices, expected values, and dashboard outputs are research estimates rather than financial advice or guarantees of future performance.
-
-## Proprietary Rights
-
-Copyright © 2026 **TheLouisMahdi**. All rights reserved.
-
-This repository is proprietary and is not open-source software. Reuse, copying, modification, redistribution, commercial or non-commercial deployment, derivative work, dataset creation, or model training requires prior written permission and clear attribution under the terms of the repository [LICENSE](LICENSE).
+**Decision to deploy with real capital must be separate from this PR.** Live fills, actual fees, data resiliency, market regimes and long out-of-sample outcomes require independent validation.

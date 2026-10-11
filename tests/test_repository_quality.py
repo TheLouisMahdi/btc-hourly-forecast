@@ -146,34 +146,20 @@ class RepositoryQualityTests(unittest.TestCase):
             readme,
         )
 
-    def test_readme_documents_immutable_outcomes(self) -> None:
+    def test_readme_documents_rule_based_runtime(self) -> None:
         root = Path(__file__).resolve().parents[1]
-        readme = (root / "README.md").read_text(
-            encoding="utf-8"
-        )
-        for required in (
-            "NEXT_CLOSED_1H_CANDLE",
-            "DIRECTION_CORRECT",
-            "DIRECTION_WRONG",
-            "IN_RANGE",
-            "OUT_OF_RANGE",
-            "immutable",
+        readme = (root / "README.md").read_text(encoding="utf-8")
+        for expected in (
+            "No model training",
+            "rule-state",
+            "Donchian",
+            "EMA",
+            "ATR",
+            "PAPER_ONLY",
+            "scripts/rule_based.py",
+            "scripts/backtest_rules.py",
         ):
-            self.assertIn(required, readme)
-
-    def test_readme_documents_directional_event_contract(self) -> None:
-        root = Path(__file__).resolve().parents[1]
-        readme = (root / "README.md").read_text(
-            encoding="utf-8"
-        )
-        for required in (
-            "RESISTANCE_BREAKOUT_LONG",
-            "SUPPORT_BREAKDOWN_SHORT",
-            "2,000 unique",
-            "sampling: NONE",
-            "directional-breakout-hourly-",
-        ):
-            self.assertIn(required, readme)
+            self.assertIn(expected, readme)
 
     def test_dashboard_contains_project_identity(self) -> None:
         root = Path(__file__).resolve().parents[1]
@@ -302,14 +288,14 @@ class RepositoryQualityTests(unittest.TestCase):
             root / ".github" / "workflows" / "forecast.yml"
         ).read_text(encoding="utf-8")
         self.assertIn(
-            "python scripts/github_hourly_forecast.py",
+            "python scripts/rule_based.py --state-dir .rule_state",
             workflow,
         )
         self.assertNotIn(
             "python scripts/github_structural_forecast.py",
             workflow,
         )
-        self.assertIn('cron: "17,47 * * * *"', workflow)
+        self.assertIn('cron: "7,22,37,52 * * * *"', workflow)
         self.assertNotIn("inputs.allow_retrain", workflow)
         self.assertNotIn("gh workflow run retrain.yml", workflow)
 

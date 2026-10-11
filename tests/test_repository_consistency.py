@@ -102,8 +102,9 @@ class RepositoryConsistencyTests(unittest.TestCase):
 
         forecast = workflows["forecast.yml"]
         self.assertIn("\n  schedule:\n", forecast)
-        self.assertIn('cron: "17,47 * * * *"', forecast)
-        self.assertNotIn("\n  push:\n", forecast)
+        self.assertIn('cron: "7,22,37,52 * * * *"', forecast)
+        self.assertIn("\n  push:\n", forecast)
+        self.assertIn("\n      - main\n", forecast)
         self.assertNotIn("\n  workflow_run:\n", forecast)
         self.assertNotIn("gh workflow run retrain.yml", forecast)
         self.assertNotIn("inputs.allow_retrain", forecast)
@@ -124,18 +125,18 @@ class RepositoryConsistencyTests(unittest.TestCase):
         workflow = (
             self.root / ".github" / "workflows" / "forecast.yml"
         ).read_text(encoding="utf-8")
-        self.assertIn("python scripts/github_hourly_forecast.py", workflow)
+        self.assertIn("python scripts/rule_based.py --state-dir .rule_state", workflow)
         self.assertNotIn("python scripts/github_structural_forecast.py", workflow)
         self.assertNotIn("gh workflow run retrain.yml", workflow)
         self.assertNotIn("inputs.allow_retrain", workflow)
-        self.assertIn('cron: "17,47 * * * *"', workflow)
+        self.assertIn('cron: "7,22,37,52 * * * *"', workflow)
 
     def test_dashboard_workflow_has_one_render_entry_point(self) -> None:
         workflow = (
             self.root / ".github" / "workflows" / "dashboard.yml"
         ).read_text(encoding="utf-8")
         self.assertIn(
-            "python scripts/render_dashboard.py --runtime-dir",
+            "python scripts/render_rules_dashboard.py",
             workflow,
         )
         for component in (
