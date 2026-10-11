@@ -8,7 +8,10 @@ from scripts.compare_observed_paper_trades import (
     compare,
     markdown_report,
     validate_ledger,
+    structural_alignment,
+    STRUCTURAL_EVENTS,
 )
+from btc_ema_trader.strategy import STRUCTURAL_EVENTS as STRATEGY_EVENTS
 
 
 def trade(
@@ -57,6 +60,28 @@ class PaperPolicyAttributionTests(unittest.TestCase):
         self.assertEqual(report["excluded_trade_ids"], ["winner", "loser"])
         self.assertIn("NOT_BACKTEST", report["analysis_type"])
         self.assertIn("not a backtest", markdown_report(report).lower())
+
+    def test_structural_events_match_live_policy(self) -> None:
+        self.assertEqual(STRUCTURAL_EVENTS, STRATEGY_EVENTS)
+
+    def test_structural_direction_breakdown_is_auditable(self) -> None:
+        rows = [
+            dict(trade("aligned-long", "RESISTANCE_BREAKOUT_LONG", 3.0, 2), direction="LONG"),
+            dict(trade("aligned-short", "TRIANGLE_BREAKDOWN_SHORT", -1.0, 3), direction="SHORT"),
+            dict(trade("mismatched", "SUPPORT_BREAKDOWN_SHORT", 7.0, 4), direction="LONG"),
+            dict(trade("triangle-long", "TRIANGLE_BREAKOUT_LONG", 2.0, 5), direction="LONG"),
+            trade("unknown", "RESISTANCE_BREAKOUT_LONG", 1.0, 6),
+            dict(trade("model", "NONE", -5.0, 7), direction="LONG"),
+        ]
+        report = compare(rows)
+        self.assertEqual(report["retained_structural_opportunities"]["closed_trades"], 5)
+        self.assertEqual(report["aligned_structural_opportunities"]["closed_trades"], 3)
+        self.assertEqual(report["aligned_structural_opportunities"]["net_pnl_usd"], 4.0)
+        self.assertEqual(report["mismatched_structural_opportunities"]["net_pnl_usd"], 7.0)
+        self.assertEqual(report["unknown_direction_structural_opportunities"]["closed_trades"], 1)
+        self.assertEqual(report["excluded_model_only_opportunities"]["closed_trades"], 1)
+        self.assertEqual(structural_alignment(rows[2]), "MISMATCHED")
+        self.assertIn("Mismatched structural", markdown_report(report))
 
     def test_profit_factor_without_losses_is_undefined(self) -> None:
         report = compare([trade("one", "SUPPORT_BREAKDOWN_SHORT", 1.0, 3)])
