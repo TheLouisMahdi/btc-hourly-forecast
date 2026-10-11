@@ -90,11 +90,11 @@ The live indicators above are sourced from the latest public forecast snapshot a
 | **Adaptive Position Lifecycle** | Maintains one auditable paper position from entry through target, stop-loss, breakeven, trailing management, or time exit. |
 | **Risk-Scaled Decisioning** | Adjusts paper risk according to event quality, confidence, tradeability, economic edge, volatility, data health, and negative-pattern evidence. |
 | **Continuous Evaluation** | Scores forecasts only after the exact target candle closes and preserves completed outcomes without retroactive rewriting. |
-| **Auditable Research Operations** | Provides explicit manual workflows for quality validation, hourly cycles, dashboard deployment and policy-driven challenger training. |
+| **Auditable Research Operations** | Runs scheduled forecasts and quality checks, deploys the dashboard after successful forecasts, and requires an explicit manual trigger for heavyweight challenger training. |
 
-## Maintenance mode
+## Scheduled paper operations
 
-GitHub Actions workflows are currently manual-only. This prevents overlapping scheduled runs while repository structure and data resilience are validated. The supported execution order is documented in [Repository structure](docs/REPOSITORY_STRUCTURE.md).
+The forecast workflow is scheduled for `HH:17` and `HH:47 UTC` (and can be run manually). Repository quality runs on pushes to `main`, pull requests and daily at `03:37 UTC`. A successful forecast triggers dashboard deployment. Heavyweight model retraining is **manual-only**: a `RETRAIN_RECOMMENDED` status is advisory and does **not** dispatch `retrain.yml`. Live paper trading remains enabled only under the entry rules implemented in the strategy; unqualified model evidence is currently risk-penalized rather than always blocked. The execution order is described in [Repository structure](docs/REPOSITORY_STRUCTURE.md).
 
 ## Built for Trust, Not Hype
 
