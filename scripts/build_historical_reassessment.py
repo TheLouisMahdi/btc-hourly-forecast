@@ -11,7 +11,12 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-from scripts.compare_observed_paper_trades import STRUCTURAL_EVENTS, metrics, validate_ledger
+from scripts.compare_observed_paper_trades import (
+    STRUCTURAL_EVENTS,
+    metrics,
+    structural_alignment,
+    validate_ledger,
+)
 from scripts.replay_recorded_exits import replay_entries
 
 SCHEMA_VERSION = 1
@@ -35,6 +40,9 @@ def build_reassessment(
     closed = validate_ledger(ledger)
     structural = [t for t in closed if t.get("event_type") in STRUCTURAL_EVENTS]
     model_only = [t for t in closed if t.get("event_type") not in STRUCTURAL_EVENTS]
+    aligned = [t for t in structural if structural_alignment(t) == "ALIGNED"]
+    mismatched = [t for t in structural if structural_alignment(t) == "MISMATCHED"]
+    unknown = [t for t in structural if structural_alignment(t) == "UNKNOWN_DIRECTION"]
     previous = previous if isinstance(previous, dict) else {}
     existing = {
         row.get("trade_id"): row
@@ -49,6 +57,7 @@ def build_reassessment(
             "trade_id": ident,
             "event_type": trade.get("event_type", "NONE"),
             "recorded_direction": trade.get("direction"),
+            "event_alignment": structural_alignment(trade),
             **_identity(trade),
             "historical_policy_class": (
                 "STRUCTURAL_ENTRY_CANDIDATE_RECHECK_OTHER_GATES"
@@ -97,6 +106,9 @@ def build_reassessment(
         ),
         "original_closed_trades": metrics(closed),
         "historically_structural_subset": metrics(structural),
+        "historically_aligned_structural_subset": metrics(aligned),
+        "historically_mismatched_structural_subset": metrics(mismatched),
+        "historically_unknown_direction_structural_subset": metrics(unknown),
         "historically_model_only_subset": metrics(model_only),
         "historically_profitable_but_now_blocked_entries": sum(
             float(t["realized_net_pnl_usd"]) > 0 for t in model_only
