@@ -214,6 +214,9 @@ def main() -> int:
         result = step(state, bars, quote, now)
         if result["action"] == "FAIL_SAFE":
             raise RuntimeError(result["reason"])
+        if result["action"] == "UNCHANGED":
+            print("Latest completed hour already processed; state unchanged")
+            return 0
         save(directory / "state.json", state)
         save(directory / "candles.json", bars[-168:])
         save(directory / "trades.json", state["trades"])
@@ -227,8 +230,9 @@ def main() -> int:
                  "reason": f"{type(exc).__name__}: {exc}",
                  "time": utc(now), "mode": "PAPER_ONLY"}
         save(directory / "latest.json", error)
+        print("::warning::Rule engine entered FAIL_SAFE; no paper orders placed")
         print(json.dumps(error, indent=2))
-        return 1
+        return 0
 
 
 if __name__ == "__main__":
