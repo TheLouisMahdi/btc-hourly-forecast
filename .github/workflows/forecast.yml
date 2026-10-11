@@ -1,120 +1,49 @@
 name: Hourly BTC forecast
-run-name: Hourly BTC forecast · ${{ github.event_name }}
+run-name: BTC rule-based spot paper trader · ${{ github.event_name }}
 
 on:
   workflow_dispatch:
   schedule:
-    - cron: "17,47 * * * *"
+    - cron: "17 * * * *"
 
 permissions:
   contents: write
 
 concurrency:
-  group: hourly-btc-forecast
+  group: hourly-btc-rule-based
   cancel-in-progress: false
 
 jobs:
   forecast:
     runs-on: ubuntu-latest
-    timeout-minutes: 35
+    timeout-minutes: 15
     steps:
       - name: Checkout project
         uses: actions/checkout@v6
-        with:
-          fetch-depth: 1
 
       - name: Set up Python
         uses: actions/setup-python@v6
         with:
           python-version: "3.11"
-          cache: pip
-          cache-dependency-path: requirements-github.txt
 
-      - name: Install runtime dependencies
-        run: |
-          python -m pip install --upgrade pip
-          python -m pip install -r requirements-github.txt
-          python -m pip install -e . --no-deps
+      - name: Run offline rule-engine tests
+        run: python -m unittest tests.test_rule_based -v
 
-      - name: Restore forecast and trade ledger
+      - name: Restore isolated rule-only paper state
         shell: bash
         run: |
-          mkdir -p .github_state
-          if git ls-remote --exit-code --heads origin forecast-state >/dev/null 2>&1; then
-            git fetch origin forecast-state --depth=1
-            git show origin/forecast-state:history.json > .github_state/history.json 2>/dev/null || printf '[]\n' > .github_state/history.json
-            git show origin/forecast-state:latest.json > .github_state/latest.json 2>/dev/null || printf '{}\n' > .github_state/latest.json
-            git show origin/forecast-state:trades.json > .github_state/trades.json 2>/dev/null || printf '[]\n' > .github_state/trades.json
-            git show origin/forecast-state:retrain_control.json > .github_state/retrain_control.json 2>/dev/null || printf '{}\n' > .github_state/retrain_control.json
-            git show origin/forecast-state:chart_candles.json > .github_state/chart_candles.json 2>/dev/null || printf '[]\n' > .github_state/chart_candles.json
-            git show origin/forecast-state:historical_reassessment.json > .github_state/historical_reassessment.json 2>/dev/null || printf '{}\n' > .github_state/historical_reassessment.json
-          else
-            printf '[]\n' > .github_state/history.json
-            printf '{}\n' > .github_state/latest.json
-            printf '[]\n' > .github_state/trades.json
-            printf '{}\n' > .github_state/retrain_control.json
-            printf '[]\n' > .github_state/chart_candles.json
-            printf '{}\n' > .github_state/historical_reassessment.json
-          fi
-
-      - name: Restore batch champion, memories and trade assistant
-        shell: bash
-        run: |
-          mkdir -p .model_state
-          if git ls-remote --exit-code --heads origin model-state >/dev/null 2>&1; then
-            git fetch origin model-state --depth=1
-            for file in latest.joblib latest_training_report.json latest_metrics.csv model_metadata.json negative_memory.joblib negative_memory_report.json trade_assistant_meta.joblib trade_assistant_patterns.joblib trade_assistant_meta_report.json trade_assistant_pattern_report.json; do
-              git show "origin/model-state:${file}" > ".model_state/${file}" 2>/dev/null || rm -f ".model_state/${file}"
+          mkdir -p .rule_state
+          if git ls-remote --exit-code --heads origin rule-state >/dev/null 2>&1; then
+            git fetch origin rule-state --depth=1
+            for file in state.json candles.json latest.json history.json trades.json; do
+              git show "origin/rule-state:$file" > ".rule_state/$file" 2>/dev/null || true
             done
           fi
 
-      - name: Restore adaptive learners
-        shell: bash
-        run: |
-          mkdir -p .adaptive_state
-          if git ls-remote --exit-code --heads origin adaptive-state >/dev/null 2>&1; then
-            git fetch origin adaptive-state --depth=1
-            for file in adaptive_state.joblib price_adaptive_state.joblib trade_adaptive_state.joblib candle_pattern_memory.joblib summary.json price_summary.json trade_summary.json; do
-              git show "origin/adaptive-state:${file}" > ".adaptive_state/${file}" 2>/dev/null || rm -f ".adaptive_state/${file}"
-            done
-          fi
+      - name: Run deterministic BTC spot paper cycle
+        run: python scripts/rule_based.py --state-dir .rule_state
 
-      - name: Run canonical trade-assistant cycle
-        env:
-          BTC_TRADE_ASSISTANT_RUNTIME: "1"
-        run: python scripts/github_hourly_forecast.py
-
-      - name: Export recent closed candles for dashboard chart
-        run: |
-          python scripts/export_chart_candles.py \
-            --runtime-dir .github_runtime/hourly \
-            --state-dir .github_state \
-            --hours 168
-
-      - name: Publish non-mutating historical replay assessment
-        run: |
-          python -m scripts.build_historical_reassessment \
-            --trades .github_state/trades.json \
-            --candles .github_state/chart_candles.json \
-            --previous .github_state/historical_reassessment.json \
-            --output .github_state/historical_reassessment.json
-
-      - name: Resolve secondary next-candle outcomes
-        run: python scripts/github_dashboard.py
-
-      - name: Evaluate retraining recommendation
-        run: |
-          python scripts/github_retrain_policy.py \
-            --state-dir .github_state \
-            --adaptive-state-dir .adaptive_state \
-            --model-state-dir .model_state
-
-      - name: Persist forecast and trade state
+      - name: Save isolated paper state
         env:
           GITHUB_TOKEN: ${{ github.token }}
-        run: bash scripts/push_snapshot_branch.sh forecast-state .github_state
-
-      - name: Persist adaptive learners
-        env:
-          GITHUB_TOKEN: ${{ github.token }}
-        run: bash scripts/push_snapshot_branch.sh adaptive-state .adaptive_state
+        run: bash scripts/push_snapshot_branch.sh rule-state .rule_state
