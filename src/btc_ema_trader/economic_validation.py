@@ -196,6 +196,15 @@ def _evaluate_pair(
         return _failed(len(rows), f"only {len(rows)} OOF events; 200 required")
     split = min(max(int(len(rows) * DEV_FRACTION), 120), len(rows) - 60)
     dev, holdout = rows.iloc[:split].copy(), rows.iloc[split:].copy()
+    # Event labels use the next horizon full hourly candles. The last label
+    # must be observable before the first holdout event starts.
+    holdout_start = pd.Timestamp(holdout["open_time"].iloc[0])
+    label_available_at = (
+        pd.to_datetime(dev["open_time"], utc=True)
+        + pd.Timedelta(hours=horizon + 1)
+    )
+    dev = dev.loc[label_available_at <= holdout_start].copy()
+    purged_development_events = split - len(dev)
     success_cal = _fit_calibration(dev["p_continuation"], dev["actual_continuation"])
     trade_cal = _fit_calibration(dev["p_tradeable"], dev["actual_tradeable"])
     dev = _prepare(dev, success_cal, trade_cal, base_bps, stress_bps)
@@ -220,6 +229,7 @@ def _evaluate_pair(
         "event_samples": len(rows),
         "development_samples": len(dev),
         "holdout_samples": len(holdout),
+        "purged_development_events": purged_development_events,
         "policy": policy,
         "development": dev_stats,
         "holdout": hold_stats,
