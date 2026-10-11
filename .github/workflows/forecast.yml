@@ -3,8 +3,11 @@ run-name: BTC rule-based spot paper trader · ${{ github.event_name }}
 
 on:
   workflow_dispatch:
+  push:
+    branches:
+      - main
   schedule:
-    - cron: "17 * * * *"
+    - cron: "7,22,37,52 * * * *"
 
 permissions:
   contents: write
