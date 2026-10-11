@@ -302,14 +302,14 @@ class RepositoryQualityTests(unittest.TestCase):
             root / ".github" / "workflows" / "forecast.yml"
         ).read_text(encoding="utf-8")
         self.assertIn(
-            "python scripts/github_hourly_forecast.py",
+            "python scripts/rule_based.py --state-dir .rule_state",
             workflow,
         )
         self.assertNotIn(
             "python scripts/github_structural_forecast.py",
             workflow,
         )
-        self.assertIn('cron: "17,47 * * * *"', workflow)
+        self.assertIn('cron: "17 * * * *"', workflow)
         self.assertNotIn("inputs.allow_retrain", workflow)
         self.assertNotIn("gh workflow run retrain.yml", workflow)
 
