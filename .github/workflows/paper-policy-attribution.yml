@@ -58,7 +58,11 @@ jobs:
 
       - name: Audit frozen history coverage before backtesting
         run: |
-          python scripts/audit_backtest_readiness.py             --history observed-state/history.json             --candles observed-state/chart_candles.json             --trades observed-state/trades.json             --output attribution-report/backtest_readiness.json
+          python scripts/audit_backtest_readiness.py \
+            --history observed-state/history.json \
+            --candles observed-state/chart_candles.json \
+            --trades observed-state/trades.json \
+            --output attribution-report/backtest_readiness.json
 
       - name: Replay recorded entries with baseline and candidate exit code
         run: |
