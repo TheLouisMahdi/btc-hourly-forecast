@@ -153,13 +153,25 @@ def step(state: dict, bars: list[dict], quote: float, now: int) -> dict:
     index = len(bars) - 1
     bar = bars[index]
     candle_time = bar["time"]
-    if state.get("last_candle") is not None and candle_time <= state["last_candle"]:
+    last_candle = state.get("last_candle")
+    repeat = last_candle is not None and candle_time <= last_candle
+    missed = last_candle is not None and candle_time - last_candle > HOUR
+    if repeat and (state["qty"] <= 0 or quote > state["stop"]):
         return {"action": "UNCHANGED", "reason": "ALREADY_PROCESSED"}
-    if state.get("last_candle") is not None and candle_time - state["last_candle"] > HOUR:
-        return {"action": "FAIL_SAFE", "reason": "MISSED_CANDLE_MANUAL_REVIEW"}
     f = indicators(bars, index)
     action, reason = "FLAT", "NO_BREAKOUT"
-    if state["qty"] > 0:
+    if repeat:
+        sell(state, quote, "STOP_QUOTE", now, candle_time)
+        action, reason = "EXIT", "STOP_QUOTE"
+    elif missed:
+        # Never fabricate missed fills or start a new trade after an outage.
+        # Close an exposed paper position using the fresh quote, or resync cash.
+        if state["qty"] > 0:
+            sell(state, quote, "MISSED_CANDLE_EXIT", now, candle_time)
+            action, reason = "EXIT", "MISSED_CANDLE_EXIT"
+        else:
+            action, reason = "RESYNC", "MISSED_CANDLE_SKIPPED"
+    elif state["qty"] > 0:
         action, reason = "HOLD", "OPEN_POSITION"
         # A full candle must start after entry; no use of earlier intrabar lows.
         if quote <= state["stop"]:
