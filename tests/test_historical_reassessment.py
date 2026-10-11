@@ -61,6 +61,24 @@ class HistoricalReassessmentTests(unittest.TestCase):
                          "MODEL_ONLY_ENTRY_BLOCKED_BY_NEW_POLICY")
         self.assertNotEqual(row["exit_replay_estimate"]["net_pnl_usd"], 1.0)
 
+    def test_structural_alignment_is_reported_without_mutating_ledger(self) -> None:
+        trades = [
+            self._trade("aligned", "TRIANGLE_BREAKOUT_LONG"),
+            self._trade("mismatch", "SUPPORT_BREAKDOWN_SHORT"),
+            dict(self._trade("unknown", "RESISTANCE_BREAKOUT_LONG"), direction=None),
+        ]
+        original = copy.deepcopy(trades)
+        report = build_reassessment(trades, self._candles())
+        by_id = {entry["trade_id"]: entry for entry in report["entries"]}
+        self.assertEqual(trades, original)
+        self.assertEqual(report["historically_structural_subset"]["closed_trades"], 3)
+        self.assertEqual(report["historically_aligned_structural_subset"]["closed_trades"], 1)
+        self.assertEqual(report["historically_mismatched_structural_subset"]["closed_trades"], 1)
+        self.assertEqual(report["historically_unknown_direction_structural_subset"]["closed_trades"], 1)
+        self.assertEqual(by_id["aligned"]["event_alignment"], "ALIGNED")
+        self.assertEqual(by_id["mismatch"]["event_alignment"], "MISMATCHED")
+        self.assertEqual(by_id["unknown"]["event_alignment"], "UNKNOWN_DIRECTION")
+
     def test_rollover_preserves_prior_estimates(self) -> None:
         row = self._trade("old")
         first = build_reassessment([row], self._candles())
