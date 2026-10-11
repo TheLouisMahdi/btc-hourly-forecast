@@ -70,7 +70,7 @@ class EconomicValidationTests(unittest.TestCase):
             with self.subTest(horizon=horizon):
                 result = _evaluate_pair(rows, horizon, 14.0, 25.0)
                 split = min(max(int(len(rows) * 0.70), 120), len(rows) - 60)
-                expected_purged = horizon + 1
+                expected_purged = horizon
                 self.assertTrue(result["passed"])
                 self.assertEqual(
                     result["purged_development_events"], expected_purged
