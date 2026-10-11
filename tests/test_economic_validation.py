@@ -55,7 +55,7 @@ class EconomicValidationTests(unittest.TestCase):
         rows = pd.DataFrame(
             {
                 "open_time": pd.date_range(
-                    "2020-01-01", periods=240, freq="h", tz="UTC"
+                    "2020-01-01", periods=900, freq="h", tz="UTC"
                 ),
                 "p_continuation": 0.75,
                 "p_tradeable": 0.75,
