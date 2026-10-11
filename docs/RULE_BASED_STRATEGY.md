@@ -35,8 +35,8 @@ We simulate fees as 0.15% and slippage as 0.03% per side. The quote, candles and
 ## Data correctness and limitations
 
 - Never score a nonfinal candle, a stale quote, malformed OHLC or discontinuous candles.
-- On missed processing time, stop processing and require manual reconciliation. The rule-state branch does **not** reuse old model-state, forecast-state or adaptive-state.
-- Repeated invocations within the same completed candle do not open another trade. The previous ledger remains append-only for completed trades.
+- If GitHub misses an hourly run, the next valid cycle skips unknown opportunities while flat, or exits an existing simulated position at its fresh quote. It never invents fills during downtime. Malformed, stale or discontinuous market data still causes FAIL_SAFE. The rule-state branch does **not** reuse old model-state, forecast-state or adaptive-state.
+- Repeated invocations within the same completed candle do not open another trade, but do check for a breached stop using the latest quote. The previous ledger remains append-only for completed trades.
 - Stop monitoring is hourly rather than a real resting stop order. Intrabar order and outage behavior **can differ substantially**.
 - Coinbase Exchange public historical endpoint returns at most 300 candle buckets per request; requests are time-windowed to 290 hours.
 - There is no exchange authorization and absolutely no live order execution.
