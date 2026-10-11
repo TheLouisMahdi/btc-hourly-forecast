@@ -1,0 +1,24 @@
+{
+  "status": "ACTIVE",
+  "schema_version": 4,
+  "samples_seen": 26,
+  "learned_now": 0,
+  "active_trades": 0,
+  "resolved_trades": 26,
+  "target_hits": 0,
+  "stop_hits": 25,
+  "time_exits": 1,
+  "target_hit_rate": 0.0,
+  "net_pnl_usd": -34.79340852304576,
+  "average_r": -0.1411245402029642,
+  "updated_at": "2026-10-11T19:44:54.534313+00:00",
+  "source_model_ids": [
+    "directional-breakout-hourly-20260804T091016Z-fc3a2f87"
+  ],
+  "feature_count": 28,
+  "runtime_contract": "CANONICAL_GITHUB_RUNTIME_V2",
+  "profitable_trades": 12,
+  "losing_trades": 14,
+  "net_win_rate": 0.46153846153846156,
+  "entry_learning_target": "REALIZED_NET_PNL_SIGN"
+}
