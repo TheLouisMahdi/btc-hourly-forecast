@@ -43,12 +43,32 @@ class RuleEngineTests(unittest.TestCase):
         self.assertEqual(result["action"], "UNCHANGED")
         self.assertEqual(len(state["history"]), 1)
 
-    def test_skipped_candles_stop_new_orders(self):
+    def test_skipped_candles_resync_without_new_entry(self):
         state = new_state()
         state["last_candle"] = 295 * HOUR
         result = step(state, candles(), 115, 300 * HOUR)
-        self.assertEqual(result["action"], "FAIL_SAFE")
-        self.assertEqual(state["last_candle"], 295 * HOUR)
+        self.assertEqual(result["action"], "RESYNC")
+        self.assertEqual(state["last_candle"], 299 * HOUR)
+        self.assertEqual(state["qty"], 0)
+
+    def test_skipped_candles_close_open_paper_position(self):
+        state = new_state()
+        self.assertTrue(buy(state, 110, 1, 294 * HOUR, 295 * HOUR))
+        state["last_candle"] = 295 * HOUR
+        result = step(state, candles(), 114, 300 * HOUR)
+        self.assertEqual(result["action"], "EXIT")
+        self.assertEqual(result["reason"], "MISSED_CANDLE_EXIT")
+        self.assertEqual(state["qty"], 0)
+        self.assertEqual(len(state["trades"]), 1)
+
+    def test_stop_quote_checked_within_same_candle(self):
+        state, data = new_state(), candles()
+        self.assertTrue(buy(state, 110, 1, 299 * HOUR, 300 * HOUR))
+        step(state, data, 110, 300 * HOUR)
+        result = step(state, data, 106, 300 * HOUR + 900)
+        self.assertEqual(result["action"], "EXIT")
+        self.assertEqual(result["reason"], "STOP_QUOTE")
+        self.assertEqual(len(state["trades"]), 1)
 
     def test_open_position_exits_on_current_quote_below_stop(self):
         state = new_state()
