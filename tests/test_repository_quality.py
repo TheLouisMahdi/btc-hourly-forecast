@@ -295,7 +295,7 @@ class RepositoryQualityTests(unittest.TestCase):
             "python scripts/github_structural_forecast.py",
             workflow,
         )
-        self.assertIn('cron: "17 * * * *"', workflow)
+        self.assertIn('cron: "7,22,37,52 * * * *"', workflow)
         self.assertNotIn("inputs.allow_retrain", workflow)
         self.assertNotIn("gh workflow run retrain.yml", workflow)
 
