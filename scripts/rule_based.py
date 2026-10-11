@@ -162,7 +162,11 @@ def step(state: dict, bars: list[dict], quote: float, now: int) -> dict:
     if state["qty"] > 0:
         action, reason = "HOLD", "OPEN_POSITION"
         # A full candle must start after entry; no use of earlier intrabar lows.
-        if candle_time >= state["position"]["entry_time"]:
+        if quote <= state["stop"]:
+            # A current quote below the stop is not ignored while a candle is incomplete.
+            sell(state, quote, "STOP_QUOTE", now, candle_time)
+            action, reason = "EXIT", "STOP_QUOTE"
+        elif candle_time >= state["position"]["entry_time"]:
             if bar["low"] <= state["stop"]:
                 sell(state, min(bar["open"], state["stop"]), "STOP", now, candle_time)
                 action, reason = "EXIT", "STOP"
@@ -224,7 +228,7 @@ def main() -> int:
         save(directory / "latest.json", result)
         print(json.dumps(result, indent=2))
         return 0
-    except (OSError, ValueError, KeyError, RuntimeError) as exc:
+    except (OSError, ValueError, KeyError, RuntimeError, TypeError, IndexError) as exc:
         # No position/equity changes or synthetic fills when data is unhealthy.
         error = {"run_status": "FAIL_SAFE", "action": "NO_TRADE",
                  "reason": f"{type(exc).__name__}: {exc}",
