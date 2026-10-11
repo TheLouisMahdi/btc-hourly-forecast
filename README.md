@@ -22,9 +22,9 @@ This is a fixed-hypothesis system, **not an experimentally proven best Bitcoin s
 
 * Product: Coinbase BTC-USD spot, long or cash, **never short or leverage**.
 * Only finalized **hourly candles** are accepted.
-* **Buy** if the closed price breaks the prior 55-candle high and exceeds EMA(200), with ATR(14)/price between 0.2% and 6%.
+* **Buy** if the closed price breaks the prior 55-candle Donchian high and exceeds EMA(200), with ATR(14)/price between 0.2% and 6%.
 * **Exit** for an ATR-based simulated stop, a close below the prior 20-candle low or a close below EMA(200).
-* **Position sizing**: at most 0.5% of paper equity exposed to initial stop risk and at most 50% of paper cash allocated. Stop distance is 3 × ATR(14).
+* **Position sizing**: at most 0.5% of available paper cash at the initial stop distance and at most 50% of paper cash allocated. Stop distance is 3 × ATR(14).
 * Default paper assumptions: 15 bps trading fee and 3 bps slippage **per side**, not a claim about Coinbase's actual fee tier.
 * Any data gap, stale quote or missed processing hour causes **FAIL_SAFE** and requires manual reconciliation before resuming.
 * These stops exist **only in the simulation** and are evaluated using completed candles. They are **not broker stop orders**.
