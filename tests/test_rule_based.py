@@ -50,6 +50,17 @@ class RuleEngineTests(unittest.TestCase):
         self.assertEqual(result["action"], "FAIL_SAFE")
         self.assertEqual(state["last_candle"], 295 * HOUR)
 
+    def test_open_position_exits_on_current_quote_below_stop(self):
+        state = new_state()
+        data = candles()
+        self.assertTrue(buy(state, 110, 1, 298 * HOUR, 299 * HOUR))
+        stop = state["stop"]
+        result = step(state, data, stop - 1, 300 * HOUR)
+        self.assertEqual(result["action"], "EXIT")
+        self.assertEqual(result["reason"], "STOP_QUOTE")
+        self.assertEqual(state["qty"], 0)
+        self.assertEqual(len(state["trades"]), 1)
+
     def test_entry_signal_is_explicit(self):
         features = {"entry_high55": 100, "ema200": 90, "atr14": 2}
         self.assertTrue(entry_signal({"close": 105}, features))
