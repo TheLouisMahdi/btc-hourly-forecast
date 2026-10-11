@@ -65,7 +65,8 @@ def evaluate_policy(
         "reason": "NOT_REQUIRED",
         "status": "IDLE",
         "data_ready": data_ready,
-        "automatic": True,
+        "automatic": False,
+        "dispatch_mode": "MANUAL_WORKFLOW_DISPATCH",
     }
     if not bool(cfg["enabled"]):
         result.update(status="DISABLED", reason="AUTO_RETRAIN_DISABLED")
@@ -114,9 +115,8 @@ def evaluate_policy(
         }
     )
 
-    # Missing precision-meta artifacts are a legitimate challenger need, not a
-    # reason to weaken the primary one-hour forecast. Dispatch still requires
-    # the workflow caller to opt in with allow_retrain=true.
+    # Missing precision-meta artifacts justify a recommendation, but the
+    # heavyweight retraining workflow is only started by workflow_dispatch.
     if assistant_ready is False:
         return _request(result, "TRADE_ASSISTANT_ARTIFACT_MISSING")
 
@@ -248,7 +248,7 @@ def main() -> int:
 
 def _request(result: dict[str, Any], reason: str) -> dict[str, Any]:
     output = dict(result)
-    output.update(required=True, reason=reason, status="AUTO_REQUESTED")
+    output.update(required=True, reason=reason, status="RETRAIN_RECOMMENDED")
     return output
 
 
