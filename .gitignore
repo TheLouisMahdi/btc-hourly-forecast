@@ -5,6 +5,7 @@ __pycache__/
 *.egg-info/
 .github_runtime/
 .github_state/
+.rule_state/
 .model_state/
 .adaptive_state/
 .dashboard_runtime/
