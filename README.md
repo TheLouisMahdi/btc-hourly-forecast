@@ -26,7 +26,7 @@ This is a fixed-hypothesis system, **not an experimentally proven best Bitcoin s
 * **Exit** for an ATR-based simulated stop, a close below the prior 20-candle low or a close below EMA(200).
 * **Position sizing**: at most 0.5% of available paper cash at the initial stop distance and at most 50% of paper cash allocated. Stop distance is 3 × ATR(14).
 * Default paper assumptions: 15 bps trading fee and 3 bps slippage **per side**, not a claim about Coinbase's actual fee tier.
-* Any data gap, stale quote or missed processing hour causes **FAIL_SAFE** and requires manual reconciliation before resuming.
+* Malformed or stale market data causes **FAIL_SAFE**. After missed cycles, the paper engine safely resyncs while flat or exits an open simulated position at the fresh quote, without inventing historical fills.
 * These stops exist **only in the simulation** and are evaluated using completed candles. They are **not broker stop orders**.
 
 ## Run locally
@@ -41,7 +41,7 @@ python scripts/render_rules_dashboard.py
 
 The first command performs offline tests. The second requests public Coinbase market data and writes isolated paper-state JSON. The third builds site/index.html.
 
-The scheduled workflow is .github/workflows/forecast.yml; deployment uses .github/workflows/dashboard.yml. To reset a stuck FAIL_SAFE after a missed candle, inspect and explicitly reconcile the active paper position and last processed timestamp in rule-state. **Never silently skip unknown price history.**
+The scheduled workflow is .github/workflows/forecast.yml, running every 15 minutes and on main-branch pushes; deployment uses .github/workflows/dashboard.yml. For broken, discontinuous or stale market data, the workflow enters FAIL_SAFE until fresh valid data is available. After a missed execution interval with valid market data, the engine closes an open simulated position at the current quote or resyncs a flat state. It never fabricates retrospective fills.
 
 ## Backtest
 
