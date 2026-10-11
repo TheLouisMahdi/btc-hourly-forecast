@@ -13,9 +13,28 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 
-STRUCTURAL_EVENTS = frozenset(
-    {"RESISTANCE_BREAKOUT_LONG", "SUPPORT_BREAKDOWN_SHORT"}
-)
+STRUCTURAL_EVENT_DIRECTIONS = {
+    "RESISTANCE_BREAKOUT_LONG": "LONG",
+    "TRIANGLE_BREAKOUT_LONG": "LONG",
+    "SUPPORT_BREAKDOWN_SHORT": "SHORT",
+    "TRIANGLE_BREAKDOWN_SHORT": "SHORT",
+}
+STRUCTURAL_EVENTS = frozenset(STRUCTURAL_EVENT_DIRECTIONS)
+
+
+def structural_alignment(trade: dict[str, Any]) -> str:
+    """Classify recorded entry direction without inferring an unrecorded action."""
+    event_type = str(trade.get("event_type") or "")
+    if event_type not in STRUCTURAL_EVENTS:
+        return "MODEL_ONLY"
+    direction = str(trade.get("direction") or "").upper()
+    if direction not in {"LONG", "SHORT"}:
+        return "UNKNOWN_DIRECTION"
+    return (
+        "ALIGNED"
+        if direction == STRUCTURAL_EVENT_DIRECTIONS[event_type]
+        else "MISMATCHED"
+    )
 LIMITATION = (
     "Fixed-opportunity historical attribution only, NOT a counterfactual backtest. "
     "Filtering a completed ledger does not model newly available entry opportunities, "
@@ -134,11 +153,17 @@ def compare(
     ledger = validate_ledger(trades)
     retained = [t for t in ledger if t.get("event_type") in STRUCTURAL_EVENTS]
     excluded = [t for t in ledger if t.get("event_type") not in STRUCTURAL_EVENTS]
+    aligned = [t for t in retained if structural_alignment(t) == "ALIGNED"]
+    mismatched = [t for t in retained if structural_alignment(t) == "MISMATCHED"]
+    unknown = [t for t in retained if structural_alignment(t) == "UNKNOWN_DIRECTION"]
     return {
         "analysis_type": "OBSERVED_LEDGER_ATTRIBUTION_NOT_BACKTEST",
         "limitation": LIMITATION,
         "original_recorded_opportunities": metrics(ledger),
         "retained_structural_opportunities": metrics(retained),
+        "aligned_structural_opportunities": metrics(aligned),
+        "mismatched_structural_opportunities": metrics(mismatched),
+        "unknown_direction_structural_opportunities": metrics(unknown),
         "excluded_model_only_opportunities": metrics(excluded),
         "excluded_profitable_trade_count": sum(
             _amount(t, "realized_net_pnl_usd") > 0 for t in excluded
@@ -160,6 +185,9 @@ def markdown_report(report: dict[str, Any]) -> str:
     rows = [
         ("Original", report["original_recorded_opportunities"]),
         ("Retained structural", report["retained_structural_opportunities"]),
+        ("Aligned structural", report["aligned_structural_opportunities"]),
+        ("Mismatched structural", report["mismatched_structural_opportunities"]),
+        ("Unknown-direction structural", report["unknown_direction_structural_opportunities"]),
         ("Excluded model-only", report["excluded_model_only_opportunities"]),
     ]
     output = [
