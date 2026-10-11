@@ -57,6 +57,9 @@ class RetrainPolicyTests(unittest.TestCase):
             decision["reason"],
             "TRADE_ASSISTANT_ARTIFACT_MISSING",
         )
+        self.assertEqual(decision["status"], "RETRAIN_RECOMMENDED")
+        self.assertEqual(decision["dispatch_mode"], "MANUAL_WORKFLOW_DISPATCH")
+        self.assertFalse(decision["automatic"])
 
     def test_old_model_requests_retraining(self) -> None:
         decision = evaluate_policy(
@@ -68,6 +71,7 @@ class RetrainPolicyTests(unittest.TestCase):
         )
         self.assertTrue(decision["required"])
         self.assertEqual(decision["reason"], "MODEL_AGE_LIMIT")
+        self.assertEqual(decision["status"], "RETRAIN_RECOMMENDED")
 
     def test_online_outperformance_requests_retraining(self) -> None:
         decision = evaluate_policy(

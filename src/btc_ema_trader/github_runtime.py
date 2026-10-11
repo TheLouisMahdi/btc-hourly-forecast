@@ -945,6 +945,20 @@ def open_trade_with_context(
     trade["direction_qualified"] = bool(
         trade.get("direction_qualified", False)
     )
+    # Preserve point-in-time economic evidence for future policy audits.
+    # Missing legacy fields must remain missing, not become false or zero.
+    if isinstance(plan.get("economic_policy_available"), bool):
+        trade["economic_policy_available"] = plan["economic_policy_available"]
+    for field, value in (
+        ("expected_net_edge_bps", record.get("expected_net_edge_bps")),
+        (
+            "minimum_required_net_edge_bps",
+            plan.get("minimum_required_net_edge_bps"),
+        ),
+    ):
+        number = _finite(value, float("nan"))
+        if math.isfinite(number):
+            trade[field] = number
 
     trade["selected_horizon"] = record.get(
         "trade_selected_horizon",

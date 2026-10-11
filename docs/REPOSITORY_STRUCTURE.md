@@ -51,7 +51,7 @@ See `docs/TRADE_ASSISTANT_ARCHITECTURE.md` for the full data, qualification and 
 
 ### Hourly BTC forecast
 
-- Automatic schedule: every hour at `HH:12 UTC` using `12 * * * *`.
+- Automatic schedule: twice per hour, at `HH:17` and `HH:47 UTC`, using `17,47 * * * *`.
 - Manual execution remains available.
 - Each run restores the latest model and adaptive state, fetches fresh closed-market data, resolves previous outcomes, runs the trade-assistant cycle and persists the new forecast/adaptive state.
 - The workflow may calculate a retraining recommendation for visibility, but it cannot dispatch retraining.
@@ -78,12 +78,12 @@ See `docs/TRADE_ASSISTANT_ARCHITECTURE.md` for the full data, qualification and 
 
 ## Normal operation
 
-1. `Hourly BTC forecast` runs at `HH:12 UTC`.
+1. `Hourly BTC forecast` runs at `HH:17` and `HH:47 UTC`.
 2. A successful forecast automatically triggers `Deploy BTC dashboard`.
 3. `Repository quality` continuously validates changes to `main` and also performs the daily safety run.
 4. `On-demand BTC model retraining` runs only when explicitly started by a person.
 
-A one-time manual retrain is required before the new precision meta filter can authorize future positions. Until a qualified meta artifact exists, the one-hour forecast remains available and new positions stay experimentally blocked.
+The retraining policy records `RETRAIN_RECOMMENDED` when a challenger is needed, but does not launch one. The current aggressive risk-scaled strategy can still produce paper entries with unqualified model or missing meta evidence, subject to its other gates. These entries are risk-penalized, not categorically prohibited. Model qualification and economic validation must be reviewed before interpreting such entries as profitable signals.
 
 The dashboard has one public renderer: `scripts/render_dashboard.py`. The older `github_*_dashboard.py` files are deterministic internal components, not workflow entry points.
 
