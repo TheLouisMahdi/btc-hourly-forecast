@@ -86,6 +86,34 @@ class ComparisonTests(unittest.TestCase):
         self.assertEqual(later[0]["end"], comp.epoch("2025-10-25"))
         self.assertGreaterEqual(later[1]["start"], comp.epoch("2025-12-15"))
 
+    def test_cross_granularity_audit_reports_disagreement(self):
+        sample = self.hours[:24]
+        day = [{"time": sample[0]["time"],
+                "open": sample[0]["open"], "high": sample[0]["high"],
+                "low": sample[0]["low"], "close": sample[-1]["close"],
+                "volume": 1.0}]
+        report = comp.cross_granularity_audit(sample, day)
+        self.assertEqual(report["full_days_compared"], 1)
+        self.assertAlmostEqual(report["max_open_disagreement_bps"], 0)
+        day[0]["close"] *= 1.01
+        changed = comp.cross_granularity_audit(sample, day)
+        self.assertEqual(changed["days_with_endpoint_disagreement_over_10bps"], 1)
+
+    def test_zero_profit_factor_is_not_hidden_as_na(self):
+        outcome = comp.summarize(10000, 9900, [9900],
+                                  [{"pnl_usd": -100.0}], 1, 1)
+        self.assertEqual(outcome["profit_factor"], 0.0)
+        miniature = {"periods": [{"start": "2024-01-01", "end_exclusive": "2024-01-02",
+                                   "days": 1, "cost_scenarios": [{
+                                       "fee_bps_per_side": 15,
+                                       "strategies": {"loser": outcome}}]}],
+                     "missing_hour_intervals": [], "missing_daily_intervals": [],
+                     "cross_granularity_audit": {}, "hourly_input_sha256": "x",
+                     "daily_input_sha256": "y", "exclusions": []}
+        rendered = comp.markdown(miniature)
+        self.assertIn("| loser | -1.0 |", rendered)
+        self.assertIn("| 1 | 0.0 |", rendered)
+
     def test_bad_daily_data_not_filled_or_traded(self):
         days = [x for x in self.days if x["time"] != comp.epoch("2025-08-01")]
         with self.assertRaisesRegex(ValueError, "Missing daily SMA200"):
