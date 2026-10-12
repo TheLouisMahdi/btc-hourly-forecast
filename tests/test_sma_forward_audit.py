@@ -51,7 +51,7 @@ class SMAForwardAuditTests(unittest.TestCase):
         self.assertEqual(source, original, "audit must not mutate the actual paper ledger")
 
     def test_missing_open_reference_does_not_guess_price(self):
-        payload = monitor.audit(source_state(), {}, START + paper.DAY + 100,
+        payload = monitor.audit(source_state(), {}, START + paper.DAY + 1000,
                                 fetch_open=lambda *_: None)
         row = payload["executions"][0]
         self.assertEqual(row["status"], "PENDING_REFERENCE")
@@ -129,7 +129,7 @@ class SMAForwardAuditTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "different SMA settings"):
             monitor.audit(s, prior, START + paper.DAY + 3600,
                           fetch_open=lambda *_: 99.)
-        s["latest"]["equity_usd"] += 1
+        s["latest"] = dict(s["latest"], equity_usd=s["latest"]["equity_usd"] + 1)
         with self.assertRaisesRegex(ValueError, "Latest decision"):
             monitor.audit(s, {}, START + paper.DAY + 3600,
                           fetch_open=lambda *_: 99.)
