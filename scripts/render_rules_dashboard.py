@@ -21,6 +21,11 @@ def main():
     trades = read(source / "trades.json", [])
     candles = read(source / "candles.json", [])
     history = read(source / "history.json", [])
+    shadow_source = Path(".sma_shadow")
+    shadow_latest = read(shadow_source / "latest.json", {})
+    shadow_state = read(shadow_source / "state.json", {})
+    shadow_trades = read(shadow_source / "trades.json", [])
+    shadow_history = read(shadow_source / "history.json", [])
 
     def safe(value):
         return html.escape(str(value if value is not None else "n/a"))
@@ -52,6 +57,18 @@ def main():
         ("Stop", money(state.get("stop"))),
     ]
     cards = "".join(f'<section><small>{safe(k)}</small><strong>{safe(v)}</strong></section>' for k, v in blocks)
+    shadow_blocks = [
+        ("Status", shadow_latest.get("run_status", "PENDING_FIRST_RUN")),
+        ("Daily signal", shadow_latest.get("signal", "NO_DATA")),
+        ("Action", shadow_latest.get("action", "NO_DATA")),
+        ("SMA(200)", money(shadow_latest.get("sma200"))),
+        ("Paper equity", money(shadow_latest.get("equity_usd"))),
+        ("Closed trades", len(shadow_trades)),
+    ]
+    shadow_cards = "".join(
+        f'<section><small>{safe(key)}</small><strong>{safe(value)}</strong></section>'
+        for key, value in shadow_blocks
+    )
     page = f'''<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>BTC Rule Desk</title><style>
 :root{{color-scheme:dark;font-family:system-ui;background:#10181d;color:#eef3f4}}
@@ -64,7 +81,15 @@ svg{{width:100%}}table{{width:100%;border-collapse:collapse}}td,th{{padding:10px
 .scroll{{overflow-x:auto}}footer{{font-size:13px;color:#a0b3ba;margin-top:28px}}
 </style></head><body><small>BTC-USD / HOURLY / PAPER ONLY / NO AI</small>
 <h1>Bitcoin Rule Desk</h1><p>Donchian 55 breakout, EMA 200 regime filter, ATR 14 position sizing, spot only, no leverage.</p>
-<div class="grid">{cards}</div><section class="chart"><h2>Recent closed candles</h2>{graph or "No chart data"}</section>
+<div class="grid">{cards}</div>
+<section><h2>SMA200 Daily Shadow</h2>
+<p>Independent BTC-USD daily close vs SMA(200). Long or cash, max 50% paper allocation.
+Only completed daily candles. 15 bps fee and 3 bps slippage assumed per side.
+No leverage, no real orders, and no guarantee of profit.</p>
+<div class="grid">{shadow_cards}</div>
+<small>Last daily decision: {safe(shadow_latest.get("time", "Not started"))}.
+This equity is from a separately initialized paper portfolio and may have a different valuation timestamp.</small>
+</section><section class="chart"><h2>Recent closed candles</h2>{graph or "No chart data"}</section>
 <section><h2>Closed trades: {len(trades)}</h2><div class="scroll"><table><thead>
 <tr><th>Reason</th><th>Net PnL</th><th>Entry</th><th>Exit</th></tr></thead>
 <tbody>{rows or '<tr><td colspan="4">No closed trades</td></tr>'}</tbody></table></div></section>
@@ -75,6 +100,11 @@ Assumed fee 15 bps and slippage 3 bps per side. Last run: {safe(latest.get("time
     (target / "index.html").write_text(page, encoding="utf-8")
     for name, payload in (("latest", latest), ("history", history), ("trades", trades),
                           ("candles", candles)):
+        (target / f"{name}.json").write_text(json.dumps(payload, indent=2) + "\n",
+                                             encoding="utf-8")
+    for name, payload in (("sma200_latest", shadow_latest),
+                          ("sma200_history", shadow_history),
+                          ("sma200_trades", shadow_trades)):
         (target / f"{name}.json").write_text(json.dumps(payload, indent=2) + "\n",
                                              encoding="utf-8")
     (target / ".nojekyll").touch()

@@ -6,6 +6,7 @@ on:
   workflow_run:
     workflows:
       - Hourly BTC forecast
+      - BTC SMA200 daily shadow
     types:
       - completed
 
@@ -43,6 +44,17 @@ jobs:
             git fetch origin rule-state --depth=1
             for file in state.json candles.json latest.json history.json trades.json; do
               git show "origin/rule-state:$file" > ".rule_state/$file" 2>/dev/null || true
+            done
+          fi
+
+      - name: Restore isolated SMA200 shadow state
+        shell: bash
+        run: |
+          mkdir -p .sma_shadow
+          if git ls-remote --exit-code --heads origin sma-shadow-state >/dev/null 2>&1; then
+            git fetch origin sma-shadow-state --depth=1
+            for file in state.json latest.json trades.json history.json candles.json; do
+              git show "origin/sma-shadow-state:$file" > ".sma_shadow/$file" 2>/dev/null || true
             done
           fi
 
