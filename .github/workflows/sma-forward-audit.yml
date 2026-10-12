@@ -41,6 +41,9 @@ jobs:
             git show "origin/sma-shadow-state:$file" > ".sma_shadow/$file"
           done
           python scripts/sma_forward_audit.py --shadow-dir .sma_shadow --out-dir .sma_audit
+          python scripts/render_rules_dashboard.py
+          grep -q "Forward execution audit" site/index.html
+          grep -q "Adverse quote drift" site/index.html
 
   audit:
     if: >-
