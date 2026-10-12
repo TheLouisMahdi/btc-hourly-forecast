@@ -1,0 +1,70 @@
+name: BTC SMA200 forward execution audit
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - research/sma-forward-audit
+  workflow_run:
+    workflows:
+      - BTC SMA200 daily shadow
+    types:
+      - completed
+
+permissions:
+  contents: write
+
+concurrency:
+  group: btc-sma-forward-audit
+  cancel-in-progress: false
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.11"
+      - name: Run offline immutable-ledger and execution-drift tests
+        run: |
+          python -m unittest discover -s tests -p 'test_sma_forward_audit.py' -v
+          python -m unittest discover -s tests -p 'test_sma200_shadow.py' -v
+
+  audit:
+    if: >-
+      (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main')
+      || (github.event_name == 'workflow_run'
+          && github.event.workflow_run.conclusion == 'success'
+          && github.event.workflow_run.head_branch == 'main')
+    needs: verify
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: main
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.11"
+      - name: Restore paper ledger and separate audit history
+        shell: bash
+        run: |
+          mkdir -p .sma_shadow .sma_audit
+          git fetch origin sma-shadow-state --depth=1
+          for file in state.json latest.json trades.json history.json candles.json; do
+            git show "origin/sma-shadow-state:$file" > ".sma_shadow/$file"
+          done
+          if git ls-remote --exit-code --heads origin sma-audit-state >/dev/null 2>&1; then
+            git fetch origin sma-audit-state --depth=1
+            for file in report.json snapshots.json executions.json; do
+              git show "origin/sma-audit-state:$file" > ".sma_audit/$file" 2>/dev/null || true
+            done
+          fi
+      - name: Audit SMA execution without changing paper strategy
+        run: python scripts/sma_forward_audit.py --shadow-dir .sma_shadow --out-dir .sma_audit
+      - name: Save dedicated forward-audit artifacts
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: bash scripts/push_snapshot_branch.sh sma-audit-state .sma_audit
