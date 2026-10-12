@@ -19,7 +19,7 @@ python scripts/spot_backtest.py \
   --fees 15 40 60 --slippage-bps 3
 ```
 
-This fetches Coinbase Exchange BTC-USD **spot**, not BTCUSDT futures. No authentication or trading credentials are used. An Actions workflow runs the same script and publishes its input data and report as a workflow artifact. Historical requests use 288-hour windows to stay within the 300-candle API limit. The script checks duplicate, missing, invalid, and nonfinal candle data and refuses an incomplete time series.
+This fetches Coinbase Exchange BTC-USD **spot**, not BTCUSDT futures. No authentication or trading credentials are used. An Actions workflow runs the same script and publishes its input data and report as a workflow artifact. Historical requests use 288-hour windows to stay within the 300-candle API limit. The script checks duplicate, invalid and nonfinal candles, retries a missing hour with a narrow API request, and **reports any remaining gaps**. It never interpolates missing price data.
 
 To reuse saved data:
 
@@ -33,7 +33,7 @@ python scripts/spot_backtest.py --csv research-output/coinbase_btcusd_hourly_202
 - History: 2024-01-01 00:00 UTC to 2026-01-01 00:00 UTC, exclusive end.
 - Signals use a *closed* hourly bar, and paper entry/exit uses the **next hour's open** as the execution-price proxy.
 - All evaluation windows have 1,200-bar past-only indicator history.
-- 2024 is development/reference history; **2025 is a separately reset holdout portfolio**. All-years report is descriptive, not an independent holdout.
+- 2024 is development/reference history; **2025 is a separately reset holdout portfolio**. Any genuine Coinbase gap splits an evaluation period into multiple independent segments, each with its own $10,000 paper capital and a new 1,200-bar warmup. Never add segment returns as though they were one continuous portfolio. All-years reports are descriptive, not independent holdout.
 - Existing runtime functions `step`, `buy`, `sell` and `indicators` are reused without changing source or model parameters. Fixed fees are temporarily injected into these functions **only inside the offline replay process**, then restored.
 - Trade fee scenarios (per side): 15, 40, 60 basis points plus 3 basis points slippage per side. All fills are treated as *taker* fills; no unverified maker discounts or rebates.
 - Paper capital $10,000, risk fraction 0.5%, maximum allocation 50%, spot long/cash only.
@@ -45,7 +45,7 @@ python scripts/spot_backtest.py --csv research-output/coinbase_btcusd_hourly_202
 2. The paper bot may enter later than the next hour's open because GitHub Actions are not guaranteed to start on time. Historical next-open fills can be optimistic.
 3. Real quoted spreads, order-book depth, fee tier, and actual order fills are absent from candle data. Cost scenarios must not be represented as measured spreads or account-specific costs.
 4. The model risk budget excludes execution costs and possible adverse gaps. Nominal 0.5% trade risk can be exceeded.
-5. The holdout is a **single calendar period** and not enough to prove a statistically significant positive expectation. No parameter search, trade-quality filter, or strategy-changer is included here.
+5. The holdout is a **single calendar period** and not enough to prove a statistically significant positive expectation. The downloaded data showed a missing hour near October 25, 2025; segment-wise reporting explicitly preserves this discontinuity. No parameter search, trade-quality filter, or strategy-changer is included here.
 
 ## Sources
 
