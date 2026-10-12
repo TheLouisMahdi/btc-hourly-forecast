@@ -9,6 +9,10 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: research-coinbase-spot
+  cancel-in-progress: true
+
 jobs:
   research-backtest:
     runs-on: ubuntu-latest
