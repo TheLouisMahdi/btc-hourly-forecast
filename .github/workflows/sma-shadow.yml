@@ -27,6 +27,18 @@ jobs:
           python-version: "3.11"
       - name: Verify deterministic SMA200 paper rules
         run: python -m unittest discover -s tests -p 'test_sma200_shadow.py' -v
+      - name: Verify Coinbase BTC-USD data without paper trades
+        run: |
+          PYTHONPATH=scripts python - <<'PY'
+          import time
+          import sma200_shadow as s
+          now = int(time.time())
+          candles = s.daily_bars(now)
+          quote = s.fresh_quote(now)
+          avg = sum(x["close"] for x in candles[-200:]) / 200
+          print("CLOSED_DAY", s.utc(candles[-1]["time"]),
+                "SMA200", round(avg, 2), "QUOTE", quote)
+          PY
 
   shadow:
     if: github.ref == 'refs/heads/main'
