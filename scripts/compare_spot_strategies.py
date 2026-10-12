@@ -142,6 +142,34 @@ def missing_intervals(bars: list[dict], step: int) -> list[dict]:
             if b["time"] - a["time"] != step]
 
 
+def cross_granularity_audit(hbars: list[dict], dbars: list[dict]) -> dict:
+    """Compare matched Coinbase daily OHLC endpoints to hourly endpoints.
+
+    Comparison is descriptive. The provider may aggregate daily/hourly close
+    differently at bucket boundaries; never quietly treat them as identical.
+    """
+    by_hour = {x["time"]: x for x in hbars}
+    checked = 0
+    max_open_bps = max_close_bps = 0.0
+    above_10bps = 0
+    for d in dbars:
+        t = d["time"]
+        if any(t + i * HOUR not in by_hour for i in range(24)):
+            continue
+        first = by_hour[t]
+        last = by_hour[t + 23 * HOUR]
+        open_diff = 10_000 * abs(first["open"] / d["open"] - 1)
+        close_diff = 10_000 * abs(last["close"] / d["close"] - 1)
+        checked += 1
+        max_open_bps = max(max_open_bps, open_diff)
+        max_close_bps = max(max_close_bps, close_diff)
+        above_10bps += int(max(open_diff, close_diff) > 10)
+    return {"full_days_compared": checked,
+            "max_open_disagreement_bps": round(max_open_bps, 4),
+            "max_close_disagreement_bps": round(max_close_bps, 4),
+            "days_with_endpoint_disagreement_over_10bps": above_10bps}
+
+
 def day_ceiling(t: int) -> int:
     return (t + DAY - 1) // DAY * DAY
 
@@ -321,6 +349,7 @@ def compare(hbars: list[dict], dbars: list[dict],
         "dataset": "Coinbase Exchange BTC-USD spot",
         "history_hours": len(hbars),
         "history_days": len(dbars),
+        "cross_granularity_audit": cross_granularity_audit(hbars, dbars),
         "missing_hour_intervals": hs,
         "missing_daily_intervals": ds,
         "hourly_input_sha256": hashlib.sha256(
@@ -362,10 +391,12 @@ def markdown(report: dict) -> str:
                      str(seg["days"]), str(scenario["fee_bps_per_side"]),
                      label, str(metrics["net_return_pct"]),
                      str(metrics["max_daily_drawdown_pct"]),
-                     str(metrics["closed_trades"]), str(metrics["profit_factor"] or "n/a")]) + " |")
+                     str(metrics["closed_trades"]),
+                     str(metrics["profit_factor"]) if metrics["profit_factor"] is not None else "n/a"]) + " |")
     lines.extend(["", "## Data integrity",
                   "Hourly gaps: " + json.dumps(report["missing_hour_intervals"]),
                   "Daily gaps: " + json.dumps(report["missing_daily_intervals"]),
+                  "Daily/hourly parity: " + json.dumps(report["cross_granularity_audit"]),
                   "Hourly data SHA256: " + report["hourly_input_sha256"],
                   "Daily data SHA256: " + report["daily_input_sha256"],
                   "",
