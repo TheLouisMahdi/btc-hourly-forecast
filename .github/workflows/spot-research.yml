@@ -1,0 +1,50 @@
+name: Coinbase spot research backtest
+
+on:
+  push:
+    branches:
+      - research/spot-backtest-reconstruction
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: research-coinbase-spot
+  cancel-in-progress: true
+
+jobs:
+  research-backtest:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - name: Checkout research branch
+        uses: actions/checkout@v6
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.11"
+
+      - name: Verify offline reconstruction tests
+        run: python -m unittest discover -s tests -p 'test_spot_backtest.py' -v
+
+      - name: Download historical Coinbase BTC-USD spot candles and replay
+        run: |
+          python scripts/spot_backtest.py \
+            --fetch-coinbase \
+            --start 2024-01-01 \
+            --end 2026-01-01 \
+            --save-csv research-output/coinbase_btcusd_hourly_2024_2025.csv \
+            --report research-output/spot_validation.json \
+            --fees 15 40 60 \
+            --slippage-bps 3
+
+      - name: Publish reproducible research data
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coinbase-spot-research
+          path: research-output/
+          if-no-files-found: warn
+          retention-days: 30
