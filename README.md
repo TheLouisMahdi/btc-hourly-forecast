@@ -18,6 +18,22 @@ The **hourly GitHub workflow** runs only scripts/rule_based.py, and its **dashbo
 
 This is a fixed-hypothesis system, **not an experimentally proven best Bitcoin strategy**. No live or out-of-sample profitable performance is claimed. No trading API credentials are required.
 
+## Parallel SMA200 daily research
+
+A separate paper-only daily SMA200 strategy runs on the **last completed UTC daily
+Coinbase BTC-USD candle**. It holds BTC (maximum 50% initial paper cash allocation)
+when daily close is above SMA(200), otherwise cash. It simulates 15 bps fees and
+3 bps slippage per side, with no real exchange orders and **no intraday stop**.
+
+The daily state is kept on `sma-shadow-state`; the existing hourly `rule-state`
+and all archived ML ledgers are unchanged. The homepage compares independent
+paper portfolios and displays their separate as-of times. This is a shadow
+hypothesis, **not a proven profitable system**.
+
+Scheduled entry: `.github/workflows/sma-shadow.yml` at 00:33 UTC daily
+(subject to GitHub scheduling delays), also triggered on a merge to main.
+See [SMA200 shadow contract](docs/SMA200_SHADOW.md).
+
 ## Strategy
 
 * Product: Coinbase BTC-USD spot, long or cash, **never short or leverage**.
