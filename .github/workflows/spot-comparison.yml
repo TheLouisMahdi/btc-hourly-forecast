@@ -1,0 +1,46 @@
+name: Coinbase four-strategy spot comparison
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - research/coinbase-sma200-fair-comparison
+
+permissions:
+  contents: read
+
+concurrency:
+  group: coinbase-four-strategy-comparison
+  cancel-in-progress: true
+
+jobs:
+  backtest-comparison:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - name: Checkout research
+        uses: actions/checkout@v6
+      - name: Use Python 3.11
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.11"
+      - name: Verify comparison parity and invariants
+        run: |
+          python -m unittest discover -s tests -p 'test_spot_comparison.py' -v
+          python -m unittest discover -s tests -p 'test_sma200_shadow.py' -v
+          python -m unittest discover -s tests -p 'test_rule_based.py' -v
+      - name: Download Coinbase BTC-USD spot and compare four strategies
+        run: |
+          python scripts/compare_spot_strategies.py \
+            --fetch-coinbase \
+            --output-dir research-output/comparison \
+            --fees 15 40 60 \
+            --slippage-bps 3
+      - name: Upload input data, report and replay instructions
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: btc-spot-four-strategy-comparison
+          path: research-output/comparison/
+          if-no-files-found: warn
+          retention-days: 30
