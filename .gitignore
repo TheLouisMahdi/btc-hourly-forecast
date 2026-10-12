@@ -6,6 +6,7 @@ __pycache__/
 .github_runtime/
 .github_state/
 .rule_state/
+.sma_shadow/
 .model_state/
 .adaptive_state/
 .dashboard_runtime/
