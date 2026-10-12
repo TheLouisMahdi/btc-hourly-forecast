@@ -84,6 +84,7 @@ class RepositoryConsistencyTests(unittest.TestCase):
             "manual-trigger-bridge.yml",
             "sma-shadow.yml",
             "spot-comparison.yml",
+            "sma-forward-audit.yml",
         }
         actual = {path.name for path in workflow_dir.glob("*.yml")}
         self.assertEqual(actual, expected)

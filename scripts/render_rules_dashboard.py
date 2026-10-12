@@ -26,6 +26,10 @@ def main():
     shadow_state = read(shadow_source / "state.json", {})
     shadow_trades = read(shadow_source / "trades.json", [])
     shadow_history = read(shadow_source / "history.json", [])
+    audit_source = Path(".sma_audit")
+    audit_report = read(audit_source / "report.json", {})
+    audit_executions = read(audit_source / "executions.json", [])
+    audit_snapshots = read(audit_source / "snapshots.json", [])
 
     def safe(value):
         return html.escape(str(value if value is not None else "n/a"))
@@ -69,6 +73,48 @@ def main():
         f'<section><small>{safe(key)}</small><strong>{safe(value)}</strong></section>'
         for key, value in shadow_blocks
     )
+    if audit_report.get("status") == "OK":
+        audit_blocks = [
+            ("Forward SMA return", str(audit_report.get("sma_net_return_pct")) + "%"),
+            ("Same-timestamp Buy & Hold", str(audit_report.get("hold_return_pct")) + "%"),
+            ("Paper checkpoints", audit_report.get("observed_daily_decisions")),
+            ("Execution prices measured", str(audit_report.get("execution_events_measured")) +
+             " / " + str(audit_report.get("execution_events"))),
+            ("Average extra delay", str(audit_report.get("average_execution_delay_minutes"))
+             + " min" if audit_report.get("average_execution_delay_minutes") is not None else "n/a"),
+            ("Adverse quote drift", str(audit_report.get("average_adverse_price_drift_bps"))
+             + " bps" if audit_report.get("average_adverse_price_drift_bps") is not None else "n/a"),
+        ]
+        audit_cards = "".join(
+            f'<section><small>{safe(name)}</small><strong>{safe(value)}</strong></section>'
+            for name, value in audit_blocks
+        )
+        recent_audits = "".join(
+            f'<tr><td>{safe(e.get("side"))}</td>'
+            f'<td>{safe(e.get("paper_execution_time"))}</td>'
+            f'<td>{money(e.get("reference_open_usd"))}</td>'
+            f'<td>{money(e.get("paper_quote_usd"))}</td>'
+            f'<td>{safe(e.get("adverse_price_drift_bps"))}</td>'
+            f'<td>{safe(e.get("status"))}</td></tr>'
+            for e in reversed(audit_executions[-10:])
+        )
+        audit_panel = (
+            '<section><h2>Forward execution audit</h2>'
+            '<p>Actual recorded paper decisions only. Quote drift is relative to the '
+            'UTC next-day opening price, not verified exchange slippage.</p>'
+            f'<div class="grid">{audit_cards}</div>'
+            f'<small>Paper valuation: {safe(audit_report.get("as_of"))}. '
+            'Buy & Hold uses 100% exposure with the same timestamps; '
+            'SMA200 limits new entries to 50% cash.</small>'
+            '<div class="scroll"><table><thead><tr><th>Side</th><th>Paper time</th>'
+            '<th>Next-open</th><th>Paper quote</th><th>Adverse drift (bps)</th>'
+            '<th>Status</th></tr></thead><tbody>'
+            f'{recent_audits or "<tr><td colspan=6>No executed paper events yet</td></tr>"}'
+            '</tbody></table></div></section>'
+        )
+    else:
+        audit_panel = ('<section><h2>Forward execution audit</h2>'
+                       '<p>Awaiting the first validated forward audit.</p></section>')
     page = f'''<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>BTC Rule Desk</title><style>
 :root{{color-scheme:dark;font-family:system-ui;background:#10181d;color:#eef3f4}}
@@ -89,7 +135,7 @@ No leverage, no real orders, and no guarantee of profit.</p>
 <div class="grid">{shadow_cards}</div>
 <small>Last daily decision: {safe(shadow_latest.get("time", "Not started"))}.
 This equity is from a separately initialized paper portfolio and may have a different valuation timestamp.</small>
-</section><section class="chart"><h2>Recent closed candles</h2>{graph or "No chart data"}</section>
+</section>{audit_panel}<section class="chart"><h2>Recent closed candles</h2>{graph or "No chart data"}</section>
 <section><h2>Closed trades: {len(trades)}</h2><div class="scroll"><table><thead>
 <tr><th>Reason</th><th>Net PnL</th><th>Entry</th><th>Exit</th></tr></thead>
 <tbody>{rows or '<tr><td colspan="4">No closed trades</td></tr>'}</tbody></table></div></section>
@@ -105,6 +151,11 @@ Assumed fee 15 bps and slippage 3 bps per side. Last run: {safe(latest.get("time
     for name, payload in (("sma200_latest", shadow_latest),
                           ("sma200_history", shadow_history),
                           ("sma200_trades", shadow_trades)):
+        (target / f"{name}.json").write_text(json.dumps(payload, indent=2) + "\n",
+                                             encoding="utf-8")
+    for name, payload in (("sma200_forward_report", audit_report),
+                          ("sma200_forward_executions", audit_executions),
+                          ("sma200_forward_snapshots", audit_snapshots)):
         (target / f"{name}.json").write_text(json.dumps(payload, indent=2) + "\n",
                                              encoding="utf-8")
     (target / ".nojekyll").touch()
