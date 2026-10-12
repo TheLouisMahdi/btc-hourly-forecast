@@ -49,9 +49,11 @@ class SpotBacktestTests(unittest.TestCase):
         bars = hourly(count=17544)
         with patch.object(research, "replay", return_value={"test": True}) as replay:
             report = research.report(bars, (15.0, 60.0))
-        self.assertEqual(len(report["scenarios"]["2024"]), 2)
-        self.assertEqual(len(report["scenarios"]["2025_holdout"]), 2)
-        self.assertEqual(len(report["scenarios"]["full"]), 2)
+        self.assertEqual(len(report["scenarios"]["2024"]), 1)
+        self.assertEqual(len(report["scenarios"]["2025_holdout"]), 1)
+        self.assertEqual(len(report["scenarios"]["full"]), 1)
+        self.assertEqual(len(report["scenarios"]["2024"][0]["cost_scenarios"]), 2)
+        self.assertEqual(report["missing_hours"], 0)
         split = research.timestamp("2025-01-01")
         self.assertTrue(all(
             bars[call.args[1]]["time"] >= split
@@ -61,6 +63,17 @@ class SpotBacktestTests(unittest.TestCase):
             bars[call.args[1]]["time"] < split
             for call in replay.call_args_list[:2]
         ))
+
+    def test_missing_2025_hours_split_portfolio_and_preserve_gap(self):
+        bars = hourly(count=17544)
+        del bars[16000]
+        with patch.object(research, "replay", return_value={"test": True}):
+            result = research.report(bars, (15.0,))
+        self.assertEqual(result["missing_hours"], 1)
+        self.assertEqual(len(result["gaps"]), 1)
+        self.assertEqual(len(result["scenarios"]["2025_holdout"]), 2)
+        self.assertTrue(all(s["segment"]["isolated_cash_state"]
+                            for s in result["scenarios"]["2025_holdout"]))
 
     def test_no_partial_or_future_history_accepted(self):
         bars = hourly()
