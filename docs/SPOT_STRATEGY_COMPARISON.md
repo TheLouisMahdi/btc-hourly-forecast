@@ -2,14 +2,15 @@
 
 Status: paper-only historical research. Does not touch running SMA200 or Donchian ledgers. No broker orders.
 
-## Four strategies, identical evaluation windows
+## Five strategies, identical evaluation windows
 
 - SMA200_DAILY_50PCT: calls the real [daily shadow strategy](../scripts/sma200_shadow.py) function (step) on 200 completed daily bars. A new LONG entry spends approximately **50% of currently available paper cash**, the other half remains in cash. No leverage, stops or daily rebalancing.
 - DONCHIAN55_HOURLY: calls the live [hourly trading strategy](../scripts/rule_based.py) function (step), on the most recent **1,200 previous completed hourly candles**. Retains the original allocation cap, 3xATR stop simulation, trend exit and risk fraction. Its real GitHub 15-minute quote-based stop checks cannot be recovered from hourly OHLCV.
+- RSI4H_PULLBACK1H_SPOT: calls the original [experimental 4h RSI / 1h pullback shadow](../scripts/regime_shadow.py) state machine on the same 1,200 completed hourly bars. RSI(20) uses final UTC-aligned 4-hour aggregates only. Spot long-or-cash; at most 50% cash allocation, at most three entries per continuous regime, 1.25% soft close stop, 2.5% simulated emergency stop, and 24-hour time exit. The intrahour 15-minute quote checks cannot be reconstructed from 1-hour data.
 - BUY_HOLD_100PCT: buys near **100% of initial notional**, paying one simulated entry fee plus slippage; marks final NAV after a hypothetical exit fee plus slippage.
 - CASH_100PCT: zero return, no interest.
 
-All four start from an independent **$10,000** paper portfolio for each segment. SMA200's initial 50% exposure means raw returns are **not normalized to equal invested BTC notional** against 100% Buy & Hold. Include drawdown and exposure when assessing these choices. The hourly strategy can invest less than its nominal cap due to ATR risk limits.
+All five start from an independent **$10,000** paper portfolio for each segment. SMA200's initial 50% exposure means raw returns are **not normalized to equal invested BTC notional** against 100% Buy & Hold. Include drawdown and exposure when assessing these choices. The hourly strategy can invest less than its nominal cap due to ATR risk limits.
 
 ## Historical data and methodology
 
@@ -41,7 +42,7 @@ The GitHub Actions workflow `.github/workflows/spot-comparison.yml` publishes:
 
 - `coinbase_hourly.csv`, `coinbase_daily.csv`: exact research candle inputs
 - `comparison.json`: program-readable comparison and input data fingerprints
-- `comparison.md`: cost-sensitive results table
+- `comparison.md`: cost-sensitive results table, including RSI regime spot shadow
 
 These are workflow artifacts and are **not** uploaded to the active trading state branches.
 
@@ -58,3 +59,18 @@ These are workflow artifacts and are **not** uploaded to the active trading stat
 ## Decision gate
 
 Keep both paper bots in their **current** independent execution paths. Before changing any strategy settings, reproduce artifacts, evaluate fees, reconcile signal parity on the same data, and observe a new forward period. An edge is unverified until multiple independent periods are profitable after realistic costs and risk.
+
+## Independent RSI regime study (added October 2026)
+
+The added RSI(20) regime strategy is a **hypothesis inspired by the architecture**
+of [denniskid2520/btcusdt-perp-live](https://github.com/denniskid2520/btcusdt-perp-live),
+not a replication of its leveraged futures performance. The implemented code is
+independent, spot-only and priced using Coinbase BTC-USD, not perpetual futures.
+Review its actual win rate, sample count, costs, drawdown and matched exposure
+in the generated JSON/Markdown instead of projecting 69.3% from another system.
+
+The complete five-strategy audit runs on a change to the comparison script or
+workflow, and can be invoked manually. The machine-readable result is written
+to an isolated `spot-comparison-state` branch. Coinbase hourly data is saved
+in the associated GitHub Actions artifact for reproduction. Original hourly
+and SMA200 running ledgers are never touched. No live orders are placed.

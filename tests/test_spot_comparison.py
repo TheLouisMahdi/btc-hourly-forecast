@@ -50,6 +50,7 @@ class ComparisonTests(unittest.TestCase):
         rows = [
             comp.run_sma(self.days, start, end, 15, 3),
             comp.run_hourly(self.hours, start, end, 15, 3),
+            comp.run_regime(self.hours, start, end, 15, 3),
             comp.run_hold(self.days, start, end, 15, 3),
         ]
         for result in rows:
@@ -58,6 +59,24 @@ class ComparisonTests(unittest.TestCase):
             self.assertLessEqual(result["max_daily_drawdown_pct"], 100)
         self.assertEqual(comp.summarize(10_000, 10_000, [], [], 0, 1)
                          ["net_return_pct"], 0)
+
+    def test_regime_requires_identical_warmup_and_next_hour_open(self):
+        start, end = comp.epoch("2024-02-01"), comp.epoch("2024-02-04")
+        observed = []
+        real = comp.regime.step
+
+        def verify(state, candles, price, now):
+            observed.append((candles[-1]["time"], now, price))
+            return real(state, candles, price, now)
+
+        with patch.object(comp.regime, "step", side_effect=verify):
+            report = comp.run_regime(self.hours, start, end, 15, 3)
+        self.assertEqual(len(observed), 72)
+        self.assertTrue(all(prev + comp.HOUR == now for prev, now, _ in observed))
+        expected = {b["time"]: b["open"] for b in self.hours}
+        self.assertTrue(all(quote == expected[now] for _, now, quote in observed))
+        self.assertEqual(report["closed_trades"], 0)
+        self.assertEqual(report["net_return_pct"], 0.0)
 
     def test_sma_uses_closed_prior_day_not_current(self):
         start, end = comp.epoch("2024-02-01"), comp.epoch("2024-02-04")
