@@ -1,0 +1,576 @@
+{
+  "dataset": "Coinbase Exchange BTC-USD spot",
+  "history_hours": 19003,
+  "history_days": 1096,
+  "cross_granularity_audit": {
+    "full_days_compared": 791,
+    "max_open_disagreement_bps": 0.0,
+    "max_close_disagreement_bps": 0.0,
+    "days_with_endpoint_disagreement_over_10bps": 0
+  },
+  "missing_hour_intervals": [
+    {
+      "first_missing": "2025-10-25T16:00:00+00:00",
+      "resume": "2025-10-25T21:00:00+00:00",
+      "count": 5
+    }
+  ],
+  "missing_daily_intervals": [],
+  "hourly_input_sha256": "5f9d191ac3a8b4b6faf6331fe9f9db95dff2ce87ce9fb5df0f9092f124753c36",
+  "daily_input_sha256": "179d71f34a1c5762cb82f0fab011ef6a7bd2fae25bfdf77abd3c90469c92bfb7",
+  "capital_usd_each_independent_account": 10000.0,
+  "capital_reset_at_start_of_each_period": true,
+  "valuation": "Daily close NAV, open BTC marked to liquidation net of fee/slippage at end",
+  "execution_proxy": "Signal on closed previous candle; execute at next daily/hourly OPEN",
+  "holding_policy": "SMA200 actual shadow.step at 50% cash budget per BUY, no rebalancing",
+  "exclusions": [
+    "Missing hourly candles excluded with new >=1200-bar warmup",
+    "Incomplete UTC days around gaps excluded from all comparisons",
+    "Hourly intrabar stop polling in the live 15-minute job cannot be reconstructed",
+    "Regime shadow 15-minute price-triggered emergency stop polling cannot be replayed from hourly candles",
+    "Fee tiers and slippage are simulated, not actual exchange fills",
+    "This is a historical descriptive comparison, not fresh unseen out-of-sample proof"
+  ],
+  "periods": [
+    {
+      "period": "2024",
+      "start": "2024-01-01T00:00:00+00:00",
+      "end_exclusive": "2025-01-01T00:00:00+00:00",
+      "days": 366,
+      "new_paper_account": true,
+      "cost_scenarios": [
+        {
+          "fee_bps_per_side": 15.0,
+          "slippage_bps_per_side": 3.0,
+          "strategies": {
+            "SMA200_DAILY_50PCT": {
+              "ending_equity_usd": 13724.02,
+              "net_return_pct": 37.24,
+              "max_daily_drawdown_pct": 16.434,
+              "closed_trades": 5,
+              "win_rate_pct": 40.0,
+              "profit_factor": 4.114,
+              "expectancy_usd_per_closed_trade": 279.18,
+              "time_in_market_pct": 80.05
+            },
+            "DONCHIAN55_HOURLY": {
+              "ending_equity_usd": 9584.09,
+              "net_return_pct": -4.159,
+              "max_daily_drawdown_pct": 10.309,
+              "closed_trades": 76,
+              "win_rate_pct": 32.89,
+              "profit_factor": 0.818,
+              "expectancy_usd_per_closed_trade": -5.47,
+              "time_in_market_pct": 22.13
+            },
+            "RSI4H_PULLBACK1H_SPOT": {
+              "ending_equity_usd": 10150.07,
+              "net_return_pct": 1.501,
+              "max_daily_drawdown_pct": 1.983,
+              "closed_trades": 28,
+              "win_rate_pct": 39.29,
+              "profit_factor": 1.246,
+              "expectancy_usd_per_closed_trade": 5.36,
+              "time_in_market_pct": 5.19
+            },
+            "BUY_HOLD_100PCT": {
+              "ending_equity_usd": 21996.19,
+              "net_return_pct": 119.962,
+              "max_daily_drawdown_pct": 26.232,
+              "closed_trades": 0,
+              "win_rate_pct": null,
+              "profit_factor": null,
+              "expectancy_usd_per_closed_trade": null,
+              "time_in_market_pct": 100.0,
+              "note": "Liquidation-cost NAV, buy-and-hold position remains open"
+            },
+            "CASH_100PCT": {
+              "ending_equity_usd": 10000.0,
+              "net_return_pct": 0.0,
+              "max_daily_drawdown_pct": 0.0,
+              "closed_trades": 0,
+              "win_rate_pct": null,
+              "profit_factor": null,
+              "expectancy_usd_per_closed_trade": null,
+              "time_in_market_pct": 0.0
+            }
+          }
+        },
+        {
+          "fee_bps_per_side": 40.0,
+          "slippage_bps_per_side": 3.0,
+          "strategies": {
+            "SMA200_DAILY_50PCT": {
+              "ending_equity_usd": 13519.14,
+              "net_return_pct": 35.191,
+              "max_daily_drawdown_pct": 17.399,
+              "closed_trades": 5,
+              "win_rate_pct": 40.0,
+              "profit_factor": 3.362,
+              "expectancy_usd_per_closed_trade": 250.79,
+              "time_in_market_pct": 80.05
+            },
+            "DONCHIAN55_HOURLY": {
+              "ending_equity_usd": 8703.89,
+              "net_return_pct": -12.961,
+              "max_daily_drawdown_pct": 16.975,
+              "closed_trades": 76,
+              "win_rate_pct": 31.58,
+              "profit_factor": 0.54,
+              "expectancy_usd_per_closed_trade": -17.05,
+              "time_in_market_pct": 22.13
+            },
+            "RSI4H_PULLBACK1H_SPOT": {
+              "ending_equity_usd": 9869.04,
+              "net_return_pct": -1.31,
+              "max_daily_drawdown_pct": 3.319,
+              "closed_trades": 28,
+              "win_rate_pct": 35.71,
+              "profit_factor": 0.83,
+              "expectancy_usd_per_closed_trade": -4.68,
+              "time_in_market_pct": 5.19
+            },
+            "BUY_HOLD_100PCT": {
+              "ending_equity_usd": 21886.48,
+              "net_return_pct": 118.865,
+              "max_daily_drawdown_pct": 26.232,
+              "closed_trades": 0,
+              "win_rate_pct": null,
+              "profit_factor": null,
+              "expectancy_usd_per_closed_trade": null,
+              "time_in_market_pct": 100.0,
+              "note": "Liquidation-cost NAV, buy-and-hold position remains open"
+            },
+            "CASH_100PCT": {
+              "ending_equity_usd": 10000.0,
+              "net_return_pct": 0.0,
+              "max_daily_drawdown_pct": 0.0,
+              "closed_trades": 0,
+              "win_rate_pct": null,
+              "profit_factor": null,
+              "expectancy_usd_per_closed_trade": null,
+              "time_in_market_pct": 0.0
+            }
+          }
+        },
+        {
+          "fee_bps_per_side": 60.0,
+          "slippage_bps_per_side": 3.0,
+          "strategies": {
+            "SMA200_DAILY_50PCT": {
+              "ending_equity_usd": 13357.07,
+              "net_return_pct": 33.571,
+              "max_daily_drawdown_pct": 18.165,
+              "closed_trades": 5,
+              "win_rate_pct": 40.0,
+              "profit_factor": 2.914,
+              "expectancy_usd_per_closed_trade": 228.29,
+              "time_in_market_pct": 80.05
+            },
+            "DONCHIAN55_HOURLY": {
+              "ending_equity_usd": 8057.53,
+              "net_return_pct": -19.425,
+              "max_daily_drawdown_pct": 22.118,
+              "closed_trades": 76,
+              "win_rate_pct": 28.95,
+              "profit_factor": 0.396,
+              "expectancy_usd_per_closed_trade": -25.56,
+              "time_in_market_pct": 22.13
+            },
+            "RSI4H_PULLBACK1H_SPOT": {
+              "ending_equity_usd": 9649.63,
+              "net_return_pct": -3.504,
+              "max_daily_drawdown_pct": 4.591,
+              "closed_trades": 28,
+              "win_rate_pct": 35.71,
+              "profit_factor": 0.612,
+              "expectancy_usd_per_closed_trade": -12.51,
+              "time_in_market_pct": 5.19
+            },
+            "BUY_HOLD_100PCT": {
+              "ending_equity_usd": 21799.11,
+              "net_return_pct": 117.991,
+              "max_daily_drawdown_pct": 26.232,
+              "closed_trades": 0,
+              "win_rate_pct": null,
+              "profit_factor": null,
+              "expectancy_usd_per_closed_trade": null,
+              "time_in_market_pct": 100.0,
+              "note": "Liquidation-cost NAV, buy-and-hold position remains open"
+            },
+            "CASH_100PCT": {
+              "ending_equity_usd": 10000.0,
+              "net_return_pct": 0.0,
+              "max_daily_drawdown_pct": 0.0,
+              "closed_trades": 0,
+              "win_rate_pct": null,
+              "profit_factor": null,
+              "expectancy_usd_per_closed_trade": null,
+              "time_in_market_pct": 0.0
+            }
+          }
+        }
+      ]
+    },
+    {
+      "period": "2025",
+      "start": "2025-01-01T00:00:00+00:00",
+      "end_exclusive": "2025-10-25T00:00:00+00:00",
+      "days": 297,
+      "new_paper_account": true,
+      "cost_scenarios": [
+        {
+          "fee_bps_per_side": 15.0,
+          "slippage_bps_per_side": 3.0,
+          "strategies": {
+            "SMA200_DAILY_50PCT": {
+              "ending_equity_usd": 9342.98,
+              "net_return_pct": -6.57,
+              "max_daily_drawdown_pct": 17.66,
+              "closed_trades": 7,
+              "win_rate_pct": 14.29,
+              "profit_factor": 0.466,
+              "expectancy_usd_per_closed_trade": -97.05,
+              "time_in_market_pct": 87.21
+            },
+            "DONCHIAN55_HOURLY": {
+              "ending_equity_usd": 8868.3,
+              "net_return_pct": -11.317,
+              "max_daily_drawdown_pct": 12.923,
+              "closed_trades": 69,
+              "win_rate_pct": 26.09,
+              "profit_factor": 0.438,
+              "expectancy_usd_per_closed_trade": -16.4,
+              "time_in_market_pct": 22.22
+            },
+            "RSI4H_PULLBACK1H_SPOT": {
+              "ending_equity_usd": 9966.39,
+              "net_return_pct": -0.336,
+              "max_daily_drawdown_pct": 1.317,
+              "closed_trades": 16,
+              "win_rate_pct": 56.25,
+              "profit_factor": 0.838,
+              "expectancy_usd_per_closed_trade": -2.1,
+              "time_in_market_pct": 4.71
+            },
+            "BUY_HOLD_100PCT": {
+              "ending_equity_usd": 11852.81,
+              "net_return_pct": 18.528,
+              "max_daily_drawdown_pct": 28.172,
+              "closed_trades": 0,
+              "win_rate_pct": null,
+              "profit_factor": null,
+              "expectancy_usd_per_closed_trade": null,
+              "time_in_market_pct": 100.0,
+              "note": "Liquidation-cost NAV, buy-and-hold position remains open"
+            },
+            "CASH_100PCT": {
+              "ending_equity_usd": 10000.0,
+              "net_return_pct": 0.0,
+              "max_daily_drawdown_pct": 0.0,
+              "closed_trades": 0,
+              "win_rate_pct": null,
+              "profit_factor": null,
+              "expectancy_usd_per_closed_trade": null,
+              "time_in_market_pct": 0.0
+            }
+          }
+        },
+        {
+          "fee_bps_per_side": 40.0,
+          "slippage_bps_per_side": 3.0,
+          "strategies": {
+            "SMA200_DAILY_50PCT": {
+              "ending_equity_usd": 9157.47,
+              "net_return_pct": -8.425,
+              "max_daily_drawdown_pct": 18.655,
+              "closed_trades": 7,
+              "win_rate_pct": 14.29,
+              "profit_factor": 0.401,
+              "expectancy_usd_per_closed_trade": -120.21,
+              "time_in_market_pct": 87.21
+            },
+            "DONCHIAN55_HOURLY": {
+              "ending_equity_usd": 7968.41,
+              "net_return_pct": -20.316,
+              "max_daily_drawdown_pct": 20.985,
+              "closed_trades": 69,
+              "win_rate_pct": 20.29,
+              "profit_factor": 0.226,
+              "expectancy_usd_per_closed_trade": -29.44,
+              "time_in_market_pct": 22.22
+            },
+            "RSI4H_PULLBACK1H_SPOT": {
+              "ending_equity_usd": 9807.93,
+              "net_return_pct": -1.921,
+              "max_daily_drawdown_pct": 2.347,
+              "closed_trades": 16,
+              "win_rate_pct": 43.75,
+              "profit_factor": 0.322,
+              "expectancy_usd_per_closed_trade": -12.0,
+              "time_in_market_pct": 4.71
+            },
+            "BUY_HOLD_100PCT": {
+              "ending_equity_usd": 11793.69,
+              "net_return_pct": 17.937,
+              "max_daily_drawdown_pct": 28.172,
+              "closed_trades": 0,
+              "win_rate_pct": null,
+              "profit_factor": null,
+              "expectancy_usd_per_closed_trade": null,
+              "time_in_market_pct": 100.0,
+              "note": "Liquidation-cost NAV, buy-and-hold position remains open"
+            },
+            "CASH_100PCT": {
+              "ending_equity_usd": 10000.0,
+              "net_return_pct": 0.0,
+              "max_daily_drawdown_pct": 0.0,
+              "closed_trades": 0,
+              "win_rate_pct": null,
+              "profit_factor": null,
+              "expectancy_usd_per_closed_trade": null,
+              "time_in_market_pct": 0.0
+            }
+          }
+        },
+        {
+          "fee_bps_per_side": 60.0,
+          "slippage_bps_per_side": 3.0,
+          "strategies": {
+            "SMA200_DAILY_50PCT": {
+              "ending_equity_usd": 9011.39,
+              "net_return_pct": -9.886,
+              "max_daily_drawdown_pct": 19.474,
+              "closed_trades": 7,
+              "win_rate_pct": 14.29,
+              "profit_factor": 0.357,
+              "expectancy_usd_per_closed_trade": -138.49,
+              "time_in_market_pct": 87.21
+            },
+            "DONCHIAN55_HOURLY": {
+              "ending_equity_usd": 7313.71,
+              "net_return_pct": -26.863,
+              "max_daily_drawdown_pct": 27.332,
+              "closed_trades": 69,
+              "win_rate_pct": 13.04,
+              "profit_factor": 0.14,
+              "expectancy_usd_per_closed_trade": -38.93,
+              "time_in_market_pct": 22.22
+            },
+            "RSI4H_PULLBACK1H_SPOT": {
+              "ending_equity_usd": 9682.87,
+              "net_return_pct": -3.171,
+              "max_daily_drawdown_pct": 3.262,
+              "closed_trades": 16,
+              "win_rate_pct": 25.0,
+              "profit_factor": 0.128,
+              "expectancy_usd_per_closed_trade": -19.82,
+              "time_in_market_pct": 4.71
+            },
+            "BUY_HOLD_100PCT": {
+              "ending_equity_usd": 11746.61,
+              "net_return_pct": 17.466,
+              "max_daily_drawdown_pct": 28.172,
+              "closed_trades": 0,
+              "win_rate_pct": null,
+              "profit_factor": null,
+              "expectancy_usd_per_closed_trade": null,
+              "time_in_market_pct": 100.0,
+              "note": "Liquidation-cost NAV, buy-and-hold position remains open"
+            },
+            "CASH_100PCT": {
+              "ending_equity_usd": 10000.0,
+              "net_return_pct": 0.0,
+              "max_daily_drawdown_pct": 0.0,
+              "closed_trades": 0,
+              "win_rate_pct": null,
+              "profit_factor": null,
+              "expectancy_usd_per_closed_trade": null,
+              "time_in_market_pct": 0.0
+            }
+          }
+        }
+      ]
+    },
+    {
+      "period": "2025",
+      "start": "2025-12-15T00:00:00+00:00",
+      "end_exclusive": "2026-01-01T00:00:00+00:00",
+      "days": 17,
+      "new_paper_account": true,
+      "cost_scenarios": [
+        {
+          "fee_bps_per_side": 15.0,
+          "slippage_bps_per_side": 3.0,
+          "strategies": {
+            "SMA200_DAILY_50PCT": {
+              "ending_equity_usd": 10000.0,
+              "net_return_pct": 0.0,
+              "max_daily_drawdown_pct": 0.0,
+              "closed_trades": 0,
+              "win_rate_pct": null,
+              "profit_factor": null,
+              "expectancy_usd_per_closed_trade": null,
+              "time_in_market_pct": 0.0
+            },
+            "DONCHIAN55_HOURLY": {
+              "ending_equity_usd": 9833.28,
+              "net_return_pct": -1.667,
+              "max_daily_drawdown_pct": 1.667,
+              "closed_trades": 3,
+              "win_rate_pct": 0.0,
+              "profit_factor": 0.0,
+              "expectancy_usd_per_closed_trade": -55.57,
+              "time_in_market_pct": 0.0
+            },
+            "RSI4H_PULLBACK1H_SPOT": {
+              "ending_equity_usd": 10000.0,
+              "net_return_pct": 0.0,
+              "max_daily_drawdown_pct": 0.0,
+              "closed_trades": 0,
+              "win_rate_pct": null,
+              "profit_factor": null,
+              "expectancy_usd_per_closed_trade": null,
+              "time_in_market_pct": 0.0
+            },
+            "BUY_HOLD_100PCT": {
+              "ending_equity_usd": 9887.63,
+              "net_return_pct": -1.124,
+              "max_daily_drawdown_pct": 3.253,
+              "closed_trades": 0,
+              "win_rate_pct": null,
+              "profit_factor": null,
+              "expectancy_usd_per_closed_trade": null,
+              "time_in_market_pct": 100.0,
+              "note": "Liquidation-cost NAV, buy-and-hold position remains open"
+            },
+            "CASH_100PCT": {
+              "ending_equity_usd": 10000.0,
+              "net_return_pct": 0.0,
+              "max_daily_drawdown_pct": 0.0,
+              "closed_trades": 0,
+              "win_rate_pct": null,
+              "profit_factor": null,
+              "expectancy_usd_per_closed_trade": null,
+              "time_in_market_pct": 0.0
+            }
+          }
+        },
+        {
+          "fee_bps_per_side": 40.0,
+          "slippage_bps_per_side": 3.0,
+          "strategies": {
+            "SMA200_DAILY_50PCT": {
+              "ending_equity_usd": 10000.0,
+              "net_return_pct": 0.0,
+              "max_daily_drawdown_pct": 0.0,
+              "closed_trades": 0,
+              "win_rate_pct": null,
+              "profit_factor": null,
+              "expectancy_usd_per_closed_trade": null,
+              "time_in_market_pct": 0.0
+            },
+            "DONCHIAN55_HOURLY": {
+              "ending_equity_usd": 9780.96,
+              "net_return_pct": -2.19,
+              "max_daily_drawdown_pct": 2.19,
+              "closed_trades": 3,
+              "win_rate_pct": 0.0,
+              "profit_factor": 0.0,
+              "expectancy_usd_per_closed_trade": -73.01,
+              "time_in_market_pct": 0.0
+            },
+            "RSI4H_PULLBACK1H_SPOT": {
+              "ending_equity_usd": 10000.0,
+              "net_return_pct": 0.0,
+              "max_daily_drawdown_pct": 0.0,
+              "closed_trades": 0,
+              "win_rate_pct": null,
+              "profit_factor": null,
+              "expectancy_usd_per_closed_trade": null,
+              "time_in_market_pct": 0.0
+            },
+            "BUY_HOLD_100PCT": {
+              "ending_equity_usd": 9838.31,
+              "net_return_pct": -1.617,
+              "max_daily_drawdown_pct": 3.493,
+              "closed_trades": 0,
+              "win_rate_pct": null,
+              "profit_factor": null,
+              "expectancy_usd_per_closed_trade": null,
+              "time_in_market_pct": 100.0,
+              "note": "Liquidation-cost NAV, buy-and-hold position remains open"
+            },
+            "CASH_100PCT": {
+              "ending_equity_usd": 10000.0,
+              "net_return_pct": 0.0,
+              "max_daily_drawdown_pct": 0.0,
+              "closed_trades": 0,
+              "win_rate_pct": null,
+              "profit_factor": null,
+              "expectancy_usd_per_closed_trade": null,
+              "time_in_market_pct": 0.0
+            }
+          }
+        },
+        {
+          "fee_bps_per_side": 60.0,
+          "slippage_bps_per_side": 3.0,
+          "strategies": {
+            "SMA200_DAILY_50PCT": {
+              "ending_equity_usd": 10000.0,
+              "net_return_pct": 0.0,
+              "max_daily_drawdown_pct": 0.0,
+              "closed_trades": 0,
+              "win_rate_pct": null,
+              "profit_factor": null,
+              "expectancy_usd_per_closed_trade": null,
+              "time_in_market_pct": 0.0
+            },
+            "DONCHIAN55_HOURLY": {
+              "ending_equity_usd": 9739.24,
+              "net_return_pct": -2.608,
+              "max_daily_drawdown_pct": 2.608,
+              "closed_trades": 3,
+              "win_rate_pct": 0.0,
+              "profit_factor": 0.0,
+              "expectancy_usd_per_closed_trade": -86.92,
+              "time_in_market_pct": 0.0
+            },
+            "RSI4H_PULLBACK1H_SPOT": {
+              "ending_equity_usd": 10000.0,
+              "net_return_pct": 0.0,
+              "max_daily_drawdown_pct": 0.0,
+              "closed_trades": 0,
+              "win_rate_pct": null,
+              "profit_factor": null,
+              "expectancy_usd_per_closed_trade": null,
+              "time_in_market_pct": 0.0
+            },
+            "BUY_HOLD_100PCT": {
+              "ending_equity_usd": 9799.03,
+              "net_return_pct": -2.01,
+              "max_daily_drawdown_pct": 3.685,
+              "closed_trades": 0,
+              "win_rate_pct": null,
+              "profit_factor": null,
+              "expectancy_usd_per_closed_trade": null,
+              "time_in_market_pct": 100.0,
+              "note": "Liquidation-cost NAV, buy-and-hold position remains open"
+            },
+            "CASH_100PCT": {
+              "ending_equity_usd": 10000.0,
+              "net_return_pct": 0.0,
+              "max_daily_drawdown_pct": 0.0,
+              "closed_trades": 0,
+              "win_rate_pct": null,
+              "profit_factor": null,
+              "expectancy_usd_per_closed_trade": null,
+              "time_in_market_pct": 0.0
+            }
+          }
+        }
+      ]
+    }
+  ]
+}
