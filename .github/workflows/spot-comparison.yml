@@ -1,13 +1,17 @@
-name: Coinbase four-strategy spot comparison
+name: Coinbase spot five-strategy comparison
 
 on:
   workflow_dispatch:
   push:
     branches:
       - research/coinbase-sma200-fair-comparison
+      - main
+    paths:
+      - "scripts/compare_spot_strategies.py"
+      - ".github/workflows/spot-comparison.yml"
 
 permissions:
-  contents: read
+  contents: write
 
 concurrency:
   group: coinbase-four-strategy-comparison
@@ -29,18 +33,27 @@ jobs:
           python -m unittest discover -s tests -p 'test_spot_comparison.py' -v
           python -m unittest discover -s tests -p 'test_sma200_shadow.py' -v
           python -m unittest discover -s tests -p 'test_rule_based.py' -v
-      - name: Download Coinbase BTC-USD spot and compare four strategies
+      - name: Download Coinbase BTC-USD spot and compare five strategies
         run: |
           python scripts/compare_spot_strategies.py \
             --fetch-coinbase \
             --output-dir research-output/comparison \
             --fees 15 40 60 \
             --slippage-bps 3
+      - name: Publish compact verified research report
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p comparison-state
+          cp research-output/comparison/comparison.json comparison-state/
+          cp research-output/comparison/comparison.md comparison-state/
+          bash scripts/push_snapshot_branch.sh spot-comparison-state comparison-state
+
       - name: Upload input data, report and replay instructions
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: btc-spot-four-strategy-comparison
+          name: btc-spot-five-strategy-comparison
           path: research-output/comparison/
           if-no-files-found: warn
           retention-days: 30
