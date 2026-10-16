@@ -83,6 +83,7 @@ class RepositoryConsistencyTests(unittest.TestCase):
             "retrain.yml",
             "manual-trigger-bridge.yml",
             "sma-shadow.yml",
+            "regime-shadow.yml",
             "spot-comparison.yml",
             "sma-forward-audit.yml",
         }

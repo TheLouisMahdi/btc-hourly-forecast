@@ -18,6 +18,24 @@ The **hourly GitHub workflow** runs only scripts/rule_based.py, and its **dashbo
 
 This is a fixed-hypothesis system, **not an experimentally proven best Bitcoin strategy**. No live or out-of-sample profitable performance is claimed. No trading API credentials are required.
 
+## Experimental RSI(20) regime / pullback shadow
+
+A new **independent hourly spot paper hypothesis** uses the most recently
+completed **4h Wilder RSI(20) > 70** as a permission gate and final **1h**
+candles for pullback or breakout entries. It caps exposure, limits entries
+per regime and uses a dual simulated stop / 24-hour holding limit.
+This is **not an experimentally proven improvement**, and it is not a
+replacement for the live Donchian paper ledger. No leverage or live orders.
+
+- Script: `scripts/regime_shadow.py`; workflow:
+  `.github/workflows/regime-shadow.yml` (separate `regime-shadow-state`).
+- Backtest: `python scripts/backtest_regime.py hourly_ohlcv.csv --oos-fraction 0.30`
+- Method and limitations: [RSI regime spot shadow](docs/REGIME_SHADOW.md).
+- Reference credit: [denniskid2520/btcusdt-perp-live](https://github.com/denniskid2520/btcusdt-perp-live)
+  informed the **high-level idea** of 4h regime gating plus 1h pullback/breakout
+  execution. No source code was copied. That project's reported leveraged
+  futures performance does not apply to this separately implemented spot system.
+
 ## Parallel SMA200 daily research
 
 A separate paper-only daily SMA200 strategy runs on the **last completed UTC daily

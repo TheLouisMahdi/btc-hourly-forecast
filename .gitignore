@@ -22,3 +22,6 @@ data/*.joblib
 artifacts/models/*
 artifacts/reports/*
 logs/*.log
+
+# Independent local paper hypothesis snapshots
+.regime_shadow/

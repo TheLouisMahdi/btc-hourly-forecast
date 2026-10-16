@@ -21,6 +21,10 @@ def main():
     trades = read(source / "trades.json", [])
     candles = read(source / "candles.json", [])
     history = read(source / "history.json", [])
+    regime_source = Path(".regime_shadow")
+    regime_latest = read(regime_source / "latest.json", {})
+    regime_state = read(regime_source / "state.json", {})
+    regime_trades = read(regime_source / "trades.json", [])
     shadow_source = Path(".sma_shadow")
     shadow_latest = read(shadow_source / "latest.json", {})
     shadow_state = read(shadow_source / "state.json", {})
@@ -61,6 +65,18 @@ def main():
         ("Stop", money(state.get("stop"))),
     ]
     cards = "".join(f'<section><small>{safe(k)}</small><strong>{safe(v)}</strong></section>' for k, v in blocks)
+    regime_blocks = [
+        ("Status", regime_latest.get("run_status", "PENDING_FIRST_RUN")),
+        ("Decision", regime_latest.get("action", "NO_DATA")),
+        ("Reason", regime_latest.get("reason", "NO_DATA")),
+        ("Last closed 4h RSI", (regime_latest.get("features") or {}).get("rsi4h")),
+        ("Paper equity", money(regime_latest.get("equity_usd", regime_state.get("cash")))),
+        ("Closed trades", len(regime_trades)),
+    ]
+    regime_cards = "".join(
+        f'<section><small>{safe(key)}</small><strong>{safe(value)}</strong></section>'
+        for key, value in regime_blocks
+    )
     shadow_blocks = [
         ("Status", shadow_latest.get("run_status", "PENDING_FIRST_RUN")),
         ("Daily signal", shadow_latest.get("signal", "NO_DATA")),
@@ -126,8 +142,18 @@ strong{{display:block;font-size:22px;overflow-wrap:anywhere}}
 svg{{width:100%}}table{{width:100%;border-collapse:collapse}}td,th{{padding:10px;border-bottom:1px solid #33464c;text-align:left}}
 .scroll{{overflow-x:auto}}footer{{font-size:13px;color:#a0b3ba;margin-top:28px}}
 </style></head><body><small>BTC-USD / HOURLY / PAPER ONLY / NO AI</small>
-<h1>Bitcoin Rule Desk</h1><p>Donchian 55 breakout, EMA 200 regime filter, ATR 14 position sizing, spot only, no leverage.</p>
+<h1>Bitcoin Rule Desk</h1>
+<p>Hourly baseline: Donchian 55 breakout, EMA 200 and ATR 14. Spot only, no leverage.</p>
 <div class="grid">{cards}</div>
+<section><h2>4h RSI regime / 1h entries (experimental shadow)</h2>
+<p>Independent paper-only hypothesis: completed 4h RSI(20) above 70 permits
+1h pullback or breakout entries. Maximum three entries per regime, capped spot
+allocation, 1.25% candle-close exit, 2.5% simulated emergency stop, 24h time exit.
+Fees and slippage are assumed; no exchange stops or real orders.</p>
+<div class="grid">{regime_cards}</div>
+<small>Last observed paper decision: {safe(regime_latest.get("time", "Not started"))}.
+The baseline and regime portfolios have separate cash and start dates; raw
+equity is not a fair performance comparison until aligned.</small></section>
 <section><h2>SMA200 Daily Shadow</h2>
 <p>Independent BTC-USD daily close vs SMA(200). Long or cash, max 50% paper allocation.
 Only completed daily candles. 15 bps fee and 3 bps slippage assumed per side.

@@ -1,0 +1,52 @@
+name: BTC regime spot paper shadow
+run-name: Experimental BTC 4h regime / 1h entries - paper only
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+  schedule:
+    - cron: "9,24,39,54 * * * *"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: btc-regime-spot-paper
+  cancel-in-progress: false
+
+jobs:
+  paper:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout project
+        uses: actions/checkout@v6
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.11"
+
+      - name: Verify new paper strategy offline
+        run: python -m unittest discover -s tests -p 'test_regime_shadow.py' -v
+
+      - name: Restore isolated regime paper state
+        shell: bash
+        run: |
+          mkdir -p .regime_shadow
+          if git ls-remote --exit-code --heads origin regime-shadow-state >/dev/null 2>&1; then
+            git fetch origin regime-shadow-state --depth=1
+            for file in state.json candles.json latest.json history.json trades.json; do
+              git show "origin/regime-shadow-state:$file" > ".regime_shadow/$file" 2>/dev/null || true
+            done
+          fi
+
+      - name: Evaluate closed-hour BTC spot regime
+        run: python scripts/regime_shadow.py --state-dir .regime_shadow
+
+      - name: Save isolated regime shadow snapshots
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: bash scripts/push_snapshot_branch.sh regime-shadow-state .regime_shadow
