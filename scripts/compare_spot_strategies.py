@@ -1,4 +1,4 @@
-"""Fair chronological BTC-USD spot comparison of running hourly and SMA200 paper rules.
+"""Fair chronological BTC-USD spot comparison including the 4h RSI regime shadow.
 
 Pure research: no orders, no state-branch writes and no changes to production.
 Signals use completed candles and next period OPEN as an execution proxy.
@@ -18,6 +18,7 @@ from urllib.error import HTTPError, URLError
 
 import rule_based as hourly
 import sma200_shadow as daily
+import regime_shadow as regime
 
 START_HOUR = "2023-11-01"
 START_DAY = "2023-01-01"
@@ -296,6 +297,46 @@ def run_hourly(hbar: list[dict], first: int, end: int,
                      active_days, len(curve))
 
 
+
+def run_regime(hbar: list[dict], first: int, end: int,
+               fee: float, slip: float) -> dict:
+    """Replay exactly the running 4h RSI / 1h entry spot paper state machine.
+
+    Price-triggered intrahour stop checks from 15-minute live polling are
+    unavailable in 1h OHLC, so only completed bars and next-open proxies
+    are replayed, consistent with the Donchian comparator.
+    """
+    idx = {r["time"]: i for i, r in enumerate(hbar)}
+    start_i = idx[first]
+    end_i = idx[end - HOUR] + 1
+    if start_i < hourly.WINDOW:
+        raise ValueError("Insufficient identical warmup for regime comparison")
+    state = regime.new_state()
+    curve = []
+    exposed_days = 0
+    with patch.object(regime, "FEE_BPS", fee), patch.object(regime, "SLIPPAGE_BPS", slip):
+        for i in range(start_i - 1, end_i - 1):
+            history = hbar[i - hourly.WINDOW + 1:i + 1]
+            if len(history) != hourly.WINDOW:
+                raise ValueError("Incomplete 1200-bar regime history")
+            quote = hbar[i + 1]
+            if quote["time"] != hbar[i]["time"] + HOUR:
+                raise ValueError("Cannot replay regime across hourly data gap")
+            result = regime.step(state, history, quote["open"], quote["time"])
+            if result["action"] == "UNCHANGED":
+                raise RuntimeError("Duplicate regime decision in historical replay")
+            if quote["time"] % DAY == 23 * HOUR:
+                exposed_days += int(state["qty"] > 0)
+                curve.append(state["cash"] + state["qty"] * quote["close"])
+        last_close = hbar[end_i - 1]["close"]
+        ending = (state["cash"] + state["qty"] * last_close *
+                  (1 - slip / 10000) * (1 - fee / 10000))
+    if len(curve) != (end - first) // DAY:
+        raise RuntimeError("Regime and other strategy valuation calendars differ")
+    return summarize(INITIAL, ending, curve, state["trades"],
+                     exposed_days, len(curve))
+
+
 def run_hold(dbar: list[dict], first: int, end: int,
              fee: float, slip: float) -> dict:
     idx = {r["time"]: i for i, r in enumerate(dbar)}
@@ -333,6 +374,7 @@ def compare(hbars: list[dict], dbars: list[dict],
                 "strategies": {
                     "SMA200_DAILY_50PCT": run_sma(dbars, w["start"], w["end"], fee, slip),
                     "DONCHIAN55_HOURLY": run_hourly(hbars, w["start"], w["end"], fee, slip),
+                    "RSI4H_PULLBACK1H_SPOT": run_regime(hbars, w["start"], w["end"], fee, slip),
                     "BUY_HOLD_100PCT": run_hold(dbars, w["start"], w["end"], fee, slip),
                     "CASH_100PCT": summarize(INITIAL, INITIAL, [], [], 0, 1),
                 },
@@ -365,6 +407,7 @@ def compare(hbars: list[dict], dbars: list[dict],
             "Missing hourly candles excluded with new >=1200-bar warmup",
             "Incomplete UTC days around gaps excluded from all comparisons",
             "Hourly intrabar stop polling in the live 15-minute job cannot be reconstructed",
+            "Regime shadow 15-minute price-triggered emergency stop polling cannot be replayed from hourly candles",
             "Fee tiers and slippage are simulated, not actual exchange fills",
             "This is a historical descriptive comparison, not fresh unseen out-of-sample proof",
         ],
@@ -374,7 +417,7 @@ def compare(hbars: list[dict], dbars: list[dict],
 
 def markdown(report: dict) -> str:
     lines = [
-        "# Coinbase Spot: Fair SMA200 / Hourly / Buy & Hold / Cash Comparison",
+        "# Coinbase Spot: Fair SMA200 / Donchian / Regime / Hold / Cash Comparison",
         "",
         "Paper-only historical replay, not a promise of profit.",
         "Each row is a separate $10,000 portfolio. Do not add returns across segments.",
