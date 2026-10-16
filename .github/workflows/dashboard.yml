@@ -6,6 +6,7 @@ on:
   workflow_run:
     workflows:
       - Hourly BTC forecast
+      - BTC regime spot paper shadow
       - BTC SMA200 daily shadow
       - BTC SMA200 forward execution audit
     types:
@@ -45,6 +46,17 @@ jobs:
             git fetch origin rule-state --depth=1
             for file in state.json candles.json latest.json history.json trades.json; do
               git show "origin/rule-state:$file" > ".rule_state/$file" 2>/dev/null || true
+            done
+          fi
+
+      - name: Restore isolated RSI regime paper state
+        shell: bash
+        run: |
+          mkdir -p .regime_shadow
+          if git ls-remote --exit-code --heads origin regime-shadow-state >/dev/null 2>&1; then
+            git fetch origin regime-shadow-state --depth=1
+            for file in state.json candles.json latest.json history.json trades.json; do
+              git show "origin/regime-shadow-state:$file" > ".regime_shadow/$file" 2>/dev/null || true
             done
           fi
 
