@@ -1,0 +1,80 @@
+[
+  {
+    "candle_time": "2026-10-11T00:00:00+00:00",
+    "observed_time": "2026-10-12T07:12:50+00:00",
+    "paper_quote_usd": 84139.5,
+    "paper_equity_usd": 9991.000449865041,
+    "paper_cash_usd": 4992.5,
+    "btc_quantity": 0.0594072991860546,
+    "action": "BUY",
+    "missed_days": 0,
+    "sma_return_pct": -0.09,
+    "hold_equity_usd": 9982.0279,
+    "hold_return_pct": -0.1797
+  },
+  {
+    "candle_time": "2026-10-12T00:00:00+00:00",
+    "observed_time": "2026-10-13T07:00:52+00:00",
+    "paper_quote_usd": 83675.82,
+    "paper_equity_usd": 9963.454473378451,
+    "paper_cash_usd": 4992.5,
+    "btc_quantity": 0.0594072991860546,
+    "action": "HOLD",
+    "missed_days": 0,
+    "sma_return_pct": -0.3655,
+    "hold_equity_usd": 9927.0184,
+    "hold_return_pct": -0.7298
+  },
+  {
+    "candle_time": "2026-10-13T00:00:00+00:00",
+    "observed_time": "2026-10-14T05:15:33+00:00",
+    "paper_quote_usd": 83423.9,
+    "paper_equity_usd": 9948.488586567499,
+    "paper_cash_usd": 4992.5,
+    "btc_quantity": 0.0594072991860546,
+    "action": "HOLD",
+    "missed_days": 0,
+    "sma_return_pct": -0.5151,
+    "hold_equity_usd": 9897.1315,
+    "hold_return_pct": -1.0287
+  },
+  {
+    "candle_time": "2026-10-14T00:00:00+00:00",
+    "observed_time": "2026-10-15T05:02:27+00:00",
+    "paper_quote_usd": 81481.04,
+    "paper_equity_usd": 9833.068521270881,
+    "paper_cash_usd": 4992.5,
+    "btc_quantity": 0.0594072991860546,
+    "action": "HOLD",
+    "missed_days": 0,
+    "sma_return_pct": -1.6693,
+    "hold_equity_usd": 9666.6371,
+    "hold_return_pct": -3.3336
+  },
+  {
+    "candle_time": "2026-10-15T00:00:00+00:00",
+    "observed_time": "2026-10-16T04:51:51+00:00",
+    "paper_quote_usd": 81960.71,
+    "paper_equity_usd": 9861.564420471457,
+    "paper_cash_usd": 4992.5,
+    "btc_quantity": 0.0594072991860546,
+    "action": "HOLD",
+    "missed_days": 0,
+    "sma_return_pct": -1.3844,
+    "hold_equity_usd": 9723.5435,
+    "hold_return_pct": -2.7646
+  },
+  {
+    "candle_time": "2026-10-16T00:00:00+00:00",
+    "observed_time": "2026-10-17T04:52:58+00:00",
+    "paper_quote_usd": 81412.8,
+    "paper_equity_usd": 9829.014567174425,
+    "paper_cash_usd": 4992.5,
+    "btc_quantity": 0.0594072991860546,
+    "action": "HOLD",
+    "missed_days": 0,
+    "sma_return_pct": -1.7099,
+    "hold_equity_usd": 9658.5413,
+    "hold_return_pct": -3.4146
+  }
+]
