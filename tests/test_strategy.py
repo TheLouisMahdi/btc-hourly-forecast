@@ -10,7 +10,7 @@ import pandas as pd
 import yaml
 
 from btc_ema_trader.config import Settings
-from btc_ema_trader.strategy import make_decision
+from btc_ema_trader.strategy import _select_economic_horizon, make_decision
 
 
 def _row(**overrides):
@@ -184,6 +184,63 @@ class StrategyRiskPolicyTests(unittest.TestCase):
             strong.trade_plan["risk_score"],
             weak.trade_plan["risk_score"],
         )
+
+    def test_horizon_rank_uses_stress_cost_and_net_edge(self) -> None:
+        prediction = {
+            "selected_horizon": 3,
+            "continuation": {3: 0.90, 6: 0.60},
+            "tradeability": {3: 0.90, 6: 0.60},
+            "event_returns": {3: 0.0030, 6: 0.0045},
+        }
+        policies = {
+            "3": {"minimum_predicted_stress_edge_bps": 16.0},
+            "6": {"minimum_predicted_stress_edge_bps": 16.0},
+        }
+        expensive = _select_economic_horizon(
+            prediction, {3, 6}, policies, 0.8, stress_cost_bps=25.0
+        )
+        cheap = _select_economic_horizon(
+            prediction, {3, 6}, policies, 0.8, stress_cost_bps=5.0
+        )
+        # 0.6² * (45-25) exceeds 0.9² * (30-25).
+        self.assertEqual(expensive[0], 6)
+        # Lower execution cost reverses the preferred economic horizon.
+        self.assertEqual(cheap[0], 3)
+        self.assertEqual(expensive[3], policies["6"])
+
+    def test_horizon_rank_preserves_negative_edge_fallback(self) -> None:
+        prediction = {
+            "selected_horizon": 3,
+            "continuation": {3: 0.80, 6: 0.55},
+            "tradeability": {3: 0.80, 6: 0.55},
+            "event_returns": {3: 0.0010, 6: 0.0005},
+        }
+        horizon, _, _, _ = _select_economic_horizon(
+            prediction, {3, 6}, {}, 0.7, stress_cost_bps=25.0
+        )
+        self.assertEqual(horizon, 3)
+
+    def test_live_decision_uses_validated_cost_aware_horizon(self) -> None:
+        prediction = _prediction(
+            success=0.90, tradeability=0.90, event_return=0.0030
+        )
+        prediction["continuation"][6] = 0.60
+        prediction["tradeability"][6] = 0.60
+        prediction["event_returns"][6] = 0.0045
+        bundle = _qualified_bundle()
+        bundle.qualification["qualified_directions"]["LONG"] = [3, 6]
+        bundle.qualification["economic_stress_cost_bps"] = 25.0
+        bundle.qualification["economic_policy"]["LONG"]["6"] = {
+            "success_probability": 0.58,
+            "tradeability_probability": 0.56,
+            "minimum_event_score": 0.10,
+            "minimum_predicted_stress_edge_bps": 0.0,
+        }
+        decision = make_decision(_row(), prediction, bundle, self.settings)
+        self.assertEqual(decision.selected_horizon, 6)
+        self.assertEqual(decision.expected_net_edge_bps, 20.0)
+        self.assertEqual(decision.action, "LONG")
+        self.assertEqual(decision.blockers, [])
 
     def test_no_event_is_forecast_only_even_with_high_event_scores(self) -> None:
         decision = make_decision(

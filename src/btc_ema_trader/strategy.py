@@ -111,6 +111,13 @@ def make_decision(
     }
     policy_by_direction = qualification.get("economic_policy", {})
     direction_policies = policy_by_direction.get(direction_name, {})
+    base_costs = execution_cost_breakdown(cfg)
+    stress_cost_bps = float(
+        qualification.get(
+            "economic_stress_cost_bps",
+            base_costs["stress_cost_bps"],
+        )
+    )
 
     selected_horizon, confidence, tradeability_probability, policy = (
         _select_economic_horizon(
@@ -118,6 +125,7 @@ def make_decision(
             qualified_horizons=qualified_horizons,
             policies=direction_policies,
             event_score=event_score,
+            stress_cost_bps=stress_cost_bps,
         )
     )
     event_aligned_return = _mapping_value(
@@ -134,13 +142,6 @@ def make_decision(
         -model_expected_return
         if invert_execution
         else model_expected_return
-    )
-    base_costs = execution_cost_breakdown(cfg)
-    stress_cost_bps = float(
-        qualification.get(
-            "economic_stress_cost_bps",
-            base_costs["stress_cost_bps"],
-        )
     )
     net_edge_bps = event_aligned_return * 10_000.0 - stress_cost_bps
     minimum_edge_bps = float(
@@ -405,6 +406,7 @@ def _select_economic_horizon(
     qualified_horizons: set[int],
     policies: dict[str, Any],
     event_score: float,
+    stress_cost_bps: float,
 ) -> tuple[int, float, float, dict[str, Any]]:
     fallback = int(prediction.get("selected_horizon", 1))
     available: set[int] = set()
@@ -424,6 +426,7 @@ def _select_economic_horizon(
         or [fallback]
     )
     best: tuple[float, int, float, float, dict[str, Any]] | None = None
+    fallback_best: tuple[float, int, float, float, dict[str, Any]] | None = None
     for horizon in candidates:
         policy = policies.get(str(horizon), policies.get(horizon, {}))
         policy = policy if isinstance(policy, dict) else {}
@@ -445,21 +448,43 @@ def _select_economic_horizon(
         edge_floor = float(
             policy.get("minimum_predicted_stress_edge_bps", 0.0)
         )
+        predicted_stress_edge_bps = gross_return * 10_000.0 - stress_cost_bps
+        # Match the economic validator's rank for cost-positive candidates.
+        score = (
+            success
+            * tradeability
+            * max(predicted_stress_edge_bps, 0.0)
+            * (0.5 + max(event_score, 0.0))
+        )
+        candidate = (score, horizon, success, tradeability, policy)
+        if score > 0 and (best is None or score > best[0]):
+            best = candidate
+
+        # Preserve the existing aggressive-policy selection if no horizon
+        # predicts a positive edge. Entry risk flags remain unchanged.
         relative_edge_bps = gross_return * 10_000.0 - edge_floor
         economic_weight = float(
             np.clip(0.75 + relative_edge_bps / 80.0, 0.25, 1.50)
         )
-        score = (
+        fallback_score = (
             success
             * tradeability
             * (0.5 + max(event_score, 0.0))
             * economic_weight
         )
-        candidate = (score, horizon, success, tradeability, policy)
-        if best is None or candidate[0] > best[0]:
-            best = candidate
-    assert best is not None
-    return int(best[1]), float(best[2]), float(best[3]), dict(best[4])
+        fallback_candidate = (
+            fallback_score, horizon, success, tradeability, policy
+        )
+        if fallback_best is None or fallback_score > fallback_best[0]:
+            fallback_best = fallback_candidate
+    selected = best if best is not None else fallback_best
+    assert selected is not None
+    return (
+        int(selected[1]),
+        float(selected[2]),
+        float(selected[3]),
+        dict(selected[4]),
+    )
 
 
 def _risk_assessment(
