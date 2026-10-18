@@ -6,6 +6,7 @@ import numpy as np
 import pandas as pd
 
 from btc_ema_trader.economic_validation import (
+    _evaluate_pair,
     CalibrationMap,
     apply_calibration,
     compare_with_incumbent,
@@ -49,6 +50,35 @@ class EconomicValidationTests(unittest.TestCase):
         }
         result = compare_with_incumbent(candidate, incumbent)
         self.assertEqual(result["decision"], "KEEP_INCUMBENT")
+
+    def test_holdout_does_not_train_on_future_horizon_labels(self) -> None:
+        rows = pd.DataFrame(
+            {
+                "open_time": pd.date_range(
+                    "2020-01-01", periods=900, freq="h", tz="UTC"
+                ),
+                "p_continuation": 0.75,
+                "p_tradeable": 0.75,
+                "actual_continuation": 1,
+                "actual_tradeable": 1,
+                "predicted_event_gross_return": 0.01,
+                "actual_event_net_return": 0.008,
+                "event_score": 0.75,
+            }
+        )
+        for horizon in (3, 6, 12):
+            with self.subTest(horizon=horizon):
+                result = _evaluate_pair(rows, horizon, 14.0, 25.0)
+                split = min(max(int(len(rows) * 0.70), 120), len(rows) - 60)
+                expected_purged = horizon
+                self.assertTrue(result["passed"])
+                self.assertEqual(
+                    result["purged_development_events"], expected_purged
+                )
+                self.assertEqual(
+                    result["development_samples"], split - expected_purged
+                )
+                self.assertEqual(result["holdout_samples"], len(rows) - split)
 
     def test_economic_gate_can_qualify_stable_cost_aware_edge(self) -> None:
         rows = []
