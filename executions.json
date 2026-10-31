@@ -1,0 +1,18 @@
+[
+  {
+    "id": "BUY:2026-10-12T07:12:50+00:00:2026-10-12T07:12:50+00:00",
+    "side": "BUY",
+    "signal_candle": "2026-10-11T00:00:00+00:00",
+    "planned_open_time": "2026-10-12T00:00:00+00:00",
+    "paper_execution_time": "2026-10-12T07:12:50+00:00",
+    "delay_minutes": 432.83,
+    "quantity": 0.0594072991860546,
+    "paper_quote_usd": 84139.5,
+    "modeled_fill_usd": 84164.74184999999,
+    "modeled_fee_usd": 7.5,
+    "reference_open_usd": 83678.29,
+    "status": "MEASURED",
+    "adverse_price_drift_bps": 55.117,
+    "incremental_cost_usd_at_recorded_qty": 27.3992
+  }
+]
