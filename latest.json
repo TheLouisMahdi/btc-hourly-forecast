@@ -1,0 +1,23 @@
+{
+  "time": "2026-10-31T21:57:12+00:00",
+  "candle_time": "2026-10-31T20:00:00+00:00",
+  "run_status": "OK",
+  "strategy": "RSI4H_PULLBACK_BREAKOUT1H_SPOT_V1",
+  "action": "RESYNC",
+  "reason": "MISSED_CANDLES",
+  "price": 77489.35,
+  "cash_usd": 10000.0,
+  "equity_usd": 10000.0,
+  "btc_quantity": 0.0,
+  "hard_stop": null,
+  "features": {
+    "rsi4h": 39.57389,
+    "completed_4h_end": "2026-10-31T20:00:00+00:00",
+    "prior_high12": 77645.12,
+    "entry_setup": null,
+    "regime_long": false
+  },
+  "zone_entries": 0,
+  "completed_trades": 0,
+  "mode": "PAPER_ONLY"
+}
