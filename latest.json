@@ -1,0 +1,21 @@
+{
+  "run_status": "OK",
+  "strategy": "SMA200_DAILY_SPOT_V1",
+  "mode": "PAPER_ONLY",
+  "action": "HOLD",
+  "signal": "LONG",
+  "time": "2026-10-31T06:09:52+00:00",
+  "candle_time": "2026-10-30T00:00:00+00:00",
+  "daily_close": 77180.42,
+  "sma200": 73113.69580000002,
+  "price": 77124.35,
+  "cash_usd": 4992.5,
+  "equity_usd": 9574.249334979992,
+  "btc_quantity": 0.0594072991860546,
+  "closed_trades": 0,
+  "realized_pnl_usd": 0,
+  "missed_days": 0,
+  "fee_bps_per_side": 15.0,
+  "slippage_bps_per_side": 3.0,
+  "allocation_cap": 0.5
+}
